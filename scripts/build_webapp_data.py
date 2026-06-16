@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ANSWERS_DIR = ROOT / "data" / "answers"
 FUNC_DIR = ROOT / "supabase" / "functions" / "ielts-check"
 APP_FUNC_DIR = ROOT / "supabase" / "functions" / "ielts-app"
+BOT_FUNC_DIR = ROOT / "supabase" / "functions" / "ielts-bot"
 DOCS_DIR = ROOT / "docs"
 
 BOOKS = list(range(10, 21))
@@ -50,10 +51,13 @@ def main() -> None:
                 answers[key] = filled
                 answered[key] = sorted(int(q) for q in filled)
 
+    answers_json = json.dumps(answers, ensure_ascii=False)
     FUNC_DIR.mkdir(parents=True, exist_ok=True)
-    (FUNC_DIR / "answers.json").write_text(
-        json.dumps(answers, ensure_ascii=False), encoding="utf-8"
-    )
+    (FUNC_DIR / "answers.json").write_text(answers_json, encoding="utf-8")
+
+    # Telegram bot (webhook) Edge Function ham xuddi shu javob-bazasidan foydalanadi.
+    BOT_FUNC_DIR.mkdir(parents=True, exist_ok=True)
+    (BOT_FUNC_DIR / "answers.json").write_text(answers_json, encoding="utf-8")
 
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     catalog = {"books": BOOKS, "tests": TESTS, "answered": answered}
