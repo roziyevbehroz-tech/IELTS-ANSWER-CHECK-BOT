@@ -11,7 +11,6 @@
 //   SUPABASE_URL               — avtomatik beriladi
 //   SUPABASE_SERVICE_ROLE_KEY  — avtomatik beriladi (statistika yozish uchun)
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import answers from "./answers.json" with { type: "json" };
 
 type AnswerMap = Record<string, Record<string, string>>;
@@ -161,6 +160,49 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+// ---------------------- statistika (fonda, best-effort) ----------------------
+
+interface StatPayload {
+  userId: number;
+  username?: string;
+  firstName?: string;
+  book: number;
+  test: number;
+  section: string;
+  part: string;
+  correct: number;
+  total: number;
+  details: unknown;
+}
+
+// Javob qaytarilgandan KEYIN fonda ishlaydi — foydalanuvchini kutdirmaydi.
+// supabase-js faqat shu yerda (dinamik) yuklanadi, cold-start'ni tezlashtiradi.
+async function recordStats(p: StatPayload): Promise<void> {
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !srk) return;
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const sb = createClient(url, srk);
+    await sb.from("ielts_ac_users").upsert({
+      telegram_id: p.userId,
+      username: p.username,
+      first_name: p.firstName,
+      last_active_at: new Date().toISOString(),
+    }, { onConflict: "telegram_id" });
+    await sb.from("ielts_ac_attempts").insert({
+      telegram_id: p.userId,
+      book: p.book,
+      test: p.test,
+      section: p.section,
+      part: p.part,
+      correct: p.correct,
+      total: p.total,
+      details: p.details,
+    });
+  } catch (_) { /* statistika yozilmasa ham muhim emas */ }
+}
+
 // --------------------------------- main ---------------------------------
 
 Deno.serve(async (req) => {
@@ -206,29 +248,22 @@ Deno.serve(async (req) => {
       else incorrect.push(q);
     }
 
-    // Statistikani yozish (best-effort)
-    try {
-      const url = Deno.env.get("SUPABASE_URL");
-      const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      if (url && srk && auth.userId) {
-        const sb = createClient(url, srk);
-        await sb.from("ielts_ac_users").upsert({
-          telegram_id: auth.userId,
-          username: auth.username,
-          first_name: auth.firstName,
-          last_active_at: new Date().toISOString(),
-        }, { onConflict: "telegram_id" });
-        await sb.from("ielts_ac_attempts").insert({
-          telegram_id: auth.userId,
-          book, test, section, part,
-          correct: correct.length,
-          total,
-          details: { correct, unanswered },
-        });
-      }
-    } catch (_) { /* statistika yozilmasa ham javob qaytariladi */ }
-
-    return json({ correct, unanswered, total, score: correct.length });
+    // Natijani DARROV qaytaramiz; statistikani FONDA yozamiz (javobni kechiktirmaslik uchun).
+    const response = json({ correct, unanswered, total, score: correct.length });
+    if (auth.userId) {
+      const task = recordStats({
+        userId: auth.userId,
+        username: auth.username,
+        firstName: auth.firstName,
+        book, test, section, part,
+        correct: correct.length,
+        total,
+        details: { correct, unanswered },
+      });
+      const er = (globalThis as any).EdgeRuntime;
+      if (er && typeof er.waitUntil === "function") er.waitUntil(task);
+    }
+    return response;
   }
 
   return json({ error: "noma'lum action" }, 400);
