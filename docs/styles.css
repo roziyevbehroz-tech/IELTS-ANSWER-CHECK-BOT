@@ -9,10 +9,12 @@
   --green-bg: #e7f6ee;
   --amber: #e8a33d;
 
-  --bg: var(--tg-theme-bg-color, #f4f5f8);
-  --card: var(--tg-theme-secondary-bg-color, #ffffff);
-  --text: var(--tg-theme-text-color, #14213d);
-  --muted: var(--tg-theme-hint-color, #7a8699);
+  /* Telegram tungi rejimida matn ko'rinmay qolmasligi uchun palitra
+     mavzudan QAT'I NAZAR doimo yorug' (IELTS brendi: oq + navy + qizil). */
+  --bg: #eef1f6;
+  --card: #ffffff;
+  --text: #14213d;
+  --muted: #6b7689;
   --border: rgba(20, 39, 78, 0.10);
   --shadow: 0 6px 20px rgba(20, 39, 78, 0.08);
   --radius: 16px;
@@ -23,6 +25,7 @@
 html, body {
   margin: 0;
   padding: 0;
+  color-scheme: light;            /* tungi rejimda ham yorug' form/elementlar */
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
