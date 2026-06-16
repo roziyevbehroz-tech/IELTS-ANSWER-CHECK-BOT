@@ -1,0 +1,174 @@
+/* IELTS Answer Check — Mini App (IELTS klassik qizil dizayn) */
+
+:root {
+  --ielts-red: #e31837;
+  --ielts-red-dark: #b3122b;
+  --ielts-navy: #14274e;
+  --ielts-navy-2: #1f3a6b;
+  --green: #1aa260;
+  --green-bg: #e7f6ee;
+  --amber: #e8a33d;
+
+  --bg: var(--tg-theme-bg-color, #f4f5f8);
+  --card: var(--tg-theme-secondary-bg-color, #ffffff);
+  --text: var(--tg-theme-text-color, #14213d);
+  --muted: var(--tg-theme-hint-color, #7a8699);
+  --border: rgba(20, 39, 78, 0.10);
+  --shadow: 0 6px 20px rgba(20, 39, 78, 0.08);
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ----- Topbar ----- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(135deg, var(--ielts-red), var(--ielts-red-dark));
+  color: #fff;
+  padding: 14px 18px 16px;
+  box-shadow: 0 4px 14px rgba(227, 24, 55, 0.28);
+}
+.brand { display: flex; align-items: baseline; gap: 8px; }
+.brand-mark {
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 1px;
+}
+.brand-sub { font-size: 13px; opacity: 0.9; font-weight: 500; }
+.crumb { margin-top: 4px; font-size: 13px; opacity: 0.92; min-height: 16px; }
+
+/* ----- Screen ----- */
+.screen { flex: 1; padding: 18px 16px 28px; }
+.section-title { font-size: 15px; font-weight: 700; color: var(--muted); margin: 4px 2px 14px; }
+.hint { color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+/* ----- Grid of choices ----- */
+.grid { display: grid; gap: 12px; }
+.grid.books { grid-template-columns: repeat(3, 1fr); }
+.grid.tests { grid-template-columns: repeat(2, 1fr); }
+.grid.parts { grid-template-columns: repeat(2, 1fr); }
+
+.tile {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 14px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform .08s ease, border-color .15s ease;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.tile:active { transform: scale(0.96); }
+.tile .big { font-size: 24px; font-weight: 800; color: var(--ielts-navy); }
+.tile .small { font-size: 12px; color: var(--muted); }
+.tile.wide { grid-column: 1 / -1; }
+.tile.disabled { opacity: .4; pointer-events: none; }
+
+.tile.section-card {
+  flex-direction: row; justify-content: flex-start; gap: 14px; padding: 18px 18px;
+}
+.tile.section-card .ico { font-size: 26px; }
+.tile.section-card .col { text-align: left; }
+.tile.section-card .col .t { font-weight: 800; font-size: 17px; color: var(--ielts-navy); }
+.tile.section-card .col .d { font-size: 12px; color: var(--muted); }
+
+/* ----- Answer form ----- */
+.form-head {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--shadow);
+}
+.form-head .row { display: flex; justify-content: space-between; align-items: center; }
+.form-head .label { font-weight: 700; color: var(--ielts-navy); }
+.form-head .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+.q-list { display: flex; flex-direction: column; gap: 10px; }
+.q-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 8px 12px;
+}
+.q-num {
+  flex: 0 0 38px; height: 38px; border-radius: 10px;
+  background: var(--ielts-navy); color: #fff; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.q-input {
+  flex: 1; border: none; background: transparent; color: var(--text);
+  font-size: 16px; padding: 8px 4px; outline: none;
+}
+.q-input::placeholder { color: var(--muted); opacity: .6; }
+
+.q-row.correct { border-color: var(--green); background: var(--green-bg); }
+.q-row.correct .q-num { background: var(--green); }
+.q-row.reveal-wrong { border-color: var(--amber); }
+.q-row.reveal-wrong .q-num { background: var(--amber); }
+.q-answer { font-weight: 700; color: var(--green); font-size: 15px; }
+.q-answer.wrong { color: var(--ielts-red-dark); }
+
+/* ----- Buttons ----- */
+.btn {
+  display: block; width: 100%; border: none; border-radius: 14px;
+  padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer;
+  margin-top: 14px;
+}
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: var(--ielts-red); color: #fff; box-shadow: 0 6px 16px rgba(227,24,55,.3); }
+.btn-navy { background: var(--ielts-navy); color: #fff; }
+.btn-ghost { background: transparent; color: var(--ielts-navy); border: 1.5px solid var(--border); }
+
+/* ----- Result ----- */
+.result-card {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 22px 18px; text-align: center; margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+.score-ring {
+  width: 124px; height: 124px; border-radius: 50%; margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  background: conic-gradient(var(--green) var(--pct, 0%), rgba(20,39,78,.10) 0);
+}
+.score-ring .inner {
+  width: 96px; height: 96px; border-radius: 50%; background: var(--card);
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+}
+.score-ring .num { font-size: 26px; font-weight: 800; color: var(--ielts-navy); }
+.score-ring .lbl { font-size: 11px; color: var(--muted); }
+.result-msg { font-size: 15px; color: var(--text); line-height: 1.5; }
+.result-msg strong { color: var(--green); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+.chip {
+  padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  background: var(--green-bg); color: var(--green);
+}
+.chip.muted { background: rgba(20,39,78,.06); color: var(--muted); }
+
+/* ----- Misc ----- */
+.notice {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px; text-align: center; box-shadow: var(--shadow);
+}
+.notice .big-ico { font-size: 40px; }
+.spinner {
+  width: 34px; height: 34px; border: 3px solid rgba(20,39,78,.15);
+  border-top-color: var(--ielts-red); border-radius: 50%;
+  animation: spin .8s linear infinite; margin: 24px auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.fade-in { animation: fade .22s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

@@ -7,7 +7,7 @@ WELCOME = (
     "📌 Bot faqat *to'g'ri* javoblaringizni ko'rsatadi, xato javoblarning "
     "to'g'ri variantini darrov oshkor qilmaydi — toki siz o'zingiz "
     "ustida ishlab, «Javoblarni ko'rish» tugmasini bosmaguningizcha.\n\n"
-    "Boshlash uchun kitobni tanlang:"
+    "✨ Eng qulay tajriba uchun *Mini App*'ni oching, yoki matn orqali tekshiring:"
 )
 
 CHOOSE_BOOK = "📚 Cambridge IELTS Academic — kitobni tanlang:"

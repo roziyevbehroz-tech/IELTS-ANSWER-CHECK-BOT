@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from . import config, texts
 
 
 def _grid(buttons, per_row):
     return [buttons[i : i + per_row] for i in range(0, len(buttons), per_row)]
+
+
+def launcher_keyboard() -> InlineKeyboardMarkup:
+    """Mini App'ni ochuvchi tugma + matnli rejim tugmasi."""
+    rows = []
+    if config.WEBAPP_URL:
+        rows.append([
+            InlineKeyboardButton(
+                "🚀 Mini App'ni ochish",
+                web_app=WebAppInfo(url=config.WEBAPP_URL),
+            )
+        ])
+    rows.append([InlineKeyboardButton("⌨️ Matn orqali tekshirish", callback_data="nav:books")])
+    return InlineKeyboardMarkup(rows)
 
 
 def books_keyboard() -> InlineKeyboardMarkup:
