@@ -394,7 +394,7 @@
       tg.ready();
       tg.expand();
       try { tg.setHeaderColor && tg.setHeaderColor("#e31837"); } catch (e) {}
-      try { tg.setBackgroundColor && tg.setBackgroundColor("bg_color"); } catch (e) {}
+      try { tg.setBackgroundColor && tg.setBackgroundColor("#eef1f6"); } catch (e) {}
     }
     if (tg && !tg.initData) {
       errorScreen("Iltimos ushbu ilovani <b>Telegram bot</b> orqali oching.", null);
