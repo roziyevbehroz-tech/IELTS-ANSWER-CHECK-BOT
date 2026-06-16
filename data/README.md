@@ -74,3 +74,31 @@ TRUE/FALSE/NOT GIVEN va YES/NO/NOT GIVEN uchun bot qisqartmalarni ham qabul qila
 
 Faqat kerakli qismlarni to'ldirsangiz ham bo'ladi — masalan bugun faqat
 14-kitob Test 4 Listening Part 3 ni to'ldirib, qolganini keyin qo'shasiz.
+
+## Excel'dan ommaviy import
+
+Javoblar `data/source/IELTS_answer_data.xlsx` faylidan import qilingan.
+Excel formati: `Book | Test | Type | 1 | 2 | ... | 40` (har qator — bitta
+kitob/test/bo'lim uchun 40 ta javob, `Type` = Listening yoki Reading).
+
+Qayta import qilish:
+
+```bash
+python scripts/import_from_excel.py data/source/IELTS_answer_data.xlsx
+```
+
+Skript avtomatik:
+- `True`/`False` → `TRUE`/`FALSE`, sonlarni (`2020.0` → `2020`) to'g'rilaydi;
+- har bir kitob ichida testlarni `1..4` ga qayta raqamlaydi (mas. Cambridge 12
+  Excel'da "Test 5–8" deb belgilangan → bot uchun Test 1–4).
+
+### Hozircha manbada yetishmayotgan javoblar
+
+Quyidagi kataklar Excel manbasining o'zida bo'sh edi (bot ularni tekshirmaydi,
+qolgan savollarni tekshiraveradi). Keyinroq to'ldirib qo'ysangiz bo'ladi:
+
+| Kitob | Test | Bo'lim | Savol |
+|-------|------|--------|-------|
+| 16 | 4 | Reading | 40 |
+| 18 | 2 | Reading | 40 |
+| 18 | 4 | Reading | 40 |
