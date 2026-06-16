@@ -10,6 +10,12 @@ load_dotenv()
 # Telegram
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 
+# Mini App (Telegram WebApp) manzili — GitHub Pages'da joylashgan frontend.
+WEBAPP_URL = os.getenv(
+    "WEBAPP_URL",
+    "https://roziyevbehroz-tech.github.io/IELTS-ANSWER-CHECK-BOT/",
+).strip()
+
 # Supabase (ixtiyoriy — bo'lmasa bot baza-siz ishlaydi)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY = (

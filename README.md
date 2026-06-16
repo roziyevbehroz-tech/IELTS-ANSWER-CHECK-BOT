@@ -9,8 +9,16 @@ xato javoblarning to'g'ri variantini darrov oshkor qilmaydi. O'quvchi xatolari
 ustida yana ishlaydi va tayyor bo'lganda «🔑 Javoblarni ko'rish» tugmasi orqali
 barcha to'g'ri javoblarni ko'radi.
 
+## ✨ Telegram Mini App
+
+Botda chiroyli **Mini App** (IELTS qizil dizayn) ham bor — kitob/test/qism
+tanlash va javob tekshirish endi qulay web-interfeysda. Tekshirish server
+tomonida (Supabase Edge Function) bo'ladi, javoblar brauzerga chiqmaydi.
+To'liq sozlash: [`MINIAPP.md`](MINIAPP.md).
+
 ## Imkoniyatlar
 
+- 📱 Telegram Mini App (WebApp) + klassik matnli bot rejimi
 - 📚 11 ta kitob (Cambridge IELTS Academic 10–20), har birida 4 ta test
 - 🎧 Listening (Part 1–4) va 📖 Reading (Passage 1–3) — yoki to'liq test (1–40)
 - ✅ Faqat to'g'ri javoblar ko'rsatiladi, xatolar yashiriladi

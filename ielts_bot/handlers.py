@@ -50,7 +50,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     name = update.effective_user.first_name if update.effective_user else "do'stim"
     await update.message.reply_text(
         texts.WELCOME.format(name=name),
-        reply_markup=keyboards.books_keyboard(),
+        reply_markup=keyboards.launcher_keyboard(),
         parse_mode=ParseMode.MARKDOWN,
     )
 
