@@ -6,22 +6,22 @@
 
 import { PAGE } from "./page.ts";
 
-const HTML_HEADERS = {
-  "Content-Type": "text/html; charset=utf-8",
-  "Access-Control-Allow-Origin": "*",
-  "Cache-Control": "public, max-age=60",
-};
+function corsHeaders(): Headers {
+  const h = new Headers();
+  h.set("access-control-allow-origin", "*");
+  h.set("access-control-allow-headers", "*");
+  h.set("access-control-allow-methods", "GET, OPTIONS");
+  return h;
+}
 
 Deno.serve((req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-      },
-    });
+    return new Response("ok", { headers: corsHeaders() });
   }
-  // Har qanday GET so'rovga to'liq sahifani qaytaramiz.
-  return new Response(PAGE, { headers: HTML_HEADERS });
+
+  // HTML sahifani aniq text/html sifatida qaytaramiz (brauzer render qilishi uchun).
+  const headers = corsHeaders();
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.set("x-content-type-options", "nosniff");
+  return new Response(PAGE, { status: 200, headers });
 });
