@@ -10,10 +10,11 @@ load_dotenv()
 # Telegram
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 
-# Mini App (Telegram WebApp) manzili — GitHub Pages'da joylashgan frontend.
+# Mini App (Telegram WebApp) manzili — Supabase Edge Function (ielts-app)
+# orqali tarqatiladi (GitHub Pages kerak emas, repo private bo'lsa ham ishlaydi).
 WEBAPP_URL = os.getenv(
     "WEBAPP_URL",
-    "https://roziyevbehroz-tech.github.io/IELTS-ANSWER-CHECK-BOT/",
+    "https://zanhdkzevinioaudgdgi.supabase.co/functions/v1/ielts-app",
 ).strip()
 
 # Supabase (ixtiyoriy — bo'lmasa bot baza-siz ishlaydi)

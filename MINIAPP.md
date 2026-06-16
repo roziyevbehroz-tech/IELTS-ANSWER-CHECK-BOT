@@ -7,21 +7,28 @@ varianti faqat «🔑 Javoblarni ko'rish» bosilganda ochiladi.
 
 ## Arxitektura
 
+Frontend ham, API ham **Supabase Edge Functions**'da — GitHub Pages kerak emas,
+repo **private** bo'lsa ham ishlaydi.
+
 ```
-Telegram bot  ──(WebApp tugma)──►  Mini App (GitHub Pages, docs/)
-                                        │  fetch + initData
-                                        ▼
-                          Supabase Edge Function  (ielts-check)
+Telegram bot ──(WebApp tugma)──► ielts-app (Edge Function)  ← Mini App frontendi
+                                     │  inline HTML/CSS/JS qaytaradi
+                                     ▼
+                                 (brauzer) ──fetch + initData──►
+                          ielts-check (Edge Function)
                           • initData'ni HMAC bilan tasdiqlaydi (BOT_TOKEN)
                           • javoblarni SERVERda tekshiradi (answers.json)
                           • faqat to'g'ri raqamlarni qaytaradi
                           • urinishni ielts_ac_attempts ga yozadi
 ```
 
-- **Frontend** (`docs/`): `index.html`, `styles.css`, `app.js`, `config.js`,
-  `catalog.js`. Katalogda faqat savol raqamlari bor — **javoblar yo'q**.
-- **Backend** (`supabase/functions/ielts-check/`): `index.ts` + `answers.json`
-  (to'liq javoblar faqat serverda).
+- **Frontend** — `supabase/functions/ielts-app/` (`index.ts` + `page.ts`).
+  `page.ts` `docs/` dagi HTML/CSS/JS dan avtomatik generatsiya qilinadi (barchasi
+  bitta sahifaga inline). Katalogda faqat savol raqamlari bor — **javoblar yo'q**.
+- **Backend** — `supabase/functions/ielts-check/` (`index.ts` + `answers.json`).
+  To'liq javoblar **faqat shu yerda**, brauzerga chiqmaydi.
+- `docs/` papkasi manba sifatida saqlanadi (GitHub Pages'da ham ishlatsa bo'ladi,
+  lekin shart emas).
 
 ## 1. Edge Function'ni deploy qilish
 
@@ -52,49 +59,57 @@ Skript: javob-bazasini generatsiya qiladi, loyihaga ulanadi, `BOT_TOKEN`
 secret'ini o'rnatadi va funksiyani `--no-verify-jwt` bilan deploy qiladi
 (ilova o'zi initData orqali himoyalangani uchun).
 
-Yoki qo'lda:
+Yoki qo'lda (ikkala funksiya):
 
 ```bash
 python scripts/build_webapp_data.py
 supabase link --project-ref zanhdkzevinioaudgdgi
 supabase secrets set BOT_TOKEN=123456:ABC...
-supabase functions deploy ielts-check --no-verify-jwt
+supabase functions deploy ielts-check --no-verify-jwt   # tekshiruvchi API
+supabase functions deploy ielts-app   --no-verify-jwt   # Mini App frontendi
 ```
 
-Endpoint: `https://zanhdkzevinioaudgdgi.supabase.co/functions/v1/ielts-check`
+Manzillar:
+- API:      `https://zanhdkzevinioaudgdgi.supabase.co/functions/v1/ielts-check`
+- Mini App: `https://zanhdkzevinioaudgdgi.supabase.co/functions/v1/ielts-app`
 
-> `docs/config.js` dagi `apiUrl` shu endpointga to'g'ri kelishi kerak.
+> `docs/config.js` dagi `apiUrl` API endpointiga to'g'ri kelishi kerak.
 
-## 2. Frontend'ni GitHub Pages'da yoqish
+## 2. Mini App URL (GitHub Pages SHART EMAS)
 
-1. GitHub repo → **Settings → Pages**.
-2. **Source**: `Deploy from a branch`.
-3. **Branch**: `main`, **Folder**: `/docs` → **Save**.
-4. Bir-ikki daqiqada manzil tayyor bo'ladi:
-   `https://roziyevbehroz-tech.github.io/IELTS-ANSWER-CHECK-BOT/`
+Frontend `ielts-app` funksiyasi orqali beriladi, shuning uchun GitHub Pages
+kerak emas (repo private bo'lsa ham ishlaydi). Mini App manzili:
+
+```
+https://zanhdkzevinioaudgdgi.supabase.co/functions/v1/ielts-app
+```
+
+> Agar GitHub Pages'dan foydalanmoqchi bo'lsangiz (repo public + Pro plan):
+> Settings → Pages → Source `main` / `/docs`. Lekin tavsiya — Supabase URL.
 
 ## 3. Botda Mini App'ni ulash
 
-`.env` ga qo'shing:
+`.env` ga (Python botni ishlatsangiz):
 
 ```
-WEBAPP_URL=https://roziyevbehroz-tech.github.io/IELTS-ANSWER-CHECK-BOT/
+WEBAPP_URL=https://zanhdkzevinioaudgdgi.supabase.co/functions/v1/ielts-app
 ```
 
-So'ng (ixtiyoriy, lekin tavsiya etiladi) BotFather'da Mini App'ni ro'yxatdan
-o'tkazing: `/newapp` → botni tanlang → Web App URL sifatida yuqoridagi manzil.
-Shunda foydalanuvchilar bot menyusi tugmasidan ham ochishlari mumkin.
+BotFather'da menyu tugmasi: **@BotFather → /mybots → bot → Bot Settings →
+Menu Button** → URL sifatida yuqoridagi Mini App manzilini kiriting (yoki
+`/newapp`). Shunda Python botsiz ham Mini App ochiladi.
 
-Bot `/start` bosilganda «🚀 Mini App'ni ochish» tugmasi chiqadi.
+Bot `/start` bosilganda «🚀 Mini App'ni ochish» tugmasi ham chiqadi.
 
 ## Ma'lumotni yangilash
 
 Javoblar `data/answers/*.json` da o'zgartirilsa:
 
 ```bash
-python scripts/build_webapp_data.py      # catalog.js + answers.json yangilanadi
-supabase functions deploy ielts-check --no-verify-jwt   # serverni yangilash
-git add docs/catalog.js && git commit && git push        # frontend katalogi
+python scripts/build_webapp_data.py                     # answers.json + catalog + page.ts
+supabase functions deploy ielts-check --no-verify-jwt   # API
+supabase functions deploy ielts-app   --no-verify-jwt   # frontend (yangi catalog)
+git add -A && git commit && git push                    # CI bo'lsa avtomatik deploy
 ```
 
 ## Xavfsizlik
