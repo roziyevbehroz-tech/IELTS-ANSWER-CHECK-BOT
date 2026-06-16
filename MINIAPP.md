@@ -25,6 +25,22 @@ Telegram bot  ──(WebApp tugma)──►  Mini App (GitHub Pages, docs/)
 
 ## 1. Edge Function'ni deploy qilish
 
+### Variant A — Avtomatik (GitHub Actions, tavsiya etiladi)
+
+Repoda `.github/workflows/deploy-edge-function.yml` bor — `main`ga har push'da
+funksiyani o'zi deploy qiladi. Bir martalik sozlash:
+
+1. **Supabase Access Token:** Supabase → hisob menyusi → **Access Tokens** →
+   *Generate new token* → nusxa oling.
+2. **GitHub secret:** repo → **Settings → Secrets and variables → Actions** →
+   **New repository secret** → Name: `SUPABASE_ACCESS_TOKEN`, Value: yuqoridagi token.
+3. Tayyor. Workflow'ni qo'lda ham ishga tushirish mumkin: **Actions → Deploy
+   Edge Function → Run workflow**.
+
+> `BOT_TOKEN` bu yerga emas — u **Supabase Edge Function Secrets**'da turadi.
+
+### Variant B — Qo'lda (Supabase CLI)
+
 [Supabase CLI](https://supabase.com/docs/guides/cli) orqali:
 
 ```bash
