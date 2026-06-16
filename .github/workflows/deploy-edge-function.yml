@@ -50,3 +50,7 @@ jobs:
           supabase functions deploy ielts-app \
             --project-ref "$PROJECT_REF" \
             --no-verify-jwt
+          # Telegram bot (webhook handler)
+          supabase functions deploy ielts-bot \
+            --project-ref "$PROJECT_REF" \
+            --no-verify-jwt
