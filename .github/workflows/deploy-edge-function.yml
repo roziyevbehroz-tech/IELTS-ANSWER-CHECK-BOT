@@ -11,6 +11,7 @@ on:
     paths:
       - "supabase/functions/**"
       - "data/answers/**"
+      - "docs/**"
       - "scripts/build_webapp_data.py"
       - ".github/workflows/deploy-edge-function.yml"
   workflow_dispatch: {}
@@ -35,12 +36,17 @@ jobs:
         with:
           version: latest
 
-      - name: Edge Function'ni deploy qilish
+      - name: Edge Function'larni deploy qilish
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
             echo "::error::SUPABASE_ACCESS_TOKEN secret topilmadi. Repo Settings → Secrets → Actions ga qo'shing."
             exit 1
           fi
+          # Tekshiruvchi API (javoblar serverda)
           supabase functions deploy ielts-check \
+            --project-ref "$PROJECT_REF" \
+            --no-verify-jwt
+          # Mini App frontend (inline statik sahifa)
+          supabase functions deploy ielts-app \
             --project-ref "$PROJECT_REF" \
             --no-verify-jwt
