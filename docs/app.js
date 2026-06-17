@@ -9,7 +9,7 @@
   var screenEl = document.getElementById("screen");
   var crumbEl = document.getElementById("crumb");
 
-  var state = { book: null, test: null, section: null, part: null, answers: {}, lastResult: null };
+  var state = { mode: "book", book: null, test: null, section: null, part: null, answers: {}, lastResult: null, ct: null };
 
   var SECTIONS = {
     listening: {
@@ -90,11 +90,19 @@
   // ------------------------------ screens ------------------------------
 
   function screenBooks() {
+    state.mode = "book";
     state.book = state.test = state.section = state.part = null;
     clearBack();
     hideMain();
     setCrumb([]);
     var wrap = el("div");
+    var bar = el("div", "home-bar");
+    var pBtn = el("button", "chip-btn", "👤 Mening testlarim");
+    pBtn.onclick = function () { haptic(); screenProfile(); };
+    var cBtn = el("button", "chip-btn primary", "➕ Test yaratish");
+    cBtn.onclick = function () { haptic(); screenCreate(); };
+    bar.appendChild(pBtn); bar.appendChild(cBtn);
+    wrap.appendChild(bar);
     wrap.appendChild(el("div", "section-title", "Kitobni tanlang"));
     var grid = el("div", "grid books");
     CAT.books.forEach(function (b) {
@@ -295,15 +303,20 @@
   function submitCheck(answers) {
     hideMain(); clearBack();
     loading("Javoblar tekshirilmoqda…");
-    api({
-      action: "check", book: state.book, test: state.test,
-      section: state.section, part: state.part, answers: answers,
-    }).then(function (res) {
+    var payload = (state.mode === "custom")
+      ? { action: "ct_check", id: state.ct.id, answers: answers }
+      : {
+          action: "check", book: state.book, test: state.test,
+          section: state.section, part: state.part, answers: answers,
+        };
+    api(payload).then(function (res) {
       state.lastResult = res;
       state.revealMap = null;
       screenResult(res);
     }).catch(function (e) {
-      errorScreen(e.message, function () { screenAnswers(answers); });
+      errorScreen(e.message, function () {
+        if (state.mode === "custom") screenCustomAnswers(answers); else screenAnswers(answers);
+      });
     });
   }
 
@@ -351,10 +364,10 @@
   // To'g'ri javoblarni serverdan bir marta olib, keshlaymiz (foydalanuvchi so' raganda).
   function ensureReveal() {
     if (state.revealMap) return Promise.resolve(state.revealMap);
-    return api({
-      action: "reveal", book: state.book, test: state.test,
-      section: state.section, part: state.part,
-    }).then(function (res) {
+    var payload = (state.mode === "custom")
+      ? { action: "ct_reveal", id: state.ct.id }
+      : { action: "reveal", book: state.book, test: state.test, section: state.section, part: state.part };
+    return api(payload).then(function (res) {
       var m = {};
       (res.answers || []).forEach(function (it) { m[it.q] = it.answer; });
       state.revealMap = m;
@@ -379,8 +392,14 @@
   }
 
   function screenResult(res) {
-    clearBack(); setBack(screenParts); hideMain();
-    var qs = questionsInRange(state.book, state.test, state.section, state.part);
+    clearBack();
+    setBack(state.mode === "custom"
+      ? function () { screenCustomAnswers(state.answers); }
+      : screenParts);
+    hideMain();
+    var qs = (state.mode === "custom" && state.ct)
+      ? state.ct.qnums.slice()
+      : questionsInRange(state.book, state.test, state.section, state.part);
     var total = res.total || qs.length;
     var correct = (res.correct || []).length;
     var pct = total ? Math.round((correct / total) * 100) : 0;
@@ -521,6 +540,259 @@
   }
 
 
+  // ============== Foydalanuvchi testlari: profil / yaratish / boshqaruv ==============
+
+  function popup(msg) { if (tg && tg.showPopup) tg.showPopup({ message: msg }); else alert(msg); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmtDate(s) {
+    try { var d = new Date(s); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+    catch (e) { return s; }
+  }
+  function isoIn(hours) { return new Date(Date.now() + hours * 3600 * 1000).toISOString(); }
+  function shareLink(id) { return "https://t.me/" + (CFG.botUsername || "") + "?start=t_" + id; }
+
+  function statusBadge(st) {
+    var map = { active: ["Faol", "b-active"], paused: ["To'xtatilgan", "b-paused"], closed: ["Yakunlangan", "b-closed"] };
+    var m = map[st] || map.active;
+    return el("span", "badge " + m[1], m[0]);
+  }
+
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch (e) {}
+  }
+  function copyText(text, btn) {
+    function done() { if (btn) { var o = btn.textContent; btn.textContent = "✅ Nusxalandi"; setTimeout(function () { btn.textContent = o; }, 1500); } }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text); done(); });
+        return;
+      }
+    } catch (e) {}
+    legacyCopy(text); done();
+  }
+  function confirmThen(msg, fn) {
+    if (tg && tg.showConfirm) tg.showConfirm(msg, function (ok) { if (ok) fn(); });
+    else if (confirm(msg)) fn();
+  }
+
+  // O'quvchi: test javoblarini kiritish
+  function screenCustomAnswers(prefill) {
+    state.mode = "custom";
+    clearBack(); setBack(null);
+    var qs = state.ct.qnums;
+    setCrumb([state.ct.title]);
+    var wrap = el("div");
+    var head = el("div", "form-head");
+    var row = el("div", "row");
+    row.appendChild(el("div", "label", state.ct.title));
+    row.appendChild(el("div", "meta", qs.length + " ta savol"));
+    head.appendChild(row);
+    head.appendChild(el("div", "meta", "Javoblaringizni kiriting. Faqat to'g'rilari ko'rsatiladi."));
+    wrap.appendChild(head);
+
+    var listWrap = el("div", "q-list");
+    var inputs = {};
+    qs.forEach(function (q) {
+      var qr = el("div", "q-row");
+      qr.appendChild(el("div", "q-num", String(q)));
+      var inp = el("input", "q-input"); inp.type = "text";
+      inp.setAttribute("autocomplete", "off"); inp.setAttribute("autocapitalize", "off");
+      inp.placeholder = "javob…";
+      if (prefill && prefill[q] != null) inp.value = prefill[q];
+      inputs[q] = inp; qr.appendChild(inp); listWrap.appendChild(qr);
+    });
+    wrap.appendChild(listWrap);
+    show(wrap);
+
+    setupMain("✅ Tekshirish", function () {
+      var a = {};
+      Object.keys(inputs).forEach(function (q) { var v = inputs[q].value.trim(); if (v) a[q] = v; });
+      if (Object.keys(a).length === 0) { popup("Iltimos kamida bitta javob kiriting."); return; }
+      state.answers = a; submitCheck(a);
+    });
+  }
+
+  // Profil: mening testlarim
+  function screenProfile() {
+    state.mode = "book";
+    clearBack(); setBack(screenBooks); hideMain();
+    setCrumb(["Mening testlarim"]);
+    loading("Yuklanmoqda…");
+    api({ action: "ct_list" }).then(function (res) {
+      var wrap = el("div");
+      var create = el("button", "btn btn-primary", "➕ Yangi test yaratish");
+      create.onclick = function () { haptic(); screenCreate(); };
+      wrap.appendChild(create);
+      var tests = res.tests || [];
+      if (!tests.length) {
+        var n = el("div", "notice");
+        n.appendChild(el("div", "big-ico", "📝"));
+        n.appendChild(el("div", "", "<p>Hali test yaratmagansiz. Yuqoridagi tugma orqali birinchi testingizni yarating.</p>"));
+        wrap.appendChild(n);
+      } else {
+        wrap.appendChild(el("div", "section-title", "Mening testlarim (" + tests.length + ")"));
+        var list = el("div", "q-list");
+        tests.forEach(function (t) {
+          var card = el("div", "ct-card");
+          var top = el("div", "ct-top");
+          top.appendChild(el("div", "ct-title", esc(t.title)));
+          top.appendChild(statusBadge(t.status));
+          card.appendChild(top);
+          card.appendChild(el("div", "ct-meta", t.total + " savol · 👥 " + t.students + " o'quvchi · " + t.submissions + " urinish"));
+          card.onclick = function () { haptic(); screenManage(t.id); };
+          list.appendChild(card);
+        });
+        wrap.appendChild(list);
+      }
+      show(wrap);
+    }).catch(function (e) { errorScreen(e.message, screenProfile); });
+  }
+
+  // Yangi test yaratish
+  function screenCreate() {
+    state.mode = "book";
+    clearBack(); setBack(screenProfile); hideMain();
+    setCrumb(["Yangi test"]);
+    var wrap = el("div");
+    var head = el("div", "form-head");
+    head.appendChild(el("div", "label", "Yangi test yaratish"));
+    head.appendChild(el("div", "meta", "Test nomi va har bir savol uchun to'g'ri javobni kiriting."));
+    wrap.appendChild(head);
+
+    var titleInp = el("input", "q-input title-input"); titleInp.type = "text";
+    titleInp.placeholder = "Test nomi (masalan: Unit 5 Vocabulary)";
+    var titleBox = el("div", "q-row"); titleBox.appendChild(titleInp);
+    wrap.appendChild(titleBox);
+
+    wrap.appendChild(el("div", "section-title", "To'g'ri javoblar"));
+    var listWrap = el("div", "q-list");
+    var rows = [];
+    function addRow() {
+      var idx = rows.length + 1;
+      var qr = el("div", "q-row");
+      qr.appendChild(el("div", "q-num", String(idx)));
+      var inp = el("input", "q-input"); inp.type = "text"; inp.setAttribute("autocapitalize", "off");
+      inp.placeholder = "to'g'ri javob…";
+      qr.appendChild(inp); listWrap.appendChild(qr); rows.push(inp);
+    }
+    for (var i = 0; i < 10; i++) addRow();
+    wrap.appendChild(listWrap);
+    var addBtn = el("button", "btn btn-ghost", "➕ Yana savol qo'shish");
+    addBtn.onclick = function () { haptic(); addRow(); };
+    wrap.appendChild(addBtn);
+    show(wrap);
+
+    setupMain("✅ Testni yaratish", function () {
+      var answers = {};
+      rows.forEach(function (inp, i) { var v = inp.value.trim(); if (v) answers[i + 1] = v; });
+      if (Object.keys(answers).length === 0) { popup("Kamida bitta javob kiriting."); return; }
+      hideMain(); loading("Test yaratilmoqda…");
+      api({ action: "ct_create", title: titleInp.value.trim(), answers: answers }).then(function (res) {
+        screenShare(res.id, titleInp.value.trim() || "Nomsiz test", res.total);
+      }).catch(function (e) { errorScreen(e.message, screenCreate); });
+    });
+  }
+
+  function screenShare(id, title, total) {
+    state.mode = "book";
+    clearBack(); setBack(screenProfile); hideMain();
+    setCrumb(["Test tayyor"]);
+    var link = shareLink(id);
+    var wrap = el("div");
+    var n = el("div", "notice");
+    n.appendChild(el("div", "big-ico", "✅"));
+    n.appendChild(el("div", "", "<p><b>" + esc(title) + "</b> yaratildi!<br>" + total + " ta savol</p>"));
+    wrap.appendChild(n);
+    wrap.appendChild(el("div", "section-title", "Ulashish havolasi"));
+    wrap.appendChild(el("div", "link-box", esc(link)));
+    var copyBtn = el("button", "btn btn-primary", "📋 Havolani nusxalash");
+    copyBtn.onclick = function () { haptic(); copyText(link, copyBtn); };
+    wrap.appendChild(copyBtn);
+    var shareBtn = el("button", "btn btn-navy", "📤 Telegram orqali ulashish");
+    shareBtn.onclick = function () {
+      haptic();
+      var u = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(title);
+      if (tg && tg.openTelegramLink) tg.openTelegramLink(u); else window.open(u, "_blank");
+    };
+    wrap.appendChild(shareBtn);
+    var manageBtn = el("button", "btn btn-ghost", "🛠 Boshqarish va statistika");
+    manageBtn.onclick = function () { haptic(); screenManage(id); };
+    wrap.appendChild(manageBtn);
+    show(wrap);
+  }
+
+  function mngBtn(label, fn) { var b = el("button", "ctrl-btn", label); b.onclick = function () { haptic(); fn(); }; return b; }
+  function manage(id, op, closesAt) {
+    loading("Bajarilmoqda…");
+    api({ action: "ct_manage", id: id, op: op, closesAt: closesAt })
+      .then(function () { screenManage(id); })
+      .catch(function (e) { errorScreen(e.message, function () { screenManage(id); }); });
+  }
+
+  function screenManage(id) {
+    state.mode = "book";
+    clearBack(); setBack(screenProfile); hideMain();
+    setCrumb(["Boshqaruv"]);
+    loading("Yuklanmoqda…");
+    api({ action: "ct_stats", id: id }).then(function (res) {
+      var wrap = el("div");
+      var head = el("div", "form-head");
+      var row = el("div", "row");
+      row.appendChild(el("div", "label", esc(res.title)));
+      row.appendChild(statusBadge(res.status));
+      head.appendChild(row);
+      head.appendChild(el("div", "meta", res.total + " savol · 👥 " + res.students.length + " o'quvchi · " + res.totalAttempts + " urinish"));
+      if (res.closesAt) head.appendChild(el("div", "meta", "⏱ Muddat: " + fmtDate(res.closesAt)));
+      wrap.appendChild(head);
+
+      var link = shareLink(id);
+      wrap.appendChild(el("div", "link-box", esc(link)));
+      var copyBtn = el("button", "btn btn-ghost", "📋 Havolani nusxalash");
+      copyBtn.onclick = function () { haptic(); copyText(link, copyBtn); };
+      wrap.appendChild(copyBtn);
+
+      wrap.appendChild(el("div", "section-title", "Boshqaruv"));
+      var ctrls = el("div", "ctrl-grid");
+      if (res.status === "active") ctrls.appendChild(mngBtn("⏸ To'xtatib turish", function () { manage(id, "pause"); }));
+      else if (res.status === "paused") ctrls.appendChild(mngBtn("▶️ Davom ettirish", function () { manage(id, "resume"); }));
+      if (res.status !== "closed") {
+        ctrls.appendChild(mngBtn("🔒 Yakunlash", function () { confirmThen("Testni butunlay yakunlaysizmi?", function () { manage(id, "close"); }); }));
+        ctrls.appendChild(mngBtn("⏱ 1 kun muddat", function () { manage(id, "deadline", isoIn(24)); }));
+        ctrls.appendChild(mngBtn("⏱ 1 hafta muddat", function () { manage(id, "deadline", isoIn(24 * 7)); }));
+      } else {
+        ctrls.appendChild(mngBtn("♻️ Qayta faollashtirish", function () { manage(id, "resume"); }));
+      }
+      wrap.appendChild(ctrls);
+
+      wrap.appendChild(el("div", "section-title", "O'quvchilar natijasi"));
+      if (!res.students.length) {
+        wrap.appendChild(el("div", "hint", "Hali javob berilmagan."));
+      } else {
+        var list = el("div", "q-list");
+        res.students.sort(function (a, b) { return b.best - a.best; }).forEach(function (s) {
+          var r = el("div", "stat-row");
+          var col = el("div", "stat-col");
+          col.appendChild(el("div", "stat-name", esc(s.name) + (s.username ? " <span class='muted-txt'>@" + esc(s.username) + "</span>" : "")));
+          col.appendChild(el("div", "stat-meta", fmtDate(s.last) + " · " + s.attempts + " urinish"));
+          r.appendChild(col);
+          r.appendChild(el("div", "stat-score", s.best + "/" + s.total));
+          list.appendChild(r);
+        });
+        wrap.appendChild(list);
+      }
+
+      var back = el("button", "btn btn-ghost", "⬅️ Mening testlarim");
+      back.onclick = function () { haptic(); screenProfile(); };
+      wrap.appendChild(back);
+      show(wrap);
+    }).catch(function (e) { errorScreen(e.message, function () { screenManage(id); }); });
+  }
+
   // -------------------------------- init --------------------------------
 
   // Telegram WebView uzoq vaqt fonда qolsa qotib qolishi mumkin — ilova
@@ -551,7 +823,31 @@
       errorScreen("Iltimos ushbu ilovani <b>Telegram bot</b> orqali oching.", null);
       return;
     }
+
+    // Deep-link: foydalanuvchi testi (?ct=ID yoki startapp=ct_ID)
+    var ctId = null;
+    try { ctId = new URLSearchParams(location.search).get("ct"); } catch (e) {}
+    if (!ctId && tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+      var sp = tg.initDataUnsafe.start_param;
+      if (sp.indexOf("ct_") === 0) ctId = sp.slice(3);
+    }
+    if (ctId) { openCustomTest(ctId); return; }
+
     screenBooks();
+  }
+
+  function openCustomTest(id) {
+    loading("Test yuklanmoqda…");
+    api({ action: "ct_meta", id: id }).then(function (m) {
+      if (m.status !== "active") {
+        errorScreen(m.status === "paused"
+          ? "⏸️ Bu test vaqtincha to'xtatilgan."
+          : "🔒 Bu test yakunlangan.", null);
+        return;
+      }
+      state.mode = "custom"; state.ct = m; state.answers = {};
+      screenCustomAnswers({});
+    }).catch(function (e) { errorScreen(e.message || "Test topilmadi.", null); });
   }
 
   init();

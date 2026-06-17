@@ -401,8 +401,57 @@ function bg(task: Promise<unknown>) {
   else task.catch(() => {});
 }
 
+function ctStatus(t: any): string {
+  if (!t) return "closed";
+  if (t.status === "closed") return "closed";
+  if (t.closes_at && Date.parse(t.closes_at) < Date.now()) return "closed";
+  return t.status;
+}
+
+async function getCustomTest(id: string): Promise<any | null> {
+  try {
+    const c = await sb();
+    if (!c) return null;
+    const { data } = await c.from("ielts_ac_custom_tests")
+      .select("id,title,answers,status,closes_at,owner_name").eq("id", id).maybeSingle();
+    return data || null;
+  } catch (_) { return null; }
+}
+
+function customTestKb(id: string) {
+  var sep = WEBAPP_URL.indexOf("?") >= 0 ? "&" : "?";
+  return { inline_keyboard: [[{ text: "🚀 Testni boshlash", web_app: { url: WEBAPP_URL + sep + "ct=" + id } }]] };
+}
+
+async function handleOpenCustom(chatId: number, from: any, id: string) {
+  bg(upsertUser(from));
+  const t = await getCustomTest(id);
+  if (!t) { await sendMessage(chatId, "❌ Test topilmadi yoki o'chirilgan."); return; }
+  const total = Object.keys(t.answers || {}).length;
+  const st = ctStatus(t);
+  if (st === "closed") {
+    await sendMessage(chatId, `🔒 *${t.title}*\n\nBu test yakunlangan — hozir javob qabul qilinmaydi.`);
+    return;
+  }
+  if (st === "paused") {
+    await sendMessage(chatId, `⏸️ *${t.title}*\n\nBu test vaqtincha to'xtatilgan. Keyinroq urinib ko'ring.`);
+    return;
+  }
+  const who = t.owner_name ? `\nYaratuvchi: ${t.owner_name}` : "";
+  await sendMessage(chatId,
+    `📝 *${t.title}*\n\n${total} ta savol · DREAM ZONE${who}\n\n` +
+    "Javoblaringizni kiritib darrov tekshiring — faqat to'g'rilari ko'rsatiladi.\n\n" +
+    "Boshlash uchun quyidagi tugmani bosing 👇",
+    customTestKb(id));
+}
+
 async function handleCommand(chatId: number, from: any, text: string) {
-  const cmd = text.split(/\s+/)[0].replace(/@.*$/, "");
+  const segs = text.split(/\s+/);
+  const cmd = segs[0].replace(/@.*$/, "");
+  const param = segs[1] || "";
+  if (cmd === "/start" && param.indexOf("t_") === 0) {
+    return await handleOpenCustom(chatId, from, param.slice(2));
+  }
   if (cmd === "/start") {
     bg(upsertUser(from));
     bg(setSession(from.id, { awaiting: false }));
