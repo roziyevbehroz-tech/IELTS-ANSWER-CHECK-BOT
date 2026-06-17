@@ -162,40 +162,35 @@ function partLabel(section: string, part: string): string {
 }
 
 const WELCOME = (name: string) =>
-  "🎓 *IELTS Answer Check Bot*\n\n" +
-  `Assalomu alaykum, *${name}*! Bu bot Cambridge IELTS Academic ` +
-  "kitoblarining javob kalitlari bo'yicha tekshiruv o'tkazadi.\n\n" +
-  "━━━━━━━━━━━━━━━━━━━\n\n" +
-  "📚 *Qamrab olingan kitoblar:*\n" +
-  "Cambridge IELTS Academic *10–20* (11 ta kitob)\n" +
-  "Har birida 4 ta to'liq test · Listening + Reading\n" +
-  "Jami: *44 ta test, 3 520+ savol*\n\n" +
-  "🔒 *Asosiy xususiyat:*\n" +
-  "Bot faqat *to'g'ri* javoblarni ko'rsatadi. Xato javoblarning " +
-  "to'g'ri varianti «🔑 Ko'rish» tugmasi bosilgunicha yashirinib " +
-  "turadi — bu sizga mustaqil fikrlash va xatolaringiz ustida ishlash " +
-  "imkonini beradi.\n\n" +
-  "━━━━━━━━━━━━━━━━━━━\n\n" +
-  "📖 *Qo'llanma:*\n\n" +
-  "1️⃣ Kitob → Test → Listening/Reading → Part/Passage\n" +
-  "2️⃣ O'sha qismni mustaqil yeching\n" +
-  "3️⃣ Javoblarni raqami bilan yuboring:\n" +
-  "`1. cat`\n`2. TRUE`\n`3. B`\n" +
-  "4️⃣ Bot *faqat to'g'ri* javoblarni ko'rsatadi\n" +
-  "5️⃣ Xatolar ustida yana ishlang, qayta yuboring\n" +
-  "6️⃣ Barcha javoblar tayyor bo'lganda — «🔑 Ko'rish»\n\n" +
-  "━━━━━━━━━━━━━━━━━━━\n\n" +
-  "✨ Eng qulay tajriba uchun *Mini App*'ni oching:";
+  `👋 Assalomu alaykum, *${name}*!\n\n` +
+  "*DREAM ZONE* IELTS yordamchisiga xush kelibsiz 🎓\n\n" +
+  "Listening va Reading javoblaringizni bir zumda tekshirib beraman — " +
+  "boshlash uchun quyidagi tugmani bosing 👇";
 
-const HELP =
-  "ℹ️ *Yordam*\n\n" +
-  "1. /start — kitob, test, bo'lim va qismni tanlang.\n" +
-  "2. O'sha qismni o'zingiz yeching.\n" +
-  "3. Javoblarni raqami bilan botga yuboring (masalan `21. cat`).\n" +
-  "4. Bot faqat *to'g'ri* javoblaringizni ko'rsatadi.\n" +
-  "5. Xatolaringiz ustida ishlab, qayta yuboring.\n" +
-  "6. Tayyor bo'lganingizda «🔑 Javoblarni ko'rish» tugmasini bosing.\n\n" +
-  "Buyruqlar: /start, /help, /stats";
+const WELCOME_HINT =
+  "\n\nℹ️ Bot haqida — /about\n📖 Qo'llanma — /guide";
+
+const ABOUT =
+  "🎓 *DREAM ZONE — IELTS yordamchisi*\n\n" +
+  "Men *DREAM ZONE* o'quv markazi o'quvchilari uchun yaratilganman 💙\n\n" +
+  "Cambridge IELTS Academic 10–20 kitoblaridagi Listening va Reading " +
+  "testlarini tekshiraman — jami 44 ta to'liq test.\n\n" +
+  "Eng muhimi: men *faqat to'g'ri* javoblaringizni ko'rsataman. Xato " +
+  "javoblarning to'g'ri variantini darrov ochib qo'ymayman — siz ular " +
+  "ustida o'zingiz ishlaysiz, tayyor bo'lganingizda esa o'zingiz ko'rasiz.\n\n" +
+  "📖 Qanday foydalanish — /guide";
+
+const GUIDE =
+  "📖 *Qanday foydalanaman?*\n\n" +
+  "1. Mini App'ni oching yoki «Matn orqali tekshirish»ni tanlang.\n" +
+  "2. Kitob, test va bo'limni tanlang.\n" +
+  "3. O'sha qismni mustaqil yeching.\n" +
+  "4. Javoblaringizni raqami bilan yuboring, masalan:\n" +
+  "`1. cat`\n`2. TRUE`\n`3. B`\n" +
+  "5. Men faqat to'g'rilarini belgilab beraman.\n" +
+  "6. Xatolar ustida ishlang va qayta yuboring.\n" +
+  "7. Tayyor bo'lsangiz — «🔑 Javoblarni ko'rish».\n\n" +
+  "Savolingiz bo'lsa, *DREAM ZONE* ustozlaringizga murojaat qiling 💙";
 
 const PART_NOT_AVAILABLE =
   "⚠️ Afsuski, bu qism uchun javoblar hali bazaga kiritilmagan.\n" +
@@ -412,9 +407,11 @@ async function handleCommand(chatId: number, from: any, text: string) {
     bg(upsertUser(from));
     bg(setSession(from.id, { awaiting: false }));
     const name = from.first_name || "do'stim";
-    await sendMessage(chatId, WELCOME(name), launcherKb());
-  } else if (cmd === "/help") {
-    await sendMessage(chatId, HELP);
+    await sendMessage(chatId, WELCOME(name) + WELCOME_HINT, launcherKb());
+  } else if (cmd === "/about") {
+    await sendMessage(chatId, ABOUT);
+  } else if (cmd === "/guide" || cmd === "/help") {
+    await sendMessage(chatId, GUIDE);
   } else if (cmd === "/stats") {
     await sendStats(chatId, from.id);
   } else {
@@ -620,6 +617,15 @@ Deno.serve(async (req) => {
       secret_token: secret,
       allowed_updates: ["message", "callback_query"],
       drop_pending_updates: true,
+    });
+    // Telegram buyruqlar menyusi (qulay tugmalar).
+    await tg("setMyCommands", {
+      commands: [
+        { command: "start", description: "Boshlash" },
+        { command: "about", description: "Bot haqida" },
+        { command: "guide", description: "Qo'llanma" },
+        { command: "stats", description: "Mening natijalarim" },
+      ],
     });
     const info = await tg("getWebhookInfo", {});
     const okMsg = set.ok
