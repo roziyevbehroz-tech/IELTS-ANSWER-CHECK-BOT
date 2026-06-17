@@ -313,10 +313,11 @@ async function handleCustom(body: any, auth: any): Promise<Response> {
     }
     const total = qs.length;
     const response = json({ correct, unanswered, total, score: correct.length });
+    const elapsed = Math.max(0, Math.min(86400, Number(body.elapsed) || 0));
     const task = dbInsert("ielts_ac_custom_submissions", {
       test_id: t.id, telegram_id: auth.userId, username: auth.username ?? null,
       first_name: auth.firstName ?? null, score: correct.length, total,
-      details: { correct, unanswered },
+      details: { correct, unanswered, elapsed },
     }).catch(() => {});
     const er = (globalThis as any).EdgeRuntime;
     if (er && typeof er.waitUntil === "function") er.waitUntil(task);
@@ -349,12 +350,16 @@ async function handleCustom(body: any, auth: any): Promise<Response> {
     const t = await fetchTest(String(body.id));
     if (!t) return json({ error: "Test topilmadi." }, 404);
     if (Number(t.owner_id) !== auth.userId) return json({ error: "Ruxsat yo'q." }, 403);
-    const subs = await dbGet(`ielts_ac_custom_submissions?test_id=eq.${encodeURIComponent(t.id)}&select=telegram_id,username,first_name,score,total,created_at&order=created_at.desc`);
+    const subs = await dbGet(`ielts_ac_custom_submissions?test_id=eq.${encodeURIComponent(t.id)}&select=telegram_id,username,first_name,score,total,details,created_at&order=created_at.desc`);
     const byUser: Record<string, any> = {};
     for (const s of subs) {
       const k = String(s.telegram_id);
       if (!byUser[k]) {
-        byUser[k] = { name: s.first_name || s.username || ("ID " + s.telegram_id), username: s.username, best: s.score, total: s.total, attempts: 0, last: s.created_at };
+        byUser[k] = {
+          name: s.first_name || s.username || ("ID " + s.telegram_id), username: s.username,
+          best: s.score, total: s.total, attempts: 0, last: s.created_at,
+          time: (s.details && s.details.elapsed) || 0,
+        };
       }
       byUser[k].attempts++;
       if (s.score > byUser[k].best) byUser[k].best = s.score;

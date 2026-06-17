@@ -188,6 +188,7 @@
 
   function screenAnswers(prefill) {
     clearBack(); setBack(screenParts);
+    if (!prefill) state.answerStart = Date.now();
     var s = SECTIONS[state.section];
     var qs = questionsInRange(state.book, state.test, state.section, state.part);
     setCrumb(["Cambridge " + state.book, "Test " + state.test, s.label, partLabel()]);
@@ -303,8 +304,9 @@
   function submitCheck(answers) {
     hideMain(); clearBack();
     loading("Javoblar tekshirilmoqda…");
+    state.lastElapsed = state.answerStart ? Math.round((Date.now() - state.answerStart) / 1000) : 0;
     var payload = (state.mode === "custom")
-      ? { action: "ct_check", id: state.ct.id, answers: answers }
+      ? { action: "ct_check", id: state.ct.id, answers: answers, elapsed: state.lastElapsed }
       : {
           action: "check", book: state.book, test: state.test,
           section: state.section, part: state.part, answers: answers,
@@ -421,6 +423,7 @@
     ring.appendChild(inner);
     card.appendChild(ring);
     card.appendChild(el("div", "result-msg", resultMessage(correct, total)));
+    if (state.lastElapsed) card.appendChild(el("div", "time-line", "⏱ Sarflangan vaqt: " + fmtDur(state.lastElapsed)));
     if (hasWrong) card.appendChild(el("div", "edit-hint",
       "✏️ Xato javoblarni shu yerda tuzatib, «🔄 Qayta tekshirish»ni bosing."));
     wrap.appendChild(card);
@@ -548,6 +551,7 @@
 
   function popup(msg) { if (tg && tg.showPopup) tg.showPopup({ message: msg }); else alert(msg); }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmtDur(sec) { sec = Math.max(0, sec | 0); var m = Math.floor(sec / 60), s = sec % 60; return m + ":" + (s < 10 ? "0" : "") + s; }
   function fmtDate(s) {
     try { var d = new Date(s); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
     catch (e) { return s; }
@@ -588,6 +592,7 @@
   function screenCustomAnswers(prefill) {
     state.mode = "custom";
     clearBack(); setBack(null);
+    if (!prefill || Object.keys(prefill).length === 0) state.answerStart = Date.now();
     var qs = state.ct.qnums;
     setCrumb([state.ct.title]);
     var wrap = el("div");
@@ -812,7 +817,7 @@
           var r = el("div", "stat-row");
           var col = el("div", "stat-col");
           col.appendChild(el("div", "stat-name", esc(s.name) + (s.username ? " <span class='muted-txt'>@" + esc(s.username) + "</span>" : "")));
-          col.appendChild(el("div", "stat-meta", fmtDate(s.last) + " · " + s.attempts + " urinish"));
+          col.appendChild(el("div", "stat-meta", fmtDate(s.last) + " · " + s.attempts + " urinish" + (s.time ? " · ⏱ " + fmtDur(s.time) : "")));
           r.appendChild(col);
           r.appendChild(el("div", "stat-score", s.best + "/" + s.total));
           list.appendChild(r);
