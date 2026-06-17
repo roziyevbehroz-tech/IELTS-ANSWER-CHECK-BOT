@@ -597,18 +597,37 @@ Deno.serve(async (req) => {
   if (!BOT_TOKEN) return new Response("BOT_TOKEN yo'q", { status: 500 });
   const url = new URL(req.url);
 
+  // Funksiyaning ommaviy manzili. req.url ba'zan ichki host beradi, shuning uchun
+  // loyihaning SUPABASE_URL muhit o'zgaruvchisidan quramiz (eng ishonchli).
+  function publicHookUrl(): string {
+    const base = (Deno.env.get("SUPABASE_URL") ?? url.origin).replace(/\/+$/, "");
+    return `${base}/functions/v1/ielts-bot`;
+  }
+
+  // Webhook holatini ko'rish (debug): GET ?info=1
+  if (req.method === "GET" && url.searchParams.has("info")) {
+    const r = await tg("getWebhookInfo", {});
+    return new Response(JSON.stringify(r, null, 2),
+      { status: 200, headers: { "content-type": "application/json; charset=utf-8" } });
+  }
+
   // Bir martalik sozlash: webhook'ni ro'yxatdan o'tkazish.
   if (req.method === "GET" && url.searchParams.has("setup")) {
-    const hookUrl = `${url.origin}${url.pathname}`;
+    const hookUrl = publicHookUrl();
     const secret = await webhookSecret();
-    const r = await tg("setWebhook", {
+    const set = await tg("setWebhook", {
       url: hookUrl,
       secret_token: secret,
       allowed_updates: ["message", "callback_query"],
       drop_pending_updates: true,
     });
+    const info = await tg("getWebhookInfo", {});
+    const okMsg = set.ok
+      ? "✅ Webhook muvaffaqiyatli sozlandi! Endi botga /start yuboring."
+      : "❌ Webhook sozlanmadi. Quyidagi xatoga qarang.";
     return new Response(
-      `Webhook sozlandi: ${JSON.stringify(r)}\nURL: ${hookUrl}`,
+      `${okMsg}\n\nsetWebhook: ${JSON.stringify(set)}\nURL: ${hookUrl}\n\n` +
+      `getWebhookInfo: ${JSON.stringify(info.result ?? info)}`,
       { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } },
     );
   }
