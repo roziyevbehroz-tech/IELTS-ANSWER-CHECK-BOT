@@ -216,6 +216,15 @@ body::before {
 .ans-row.revealed .ans-correct { max-height: 90px; opacity: 1; margin-top: 5px; }
 .corr-label { color: var(--muted); font-weight: 600; font-size: 12px; }
 
+/* Joyida tuzatiladigan javob maydoni */
+.ans-input {
+  width: 100%; padding: 6px 2px;
+  border-bottom: 1.5px dashed rgba(26,160,240,.55);
+  border-radius: 0; font-weight: 600;
+}
+.ans-input:focus { border-bottom-color: var(--dz-blue); }
+.edit-hint { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+
 .ans-status { flex: 0 0 28px; display: flex; align-items: center; justify-content: center; }
 .mini-spin {
   width: 18px; height: 18px; border: 2px solid rgba(26,160,240,.25);
