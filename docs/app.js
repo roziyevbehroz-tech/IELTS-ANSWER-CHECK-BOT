@@ -371,6 +371,10 @@
     var total = res.total || qs.length;
     var correct = (res.correct || []).length;
     var pct = total ? Math.round((correct / total) * 100) : 0;
+    var hasWrong = false;
+    for (var wi = 0; wi < qs.length; wi++) {
+      if (statusOf(qs[wi], res) !== "correct") { hasWrong = true; break; }
+    }
 
     var wrap = el("div");
 
@@ -385,11 +389,14 @@
     ring.appendChild(inner);
     card.appendChild(ring);
     card.appendChild(el("div", "result-msg", resultMessage(correct, total)));
+    if (hasWrong) card.appendChild(el("div", "edit-hint",
+      "✏️ Xato javoblarni shu yerda tuzatib, «🔄 Qayta tekshirish»ni bosing."));
     wrap.appendChild(card);
 
     // ----- Javoblar ro'yxati (animatsion) -----
     var list = el("div", "q-list ans-list");
     var rows = {};
+    var inputs = {};
     qs.forEach(function (q, i) {
       var st = statusOf(q, res);
       var row = el("div", "ans-row st-" + st);
@@ -399,8 +406,20 @@
 
       var body = el("div", "ans-body");
       var ua = state.answers[q];
-      body.appendChild(el("div", "ans-user",
-        ua ? esc(ua) : "<span class='muted-txt'>— javob yo'q</span>"));
+      if (st === "correct") {
+        // To'g'ri javob — qulflangan (qayta yozish shart emas)
+        body.appendChild(el("div", "ans-user", esc(ua != null ? ua : "")));
+      } else {
+        // Xato yoki bo'sh — shu yerda tuzatish mumkin
+        var input = el("input", "q-input ans-input");
+        input.type = "text";
+        input.setAttribute("autocomplete", "off");
+        input.setAttribute("autocapitalize", "off");
+        input.placeholder = "javobni tuzating…";
+        if (ua != null) input.value = ua;
+        body.appendChild(input);
+        inputs[q] = input;
+      }
       var corr = el("div", "ans-correct");
       body.appendChild(corr);
       row.appendChild(body);
@@ -433,6 +452,22 @@
     wrap.appendChild(list);
 
     // ----- Tugmalar -----
+    if (hasWrong) {
+      var recheck = el("button", "btn btn-primary", "🔄 Qayta tekshirish");
+      recheck.onclick = function () {
+        haptic();
+        var merged = {};
+        Object.keys(state.answers).forEach(function (k) { merged[k] = state.answers[k]; });
+        Object.keys(inputs).forEach(function (k) {
+          var v = inputs[k].value.trim();
+          if (v) merged[k] = v; else delete merged[k];
+        });
+        state.answers = merged;
+        submitCheck(merged);
+      };
+      wrap.appendChild(recheck);
+    }
+
     var revealAllBtn = el("button", "btn btn-navy", "👁 Barcha to'g'ri javoblarni ko'rsatish");
     revealAllBtn.onclick = function () {
       haptic("medium");
@@ -449,10 +484,6 @@
       });
     };
     wrap.appendChild(revealAllBtn);
-
-    var retry = el("button", "btn btn-primary", "🔁 Xatolarni tuzatib qayta yuborish");
-    retry.onclick = function () { haptic(); screenAnswers(state.answers); };
-    wrap.appendChild(retry);
 
     var home = el("button", "btn btn-ghost", "🏠 Bosh menyu");
     home.onclick = function () { haptic(); screenBooks(); };
