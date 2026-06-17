@@ -650,6 +650,16 @@ Deno.serve(async (req) => {
     return `${base}/functions/v1/ielts-bot`;
   }
 
+  // Keep-alive: loyihani faol ushlab turish uchun yengil DB so'rovi (GET ?ping=1)
+  if (req.method === "GET" && url.searchParams.has("ping")) {
+    let dbState = "skip";
+    try {
+      const c = await sb();
+      if (c) { await c.from("ielts_ac_users").select("telegram_id").limit(1); dbState = "ok"; }
+    } catch (_) { dbState = "err"; }
+    return new Response("pong " + dbState, { status: 200 });
+  }
+
   // Webhook holatini ko'rish (debug): GET ?info=1
   if (req.method === "GET" && url.searchParams.has("info")) {
     const r = await tg("getWebhookInfo", {});

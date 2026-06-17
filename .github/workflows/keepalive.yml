@@ -1,0 +1,25 @@
+name: Keep Supabase Alive
+
+# Supabase bepul rejasi 7 kun faolsizlikdan keyin loyihani pauza qiladi.
+# Bu workflow har kuni loyihaga yengil so'rov yuboradi (Edge Function + DB),
+# shunda loyiha hech qachon pauza bo'lmaydi. Hech qanday secret kerak emas.
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # har kuni 06:17 UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping ielts-bot (Edge Function + DB)
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /tmp/out -w "%{http_code}" --max-time 30 \
+              "https://zanhdkzevinioaudgdgi.supabase.co/functions/v1/ielts-bot?ping=1" || echo "000")
+            echo "Attempt $i -> HTTP $code, body: $(cat /tmp/out 2>/dev/null)"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "::warning::Ping muvaffaqiyatsiz (loyiha pauza bo'lgan bo'lishi mumkin)."
