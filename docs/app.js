@@ -235,7 +235,7 @@
   function setupMain(text, onClick) {
     if (!tg || !tg.MainButton) return;
     var mb = tg.MainButton;
-    mb.setParams({ text: text, color: "#e31837", text_color: "#ffffff" });
+    mb.setParams({ text: text, color: "#1aa0f0", text_color: "#ffffff" });
     if (state._main) mb.offClick(state._main);
     state._main = onClick;
     mb.onClick(onClick);
@@ -393,8 +393,8 @@
     if (tg) {
       tg.ready();
       tg.expand();
-      try { tg.setHeaderColor && tg.setHeaderColor("#e31837"); } catch (e) {}
-      try { tg.setBackgroundColor && tg.setBackgroundColor("#eef1f6"); } catch (e) {}
+      try { tg.setHeaderColor && tg.setHeaderColor("#1aa0f0"); } catch (e) {}
+      try { tg.setBackgroundColor && tg.setBackgroundColor("#eaf3fb"); } catch (e) {}
     }
     if (tg && !tg.initData) {
       errorScreen("Iltimos ushbu ilovani <b>Telegram bot</b> orqali oching.", null);
