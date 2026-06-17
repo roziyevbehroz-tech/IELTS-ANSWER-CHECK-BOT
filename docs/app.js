@@ -287,105 +287,195 @@
       section: state.section, part: state.part, answers: answers,
     }).then(function (res) {
       state.lastResult = res;
+      state.revealMap = null;
       screenResult(res);
     }).catch(function (e) {
       errorScreen(e.message, function () { screenAnswers(answers); });
     });
   }
 
+  // HTML-escape (foydalanuvchi matni / javoblar xavfsiz ko'rsatilishi uchun)
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function statusOf(q, res) {
+    var ok = (res.correct || []).indexOf(q) !== -1;
+    if (ok) return "correct";
+    var na = (res.unanswered || []).indexOf(q) !== -1;
+    if (na) return "unanswered";
+    return "wrong";
+  }
+
+  function statusIcon(st) {
+    if (st === "correct") return el("span", "ic ic-ok", "✓");
+    if (st === "wrong") return el("span", "ic ic-no", "✕");
+    return el("span", "ic ic-na", "–");
+  }
+
+  function resultMessage(correct, total) {
+    if (total > 0 && correct === total) return "🎉 Barakalla! Hammasi to'g'ri — <strong>" + total + "/" + total + "</strong>!";
+    if (correct === 0) return "Hozircha to'g'ri javob yo'q. Xafa bo'lmang, qayta urinib ko'ring 💪";
+    return "<strong>" + correct + " ta</strong> to'g'ri. Qolganlari ustida ishlang yoki javobni ko'ring.";
+  }
+
+  function animateRing(ring, numEl, correct, total, pct) {
+    var dur = 750, start = null;
+    function step(ts) {
+      if (!start) start = ts;
+      var p = Math.min(1, (ts - start) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      ring.style.setProperty("--pct", (pct * e) + "%");
+      numEl.textContent = Math.round(correct * e) + "/" + total;
+      if (p < 1) requestAnimationFrame(step);
+      else { ring.style.setProperty("--pct", pct + "%"); numEl.textContent = correct + "/" + total; }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // To'g'ri javoblarni serverdan bir marta olib, keshlaymiz (foydalanuvchi so' raganda).
+  function ensureReveal() {
+    if (state.revealMap) return Promise.resolve(state.revealMap);
+    return api({
+      action: "reveal", book: state.book, test: state.test,
+      section: state.section, part: state.part,
+    }).then(function (res) {
+      var m = {};
+      (res.answers || []).forEach(function (it) { m[it.q] = it.answer; });
+      state.revealMap = m;
+      return m;
+    });
+  }
+
+  function confetti() {
+    try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
+    var colors = ["#1aa0f0", "#0e7bc4", "#1aa260", "#e8a33d", "#ffffff"];
+    var c = el("div", "confetti");
+    for (var i = 0; i < 44; i++) {
+      var p = el("span");
+      p.style.left = Math.random() * 100 + "%";
+      p.style.background = colors[i % colors.length];
+      p.style.animationDelay = (Math.random() * 0.35) + "s";
+      p.style.width = (6 + Math.random() * 6) + "px";
+      c.appendChild(p);
+    }
+    document.body.appendChild(c);
+    setTimeout(function () { if (c.parentNode) c.parentNode.removeChild(c); }, 2800);
+  }
+
   function screenResult(res) {
-    clearBack(); setBack(screenParts);
-    var total = res.total || 0;
+    clearBack(); setBack(screenParts); hideMain();
+    var qs = questionsInRange(state.book, state.test, state.section, state.part);
+    var total = res.total || qs.length;
     var correct = (res.correct || []).length;
     var pct = total ? Math.round((correct / total) * 100) : 0;
 
     var wrap = el("div");
+
+    // ----- Ball kartasi -----
     var card = el("div", "result-card");
     var ring = el("div", "score-ring");
-    ring.style.setProperty("--pct", pct + "%");
+    ring.style.setProperty("--pct", "0%");
     var inner = el("div", "inner");
-    inner.appendChild(el("div", "num", correct + "/" + total));
+    var numEl = el("div", "num", "0/" + total);
+    inner.appendChild(numEl);
     inner.appendChild(el("div", "lbl", "to'g'ri"));
     ring.appendChild(inner);
     card.appendChild(ring);
-
-    var msg;
-    if (correct === total && total > 0) {
-      msg = "🎉 Barakalla! Hammasi to'g'ri — <strong>" + total + "/" + total + "</strong>!";
-    } else if (correct === 0) {
-      msg = "Hozircha to'g'ri javob yo'q. Xafa bo'lmang, qayta urinib ko'ring 💪";
-    } else {
-      msg = "<strong>" + correct + " ta</strong> javob to'g'ri. Qolganlari ustida ishlang.";
-    }
-    card.appendChild(el("div", "result-msg", msg));
-
-    if ((res.correct || []).length) {
-      var chips = el("div", "chips");
-      res.correct.forEach(function (q) { chips.appendChild(el("span", "chip", String(q))); });
-      card.appendChild(chips);
-    }
-    if ((res.unanswered || []).length) {
-      var u = el("div", "chips");
-      res.unanswered.forEach(function (q) { u.appendChild(el("span", "chip muted", String(q))); });
-      card.appendChild(el("div", "hint", "<div style='margin-top:10px'>Javob bermaganlar:</div>"));
-      card.appendChild(u);
-    }
+    card.appendChild(el("div", "result-msg", resultMessage(correct, total)));
     wrap.appendChild(card);
+
+    // ----- Javoblar ro'yxati (animatsion) -----
+    var list = el("div", "q-list ans-list");
+    var rows = {};
+    qs.forEach(function (q, i) {
+      var st = statusOf(q, res);
+      var row = el("div", "ans-row st-" + st);
+      row.style.animationDelay = (i * 70) + "ms";
+
+      row.appendChild(el("div", "q-num", String(q)));
+
+      var body = el("div", "ans-body");
+      var ua = state.answers[q];
+      body.appendChild(el("div", "ans-user",
+        ua ? esc(ua) : "<span class='muted-txt'>— javob yo'q</span>"));
+      var corr = el("div", "ans-correct");
+      body.appendChild(corr);
+      row.appendChild(body);
+
+      var status = el("div", "ans-status");
+      status.appendChild(el("span", "mini-spin"));
+      row.appendChild(status);
+
+      var eye = el("button", "eye-btn", "👁");
+      eye.setAttribute("aria-label", "Javobni ko'rsatish");
+      row.appendChild(eye);
+
+      function revealThis() {
+        if (row.classList.contains("revealed")) return;
+        eye.classList.add("loading");
+        ensureReveal().then(function (m) {
+          eye.classList.remove("loading");
+          var ans = (m[q] != null) ? m[q] : "—";
+          corr.innerHTML = "<span class='corr-label'>To'g'ri javob:</span> " + esc(ans);
+          row.classList.add("revealed");
+          eye.classList.add("hidden");
+          haptic("light");
+        }).catch(function () { eye.classList.remove("loading"); });
+      }
+      eye.onclick = function () { haptic(); revealThis(); };
+
+      list.appendChild(row);
+      rows[q] = { row: row, status: status, st: st, reveal: revealThis };
+    });
+    wrap.appendChild(list);
+
+    // ----- Tugmalar -----
+    var revealAllBtn = el("button", "btn btn-navy", "👁 Barcha to'g'ri javoblarni ko'rsatish");
+    revealAllBtn.onclick = function () {
+      haptic("medium");
+      revealAllBtn.disabled = true;
+      revealAllBtn.textContent = "Yuklanmoqda…";
+      ensureReveal().then(function () {
+        revealAllBtn.classList.add("hidden");
+        qs.forEach(function (q, i) {
+          setTimeout(function () { rows[q].reveal(); }, i * 80);
+        });
+      }).catch(function () {
+        revealAllBtn.disabled = false;
+        revealAllBtn.textContent = "👁 Barcha to'g'ri javoblarni ko'rsatish";
+      });
+    };
+    wrap.appendChild(revealAllBtn);
 
     var retry = el("button", "btn btn-primary", "🔁 Xatolarni tuzatib qayta yuborish");
     retry.onclick = function () { haptic(); screenAnswers(state.answers); };
     wrap.appendChild(retry);
 
-    var reveal = el("button", "btn btn-navy", "🔑 To'g'ri javoblarni ko'rish");
-    reveal.onclick = function () { haptic("medium"); submitReveal(); };
-    wrap.appendChild(reveal);
-
     var home = el("button", "btn btn-ghost", "🏠 Bosh menyu");
     home.onclick = function () { haptic(); screenBooks(); };
     wrap.appendChild(home);
 
-    hideMain();
     show(wrap);
-  }
 
-  function submitReveal() {
-    loading("Javoblar yuklanmoqda…");
-    api({
-      action: "reveal", book: state.book, test: state.test,
-      section: state.section, part: state.part,
-    }).then(function (res) {
-      screenReveal(res);
-    }).catch(function (e) {
-      errorScreen(e.message, function () { screenResult(state.lastResult); });
+    // ----- Animatsiyalar: ball + navbatma-navbat ✓/✕ -----
+    animateRing(ring, numEl, correct, total, pct);
+    qs.forEach(function (q, i) {
+      setTimeout(function () {
+        var r = rows[q];
+        r.status.innerHTML = "";
+        r.status.appendChild(statusIcon(r.st));
+        r.row.classList.add("resolved");
+        haptic("light");
+      }, 500 + i * 150);
     });
+    if (total > 0 && correct === total) {
+      setTimeout(confetti, 600 + qs.length * 150);
+    }
   }
 
-  function screenReveal(res) {
-    clearBack(); setBack(function () { screenResult(state.lastResult); });
-    var correctSet = {};
-    (state.lastResult && state.lastResult.correct || []).forEach(function (q) { correctSet[q] = true; });
-
-    var wrap = el("div");
-    wrap.appendChild(el("div", "section-title", "To'g'ri javoblar"));
-    var list = el("div", "q-list");
-    (res.answers || []).forEach(function (item) {
-      var mine = correctSet[item.q];
-      var qr = el("div", "q-row " + (mine ? "correct" : "reveal-wrong"));
-      qr.appendChild(el("div", "q-num", String(item.q)));
-      var ans = el("div", "q-answer" + (mine ? "" : " wrong"), item.answer);
-      ans.style.flex = "1";
-      qr.appendChild(ans);
-      qr.appendChild(el("div", "small", mine ? "✓ siz topdingiz" : ""));
-      list.appendChild(qr);
-    });
-    wrap.appendChild(list);
-
-    var home = el("button", "btn btn-primary", "🏠 Bosh menyu");
-    home.onclick = function () { haptic(); screenBooks(); };
-    wrap.appendChild(home);
-    hideMain();
-    show(wrap);
-  }
 
   // -------------------------------- init --------------------------------
 
