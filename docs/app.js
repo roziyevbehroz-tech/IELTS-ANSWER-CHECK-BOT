@@ -247,15 +247,25 @@
 
   function api(payload) {
     payload.initData = tg ? tg.initData : "";
+    var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 15000) : null;
     return fetch(CFG.apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: ctrl ? ctrl.signal : undefined,
     }).then(function (r) {
+      if (timer) clearTimeout(timer);
       return r.json().then(function (j) {
         if (!r.ok) throw new Error(j.error || ("Xato " + r.status));
         return j;
       });
+    }).catch(function (e) {
+      if (timer) clearTimeout(timer);
+      if (e && e.name === "AbortError") {
+        throw new Error("Internet javob bermadi. Qayta urinib ko'ring.");
+      }
+      throw e;
     });
   }
 
@@ -273,9 +283,12 @@
     n.appendChild(el("div", "big-ico", "⚠️"));
     n.appendChild(el("div", "", "<p>" + message + "</p>"));
     w.appendChild(n);
-    var b = el("button", "btn btn-navy", "Qaytadan");
+    var b = el("button", "btn btn-primary", "Qaytadan urinish");
     b.onclick = retry || screenBooks;
     w.appendChild(b);
+    var rl = el("button", "btn btn-ghost", "🔄 Ilovani yangilash");
+    rl.onclick = function () { try { location.reload(); } catch (e) {} };
+    w.appendChild(rl);
     show(w);
   }
 
@@ -510,6 +523,14 @@
 
   // -------------------------------- init --------------------------------
 
+  // Telegram WebView uzoq vaqt fonда qolsa qotib qolishi mumkin — ilova
+  // qaytganda qayta tayyorlanadi (ready/expand). Bu freeze'larni kamaytiradi.
+  function resume() {
+    if (!tg) return;
+    try { tg.ready(); } catch (e) {}
+    try { tg.expand(); } catch (e) {}
+  }
+
   function init() {
     if (tg) {
       tg.ready();
@@ -517,6 +538,15 @@
       try { tg.setHeaderColor && tg.setHeaderColor("#1aa0f0"); } catch (e) {}
       try { tg.setBackgroundColor && tg.setBackgroundColor("#eaf3fb"); } catch (e) {}
     }
+
+    // Ilova fonдан qaytganда qayta jonlantirish (qotishni kamaytirish uchun).
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) resume();
+    });
+    window.addEventListener("focus", resume);
+    window.addEventListener("pageshow", resume);
+    if (tg && tg.onEvent) { try { tg.onEvent("activated", resume); } catch (e) {} }
+
     if (tg && !tg.initData) {
       errorScreen("Iltimos ushbu ilovani <b>Telegram bot</b> orqali oching.", null);
       return;
