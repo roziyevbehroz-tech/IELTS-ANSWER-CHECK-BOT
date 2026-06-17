@@ -627,12 +627,20 @@ Deno.serve(async (req) => {
         { command: "stats", description: "Mening natijalarim" },
       ],
     });
+    // Pastdagi doimiy "Menyu" tugmasi Mini App'ni ochsin.
+    let menu: any = { ok: false, description: "WEBAPP_URL yo'q" };
+    if (WEBAPP_URL) {
+      menu = await tg("setChatMenuButton", {
+        menu_button: { type: "web_app", text: "Mini App", web_app: { url: WEBAPP_URL } },
+      });
+    }
     const info = await tg("getWebhookInfo", {});
     const okMsg = set.ok
       ? "✅ Webhook muvaffaqiyatli sozlandi! Endi botga /start yuboring."
       : "❌ Webhook sozlanmadi. Quyidagi xatoga qarang.";
     return new Response(
-      `${okMsg}\n\nsetWebhook: ${JSON.stringify(set)}\nURL: ${hookUrl}\n\n` +
+      `${okMsg}\n\nsetWebhook: ${JSON.stringify(set)}\n` +
+      `menuButton (Mini App): ${JSON.stringify(menu)}\nURL: ${hookUrl}\n\n` +
       `getWebhookInfo: ${JSON.stringify(info.result ?? info)}`,
       { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } },
     );
