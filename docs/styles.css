@@ -42,7 +42,7 @@ body::before {
   background-repeat: no-repeat;
   background-position: center 38%;
   background-size: 78vw auto;
-  opacity: 0.05;
+  opacity: 0.10;
   pointer-events: none;
   z-index: 0;
   mix-blend-mode: multiply;
