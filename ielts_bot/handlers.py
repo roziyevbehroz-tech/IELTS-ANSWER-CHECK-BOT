@@ -55,8 +55,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(texts.HELP, parse_mode=ParseMode.MARKDOWN)
+async def cmd_about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(texts.ABOUT, parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_guide(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(texts.GUIDE, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -319,7 +323,8 @@ async def _reveal_answers(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 def register(application: Application) -> None:
     application.add_handler(CommandHandler("start", cmd_start))
-    application.add_handler(CommandHandler("help", cmd_help))
+    application.add_handler(CommandHandler("about", cmd_about))
+    application.add_handler(CommandHandler(["guide", "help"], cmd_guide))
     application.add_handler(CommandHandler("stats", cmd_stats))
     application.add_handler(CallbackQueryHandler(on_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
