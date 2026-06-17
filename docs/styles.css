@@ -192,3 +192,62 @@ body::before {
 @keyframes spin { to { transform: rotate(360deg); } }
 .fade-in { animation: fade .22s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ----- Animatsion natija (premium) ----- */
+.ans-list { margin-top: 6px; }
+.ans-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+  animation: rowIn .4s ease both;
+  transition: border-color .25s ease, background .25s ease;
+}
+@keyframes rowIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.ans-row .q-num { flex: 0 0 36px; height: 36px; }
+.ans-body { flex: 1; min-width: 0; }
+.ans-user { font-size: 15px; font-weight: 600; color: var(--text); word-break: break-word; }
+.ans-row.st-wrong.resolved .ans-user { text-decoration: line-through; color: var(--muted); }
+.muted-txt { color: var(--muted); font-style: italic; font-weight: 500; }
+.ans-correct {
+  max-height: 0; overflow: hidden; opacity: 0; font-size: 14.5px;
+  color: var(--green); font-weight: 700;
+  transition: max-height .32s ease, opacity .32s ease, margin .32s ease;
+}
+.ans-row.revealed .ans-correct { max-height: 90px; opacity: 1; margin-top: 5px; }
+.corr-label { color: var(--muted); font-weight: 600; font-size: 12px; }
+
+.ans-status { flex: 0 0 28px; display: flex; align-items: center; justify-content: center; }
+.mini-spin {
+  width: 18px; height: 18px; border: 2px solid rgba(26,160,240,.25);
+  border-top-color: var(--dz-blue); border-radius: 50%; animation: spin .7s linear infinite;
+}
+.ic {
+  width: 26px; height: 26px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 15px; font-weight: 800;
+  color: #fff; animation: pop .32s cubic-bezier(.18,.89,.32,1.28);
+}
+.ic-ok { background: var(--green); }
+.ic-no { background: var(--wrong); }
+.ic-na { background: #b9c2cf; }
+@keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+.ans-row.st-correct.resolved { border-color: var(--green); background: var(--green-bg); }
+.ans-row.st-wrong.resolved { border-color: rgba(216,52,91,.32); }
+
+.eye-btn {
+  flex: 0 0 auto; border: none; background: rgba(26,160,240,.10); color: var(--dz-blue);
+  width: 38px; height: 38px; border-radius: 10px; font-size: 17px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .1s ease, opacity .2s ease;
+}
+.eye-btn:active { transform: scale(.88); }
+.eye-btn.loading { opacity: .45; pointer-events: none; }
+.eye-btn.hidden, .btn.hidden { display: none; }
+
+/* ----- Konfetti (100% natijada) ----- */
+.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
+.confetti span {
+  position: absolute; top: -14px; height: 14px; border-radius: 2px;
+  animation: fall 2.5s linear forwards;
+}
+@keyframes fall { to { transform: translateY(112vh) rotate(620deg); opacity: .15; } }
