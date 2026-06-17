@@ -537,6 +537,10 @@
     if (total > 0 && correct === total) {
       setTimeout(confetti, 600 + qs.length * 150);
     }
+
+    // To'g'ri javoblarni fonда oldindan yuklab qo'yamiz (ko'rsatmaymiz) —
+    // "ko'rsatish" bosilganda darrov chiqsin, aylanib turmasin.
+    ensureReveal().catch(function () {});
   }
 
 
