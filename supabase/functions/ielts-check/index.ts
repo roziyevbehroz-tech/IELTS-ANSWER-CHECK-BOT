@@ -230,6 +230,21 @@ async function dbPatch(table: string, filter: string, patch: unknown): Promise<v
   });
   if (!r.ok) throw new Error("db patch " + r.status);
 }
+async function dbDelete(table: string, filter: string): Promise<void> {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${filter}`, {
+    method: "DELETE", headers: dbHeaders({ Prefer: "return=minimal" }),
+  });
+  if (!r.ok) throw new Error("db delete " + r.status);
+}
+function sanitizeAnswers(raw: any): Record<string, string> {
+  const answers: Record<string, string> = {};
+  for (const k of Object.keys(raw || {})) {
+    const n = Number(k);
+    const v = String(raw[k] ?? "").trim();
+    if (Number.isInteger(n) && n >= 1 && n <= 200 && v) answers[String(n)] = v.slice(0, 120);
+  }
+  return answers;
+}
 function genId(): string {
   const c = "abcdefghijkmnpqrstuvwxyz23456789";
   const a = crypto.getRandomValues(new Uint8Array(8));
@@ -363,6 +378,37 @@ async function handleCustom(body: any, auth: any): Promise<Response> {
     else if (op === "deadline") { patch.status = "active"; patch.closes_at = body.closesAt || null; }
     else return json({ error: "noma'lum amal" }, 400);
     await dbPatch("ielts_ac_custom_tests", `id=eq.${encodeURIComponent(t.id)}`, patch);
+    return json({ ok: true });
+  }
+
+  if (action === "ct_get") {
+    const t = await fetchTest(String(body.id));
+    if (!t) return json({ error: "Test topilmadi." }, 404);
+    if (Number(t.owner_id) !== auth.userId) return json({ error: "Ruxsat yo'q." }, 403);
+    return json({ id: t.id, title: t.title, answers: t.answers || {}, status: effectiveStatus(t) });
+  }
+
+  if (action === "ct_update") {
+    const t = await fetchTest(String(body.id));
+    if (!t) return json({ error: "Test topilmadi." }, 404);
+    if (Number(t.owner_id) !== auth.userId) return json({ error: "Ruxsat yo'q." }, 403);
+    const patch: any = {};
+    if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim().slice(0, 100);
+    if (body.answers && typeof body.answers === "object") {
+      const answers = sanitizeAnswers(body.answers);
+      if (Object.keys(answers).length === 0) return json({ error: "Kamida bitta savol-javob kiriting." }, 400);
+      patch.answers = answers;
+    }
+    if (Object.keys(patch).length === 0) return json({ error: "O'zgarish yo'q." }, 400);
+    await dbPatch("ielts_ac_custom_tests", `id=eq.${encodeURIComponent(t.id)}`, patch);
+    return json({ ok: true, id: t.id });
+  }
+
+  if (action === "ct_delete") {
+    const t = await fetchTest(String(body.id));
+    if (!t) return json({ error: "Test topilmadi." }, 404);
+    if (Number(t.owner_id) !== auth.userId) return json({ error: "Ruxsat yo'q." }, 403);
+    await dbDelete("ielts_ac_custom_tests", `id=eq.${encodeURIComponent(t.id)}`);
     return json({ ok: true });
   }
 

@@ -653,48 +653,74 @@
     }).catch(function (e) { errorScreen(e.message, screenProfile); });
   }
 
-  // Yangi test yaratish
-  function screenCreate() {
+  // Namuna matnni tahlil qilish: 1-qator nom (raqamsiz), keyin "1. A", "4-d", "5,a" ...
+  function parsePasted(text) {
+    var answers = {}, title = "";
+    (text || "").split(/\r?\n/).forEach(function (raw) {
+      var line = raw.trim();
+      if (!line) return;
+      var m = line.match(/^(\d{1,3})\s*[\.\)\-:,\]]*\s*(.+)$/);
+      if (m) answers[parseInt(m[1], 10)] = m[2].trim();
+      else if (!title) title = line;
+    });
+    return { title: title, answers: answers };
+  }
+  function answersToText(ans) {
+    return Object.keys(ans).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (q) { return q + ". " + ans[q]; }).join("\n");
+  }
+
+  function screenCreate() { screenTestForm(null); }
+  function screenEdit(id) {
+    loading("Yuklanmoqda…");
+    api({ action: "ct_get", id: id }).then(function (t) {
+      screenTestForm({ id: t.id, title: t.title, answers: t.answers || {} });
+    }).catch(function (e) { errorScreen(e.message, function () { screenManage(id); }); });
+  }
+
+  // Test yaratish / tahrirlash (namuna bo'yicha copy-paste)
+  function screenTestForm(existing) {
     state.mode = "book";
-    clearBack(); setBack(screenProfile); hideMain();
-    setCrumb(["Yangi test"]);
+    clearBack();
+    setBack(existing ? function () { screenManage(existing.id); } : screenProfile);
+    hideMain();
+    setCrumb([existing ? "Tahrirlash" : "Yangi test"]);
     var wrap = el("div");
     var head = el("div", "form-head");
-    head.appendChild(el("div", "label", "Yangi test yaratish"));
-    head.appendChild(el("div", "meta", "Test nomi va har bir savol uchun to'g'ri javobni kiriting."));
+    head.appendChild(el("div", "label", existing ? "Testni tahrirlash" : "Yangi test yaratish"));
+    head.appendChild(el("div", "meta", "Namuna bo'yicha joylang: 1-qator — test nomi, keyin tartib raqamli javoblar."));
     wrap.appendChild(head);
 
     var titleInp = el("input", "q-input title-input"); titleInp.type = "text";
-    titleInp.placeholder = "Test nomi (masalan: Unit 5 Vocabulary)";
+    titleInp.placeholder = "Test nomi (ixtiyoriy — 1-qatorga ham yozsa bo'ladi)";
+    if (existing) titleInp.value = existing.title;
     var titleBox = el("div", "q-row"); titleBox.appendChild(titleInp);
     wrap.appendChild(titleBox);
 
-    wrap.appendChild(el("div", "section-title", "To'g'ri javoblar"));
-    var listWrap = el("div", "q-list");
-    var rows = [];
-    function addRow() {
-      var idx = rows.length + 1;
-      var qr = el("div", "q-row");
-      qr.appendChild(el("div", "q-num", String(idx)));
-      var inp = el("input", "q-input"); inp.type = "text"; inp.setAttribute("autocapitalize", "off");
-      inp.placeholder = "to'g'ri javob…";
-      qr.appendChild(inp); listWrap.appendChild(qr); rows.push(inp);
-    }
-    for (var i = 0; i < 10; i++) addRow();
-    wrap.appendChild(listWrap);
-    var addBtn = el("button", "btn btn-ghost", "➕ Yana savol qo'shish");
-    addBtn.onclick = function () { haptic(); addRow(); };
-    wrap.appendChild(addBtn);
+    wrap.appendChild(el("div", "section-title", "Javoblar (namuna bo'yicha)"));
+    var ta = el("textarea", "paste-area");
+    ta.rows = 12;
+    ta.placeholder = "Animal\n1. A\n2. B\n3. c\n4-d\n5,a";
+    if (existing) ta.value = answersToText(existing.answers);
+    wrap.appendChild(ta);
+    wrap.appendChild(el("div", "hint", "Qo'llab-quvvatlanadi: <b>1. A</b> · <b>1) A</b> · <b>4-d</b> · <b>5,a</b> · <b>1 A</b>"));
     show(wrap);
 
-    setupMain("✅ Testni yaratish", function () {
-      var answers = {};
-      rows.forEach(function (inp, i) { var v = inp.value.trim(); if (v) answers[i + 1] = v; });
-      if (Object.keys(answers).length === 0) { popup("Kamida bitta javob kiriting."); return; }
-      hideMain(); loading("Test yaratilmoqda…");
-      api({ action: "ct_create", title: titleInp.value.trim(), answers: answers }).then(function (res) {
-        screenShare(res.id, titleInp.value.trim() || "Nomsiz test", res.total);
-      }).catch(function (e) { errorScreen(e.message, screenCreate); });
+    setupMain(existing ? "💾 Saqlash" : "✅ Testni yaratish", function () {
+      var parsed = parsePasted(ta.value);
+      var title = titleInp.value.trim() || parsed.title || "Nomsiz test";
+      var answers = parsed.answers;
+      if (Object.keys(answers).length === 0) { popup("Javoblarni namuna bo'yicha kiriting (masalan: 1. A)."); return; }
+      hideMain(); loading(existing ? "Saqlanmoqda…" : "Test yaratilmoqda…");
+      if (existing) {
+        api({ action: "ct_update", id: existing.id, title: title, answers: answers })
+          .then(function () { screenManage(existing.id); })
+          .catch(function (e) { errorScreen(e.message, function () { screenTestForm(existing); }); });
+      } else {
+        api({ action: "ct_create", title: title, answers: answers })
+          .then(function (res) { screenShare(res.id, title, res.total); })
+          .catch(function (e) { errorScreen(e.message, function () { screenTestForm(null); }); });
+      }
     });
   }
 
@@ -756,6 +782,10 @@
       copyBtn.onclick = function () { haptic(); copyText(link, copyBtn); };
       wrap.appendChild(copyBtn);
 
+      var editBtn = el("button", "btn btn-navy", "✏️ Savollarni tahrirlash");
+      editBtn.onclick = function () { haptic(); screenEdit(id); };
+      wrap.appendChild(editBtn);
+
       wrap.appendChild(el("div", "section-title", "Boshqaruv"));
       var ctrls = el("div", "ctrl-grid");
       if (res.status === "active") ctrls.appendChild(mngBtn("⏸ To'xtatib turish", function () { manage(id, "pause"); }));
@@ -789,6 +819,18 @@
       var back = el("button", "btn btn-ghost", "⬅️ Mening testlarim");
       back.onclick = function () { haptic(); screenProfile(); };
       wrap.appendChild(back);
+
+      var del = el("button", "btn btn-danger", "🗑 Testni o'chirish");
+      del.onclick = function () {
+        haptic("medium");
+        confirmThen("Bu test va uning barcha natijalari butunlay o'chiriladi. Davom etasizmi?", function () {
+          loading("O'chirilmoqda…");
+          api({ action: "ct_delete", id: id })
+            .then(function () { screenProfile(); })
+            .catch(function (e) { errorScreen(e.message, function () { screenManage(id); }); });
+        });
+      };
+      wrap.appendChild(del);
       show(wrap);
     }).catch(function (e) { errorScreen(e.message, function () { screenManage(id); }); });
   }
