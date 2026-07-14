@@ -27,6 +27,33 @@ To'liq sozlash: [`MINIAPP.md`](MINIAPP.md).
 - 🤝 Moslashuvchan javob tekshirgich: katta-kichik harf, muqobil javoblar (`10/ten`),
   ixtiyoriy so'zlar (`(the) ticket`), TRUE/FALSE/NG qisqartmalari, ko'p tanlovli javoblar
 - 📈 Foydalanuvchi statistikasi (Supabase orqali, ixtiyoriy)
+- 🆕 **CD Test yaratish** — PDF/DOCX/DOC/matndan haqiqiy IELTS CD-formatidagi
+  (bitta mustaqil HTML fayl) Reading testini AI'siz, avtomatik yasaydi
+
+## 🆕 CD Test yaratish (Reading)
+
+Ustoz `/start` → «🆕 CD Test yaratish» → 🟢 **Reading** (Listening/Speaking/Writing
+tez orada) tugmasini bosadi va bot bosqichma-bosqich so'raydi:
+
+1. **Passage** — matn qismini yuboradi (📄 PDF / DOCX / DOC / oddiy matn). Bot
+   faylni AI'siz parse qiladi, sarlavha va paragraflarni ajratadi; matnga savollar
+   aralashib ketgan bo'lsa, ularni avtomatik ajratib faqat passage'ni oladi.
+2. **Savollar** — toza Cambridge matnini shundoq tashlaydi (bot turlarni o'zi
+   taniydi) yoki aniq shablonda yozadi (`/qtemplate`). **Barcha 14 IELTS turi**
+   qo'llab-quvvatlanadi: note/sentence/summary/table/flow-chart/short-answer/diagram
+   completion, TRUE-FALSE-NG, YES-NO-NG, multiple choice (bitta/ko'p tanlov),
+   matching headings/paragraph information/features.
+3. **Javoblar** — tartib raqami bilan (`1. white`, `5. TRUE`, `8. B`,
+   `24. vegetable / vegetation`).
+4. **Sozlamalar** — javoblar darrov ko'rinsinmi yoki «Javoblarni ko'rish» bosilganda
+   (bot uslubi); har savolga izoh qo'shiladimi.
+
+So'ng bot **DREAM ZONE logosi** bilan tayyor CD HTML faylini yuboradi: split-panel
+(passage | savollar), taymer, «Deliver» → ball/40 + IELTS band, natijalar oynasi.
+Barchasi bitta faylda, mustaqil ishlaydi. Kod: [`ielts_bot/cd/`](ielts_bot/cd/).
+
+> Fayl parse qilish uchun `pdfplumber` va `python-docx` kerak (requirements.txt'da).
+> Ular bo'lmasa ham oddiy matn orqali test yaratish ishlayveradi.
 
 ## Loyiha tuzilmasi
 
@@ -41,6 +68,14 @@ ielts_bot/
   texts.py                   # o'zbekcha interfeys matnlari
   database.py                # Supabase (ixtiyoriy)
   handlers.py                # Telegram handlerlari
+  cd/                        # 🆕 CD test yaratish (PDF/DOCX/matn -> CD HTML)
+    extract.py               #   fayldan matn (pdf/docx/txt) — AI'siz
+    passage.py               #   passage tozalash/formatlash, savol ajratish
+    questions.py             #   14 IELTS savol turini parse (shablon+auto)
+    answers.py               #   javob shablonini parse
+    render.py                #   modeldan mustaqil CD HTML fayl
+    flow.py                  #   Telegram suhbat oqimi (state machine)
+    templates/               #   base.html + styles.css + app.js (inline)
 data/answers/book_10..20.json # javob-kalitlar (siz to'ldirasiz) — format: data/README.md
 scripts/generate_templates.py # bo'sh shablonlarni qayta yaratish
 supabase/migrations/         # baza sxemasi
