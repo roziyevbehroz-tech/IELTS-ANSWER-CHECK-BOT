@@ -68,7 +68,6 @@ const QUESTION_MARKERS =
   /^\s*(questions?\s+\d+\s*[-–—]\s*\d+|question\s+\d+|choose\s+the\s+correct|complete\s+the\s+(notes|summary|table|sentences|flow|diagram)|do\s+the\s+following\s+statements|which\s+(section|paragraph)|list\s+of\s+headings|write\s+(your\s+answers|no\s+more\s+than|one\s+word)|match\s+each|reading\s+passage\s+\d+\s+has)/i;
 const HEADER_NOISE =
   /^\s*(reading\s+passage\s*\d*|part\s*\d+|passage\s*\d+|you\s+should\s+spend\s+about|read\s+the\s+(text|passage)|the\s+reading\s+passage\s+below)\b.*$/i;
-const PARA_LETTER = /^\s*([A-M])[\.\)]?\s+(?=[A-Z"'])/;
 
 export function splitPassageAndQuestions(text: string): [string, string] {
   const lines = text.split("\n");
@@ -111,23 +110,53 @@ function looksLikeTitle(line: string): boolean {
 }
 function looksLikeSubtitle(line: string): boolean {
   if (!line || line.length > 160) return false;
+  if (/^[A-M][.\)]?\s+/.test(line)) return false; // lettered marker — subtitle emas
   return (line.split(".").length - 1) <= 1 && line.split(/\s+/).length <= 24;
 }
 function splitParagraphs(body: string): [string[], boolean] {
-  let blocks = body.split(/\n\s*\n/).map((b) => b.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
-  if (blocks.length <= 1) {
-    const alt = body.split("\n").map((l) => l.trim()).filter(Boolean);
-    if (alt.length > blocks.length) blocks = alt;
+  // 1) Lettered paragraflar (A, B, C ...) — bo'sh qator bo'lsa ham, bo'lmasa ham
+  const lettered = tryLetteredSplit(body);
+  if (lettered) return [lettered, true];
+  // 2) Bo'sh qator bilan ajratilgan bloklar (ichki qattiq o'ralishni yoyamiz)
+  const blocks = body.split(/\n\s*\n/).map((b) => b.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+  if (blocks.length >= 2) return [blocks, false];
+  // 3) Bo'sh qatorsiz, qattiq o'ralgan yagona blok — yoyib, mazmunli paragraflarga bo'lamiz
+  const flat = body.replace(/\s+/g, " ").trim();
+  return [chunkParagraphs(flat), false];
+}
+
+// Ketma-ket A, B, C... markerlari bo'yicha paragraflarga bo'ladi (>=3 marker bo'lsa).
+function tryLetteredSplit(body: string): string[] | null {
+  const lines = body.split("\n");
+  const paras: string[] = [];
+  let cur = "", count = 0, expected = "A";
+  for (const raw of lines) {
+    const s = raw.trim();
+    if (!s) continue;
+    const m = s.match(/^([A-M])[.\)]?\s+(.+)/);
+    if (m && m[1] === expected) {
+      if (cur) paras.push(cur.trim());
+      cur = m[2]; count++;
+      expected = String.fromCharCode(expected.charCodeAt(0) + 1);
+    } else {
+      cur = cur ? cur + " " + s : s;
+    }
   }
-  let lettered = 0;
-  const cleaned: string[] = [];
-  for (const b of blocks) {
-    const m = b.match(PARA_LETTER);
-    if (m) { lettered++; cleaned.push(b.slice(m[0].length).trim()); }
-    else cleaned.push(b);
+  if (cur) paras.push(cur.trim());
+  return count >= 3 ? paras : null;
+}
+
+// Yoyilgan matnni ~450+ belgidan iborat mazmunli paragraflarga bo'ladi (gap chegarasida).
+function chunkParagraphs(flat: string): string[] {
+  const sentences = flat.match(/[^.!?]*[.!?]+["')\]]*\s*|[^.!?]+$/g) || [flat];
+  const paras: string[] = [];
+  let cur = "";
+  for (const s of sentences) {
+    cur += s;
+    if (cur.trim().length >= 450) { paras.push(cur.trim()); cur = ""; }
   }
-  const isLettered = lettered >= Math.max(2, Math.floor(blocks.length / 2));
-  return [cleaned, isLettered];
+  if (cur.trim()) paras.push(cur.trim());
+  return paras.length ? paras : [flat];
 }
 
 // ============================ savollar ============================

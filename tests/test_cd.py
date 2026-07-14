@@ -46,6 +46,29 @@ def test_passage_lettered():
     assert p.paragraphs[0].startswith("First")
 
 
+def test_passage_hardwrapped_not_per_line():
+    # Qattiq o'ralgan matn (bo'sh qatorsiz) — har qator paragraf BO'LMASLIGI kerak
+    lines = ["This is sentence number %d about the brain and sight." % i for i in range(40)]
+    text = "The strange world of sight\n" + "\n".join(lines)
+    p = passage_mod.parse_passage(text)
+    assert p.title == "The strange world of sight"
+    assert len(p.paragraphs) <= 12, len(p.paragraphs)   # 40 emas
+
+
+def test_passage_lettered_no_blank_lines():
+    text = ("Mammoths\n"
+            "A On a May morning a herder found a baby mammoth\n"
+            "frozen in the ice near a river in Siberia here.\n"
+            "B Scientists believe mammoths became extinct due\n"
+            "to a sharp rise in temperature long ago here.\n"
+            "C Analysis of the tusks revealed evidence of the\n"
+            "animal's short life and its sudden death here.")
+    p = passage_mod.parse_passage(text)
+    assert p.lettered is True
+    assert len(p.paragraphs) == 3
+    assert p.paragraphs[0].startswith("On a May morning")
+
+
 def test_split_passage_and_questions():
     text = ("Title\n\nBody paragraph one.\n\nBody two.\n\n"
             "Questions 1-5\nComplete the notes below.\n1. foo\n")

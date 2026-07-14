@@ -38,9 +38,6 @@ _HEADER_NOISE = re.compile(
     re.IGNORECASE,
 )
 
-# Paragraf harfi: "A", "A." "A)" satr boshida yolg'iz yoki qisqa
-_PARA_LETTER = re.compile(r"^\s*([A-M])[\.\)]?\s+(?=[A-Z\"'])")
-
 
 def split_passage_and_questions(text: str) -> Tuple[str, str]:
     """Matnni (passage_qismi, savol_qismi) ga ajratadi.
@@ -111,37 +108,73 @@ def _looks_like_title(line: str) -> bool:
 def _looks_like_subtitle(line: str) -> bool:
     if not line or len(line) > 160:
         return False
+    # Lettered paragraf markeri (A, B, ...) subtitle emas — paragrafni yutmaslik
+    if re.match(r"^[A-M][.\)]?\s+", line):
+        return False
     # Odatda kursiv/izoh: nuqta bilan tugashi mumkin, lekin bitta jumla
     return line.count(".") <= 1 and len(line.split()) <= 24
 
 
 def _paragraphs(body: str) -> Tuple[List[str], bool]:
-    """Matnni paragraflarga bo'ladi va A/B/C belgilanishini aniqlaydi."""
-    # Avval bo'sh qator bo'yicha bloklarni ajratamiz
+    """Matnni paragraflarga bo'ladi va A/B/C belgilanishini aniqlaydi.
+
+    Qattiq o'ralgan (har qatorda `\\n`, bo'sh qatorsiz) matnni ham to'g'ri
+    tiklaydi — har qatorni alohida paragraf qilib yubormaydi.
+    """
+    # 1) Lettered paragraflar (A, B, C ...) — bo'sh qatorli yoki qatorsiz
+    lettered = _try_lettered_split(body)
+    if lettered is not None:
+        return lettered, True
+
+    # 2) Bo'sh qator bilan ajratilgan bloklar (ichki o'ralishni yoyamiz)
     raw_blocks = re.split(r"\n\s*\n", body)
     blocks = [re.sub(r"\s*\n\s*", " ", b).strip() for b in raw_blocks]
     blocks = [b for b in blocks if b]
+    if len(blocks) >= 2:
+        return blocks, False
 
-    # Agar bo'sh qatorlar yo'q bo'lsa (bitta katta blok), har bir qatorni
-    # paragraf deb olamiz (fayl formatiga qarab).
-    if len(blocks) <= 1:
-        alt = [ln.strip() for ln in body.split("\n") if ln.strip()]
-        if len(alt) > len(blocks):
-            blocks = alt
+    # 3) Bo'sh qatorsiz, qattiq o'ralgan yagona blok — yoyib, mazmunli
+    # paragraflarga bo'lamiz (gap chegarasida).
+    flat = re.sub(r"\s+", " ", body).strip()
+    return _chunk_paragraphs(flat), False
 
-    # Paragraf harflarini aniqlaymiz
-    lettered = 0
-    cleaned: List[str] = []
-    for b in blocks:
-        m = _PARA_LETTER.match(b)
-        if m:
-            lettered += 1
-            cleaned.append(b[m.end():].strip())
+
+def _try_lettered_split(body: str) -> List[str] | None:
+    """Ketma-ket A, B, C... markerlari bo'yicha bo'ladi (>=3 marker bo'lsa)."""
+    paras: List[str] = []
+    cur = ""
+    count = 0
+    expected = "A"
+    for raw in body.split("\n"):
+        s = raw.strip()
+        if not s:
+            continue
+        m = re.match(r"^([A-M])[.\)]?\s+(.+)", s)
+        if m and m.group(1) == expected:
+            if cur:
+                paras.append(cur.strip())
+            cur = m.group(2)
+            count += 1
+            expected = chr(ord(expected) + 1)
         else:
-            cleaned.append(b)
+            cur = (cur + " " + s) if cur else s
+    if cur:
+        paras.append(cur.strip())
+    return paras if count >= 3 else None
 
-    is_lettered = lettered >= max(2, len(blocks) // 2)
-    if is_lettered:
-        # harflarni qayta biriktiramiz (A, B, C ...) tartib bo'yicha
-        return cleaned, True
-    return blocks, False
+
+def _chunk_paragraphs(flat: str) -> List[str]:
+    """Yoyilgan matnni ~450+ belgidan iborat paragraflarga bo'ladi."""
+    sentences = re.findall(r"[^.!?]*[.!?]+[\"')\]]*\s*|[^.!?]+$", flat)
+    if not sentences:
+        sentences = [flat]
+    paras: List[str] = []
+    cur = ""
+    for s in sentences:
+        cur += s
+        if len(cur.strip()) >= 450:
+            paras.append(cur.strip())
+            cur = ""
+    if cur.strip():
+        paras.append(cur.strip())
+    return paras if paras else [flat]
