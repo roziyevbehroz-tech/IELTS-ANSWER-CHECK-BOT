@@ -1,0 +1,188 @@
+"""CD test yaratish tizimi uchun testlar (extract, passage, questions, render)."""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from ielts_bot.cd import (  # noqa: E402
+    answers as ans_mod,
+    extract,
+    passage as passage_mod,
+    questions as q_mod,
+    render,
+)
+from ielts_bot.cd.models import ReadingTest, Settings  # noqa: E402
+
+
+# ------------------------------ extract -------------------------------
+
+def test_extract_txt():
+    assert extract.extract_text(b"Hello\nWorld", "a.txt") == "Hello\nWorld"
+
+
+def test_extract_txt_collapses_blank_lines():
+    out = extract.extract_text(b"A\n\n\n\nB", "a.txt")
+    assert out == "A\n\nB"
+
+
+# ------------------------------ passage -------------------------------
+
+def test_passage_title_and_paragraphs():
+    text = "The silk industry\n\nPara one here.\n\nPara two here.\n"
+    p = passage_mod.parse_passage(text)
+    assert p.title == "The silk industry"
+    assert len(p.paragraphs) == 2
+
+
+def test_passage_lettered():
+    text = ("Mammoths\n\nA  First paragraph about mammoths here.\n\n"
+            "B  Second paragraph about ice age here.\n\n"
+            "C  Third paragraph about tusks here.\n")
+    p = passage_mod.parse_passage(text)
+    assert p.lettered is True
+    assert len(p.paragraphs) == 3
+    # harf prefiksi olib tashlanган
+    assert p.paragraphs[0].startswith("First")
+
+
+def test_split_passage_and_questions():
+    text = ("Title\n\nBody paragraph one.\n\nBody two.\n\n"
+            "Questions 1-5\nComplete the notes below.\n1. foo\n")
+    passage, qs = passage_mod.split_passage_and_questions(text)
+    assert "Questions 1-5" not in passage
+    assert "Questions 1-5" in qs
+
+
+# ----------------------------- questions ------------------------------
+
+def _one(qtext, para_count=6):
+    gs = q_mod.parse_questions(qtext, para_count=para_count)
+    assert len(gs) == 1, [g.qtype for g in gs]
+    return gs[0]
+
+
+def test_q_note_gaps():
+    g = _one("[note] 1-3\nComplete.\n- a ___ b\n- c ___ d\n- e ___ f\n")
+    assert g.kind == "gap"
+    assert [i.number for i in g.items] == [1, 2, 3]
+    assert "{{Q1}}" in g.body and "{{Q3}}" in g.body
+
+
+def test_q_tfng():
+    g = _one("[tfng] 8-9\nTRUE FALSE NOT GIVEN\n8. one\n9. two\n")
+    assert g.kind == "tfng"
+    assert len(g.items) == 2
+
+
+def test_q_mcq():
+    g = _one("[mcq] 5-6\nChoose.\n5. stem?\nA a\nB b\nC c\n6. stem2?\nA x\nB y\nC z\n")
+    assert g.kind == "mcq"
+    assert len(g.items) == 2
+    assert g.items[0].options[0] == ("A", "a")
+
+
+def test_q_mcq_multi():
+    g = _one("[mcq_multi] 10-11\nChoose TWO.\nA a\nB b\nC c\nD d\nE e\n")
+    assert g.kind == "mcq_multi"
+    assert len(g.options) == 5
+
+
+def test_q_headings():
+    g = _one("[headings] 1-2\nList of Headings:\ni one\nii two\niii three\n"
+             "1. Paragraph A\n2. Paragraph B\n")
+    assert g.qtype == "headings"
+    assert len(g.options) == 3
+    assert len(g.items) == 2
+
+
+def test_q_matching_info_options_from_spec():
+    g = _one("[matching_info] 14-15 | A-F\nWhich paragraph...\n14. a\n15. b\n")
+    assert g.kind == "matching"
+    assert [o[0] for o in g.options] == list("ABCDEF")
+
+
+def test_q_matching_features_options_inline():
+    g = _one("[matching_features] 18-19 | A-C\nMatch.\nA Smith\nB Jones\nC Lee\n"
+             "18. one\n19. two\n")
+    assert g.options[0] == ("A", "Smith")
+    assert len(g.items) == 2
+
+
+def test_q_autodetect_tfng():
+    txt = ("Questions 1-3\nDo the following statements agree with the "
+           "information? Write TRUE, FALSE or NOT GIVEN.\n"
+           "1. one\n2. two\n3. three\n")
+    gs = q_mod.parse_questions(txt)
+    assert gs and gs[0].kind == "tfng"
+
+
+def test_q_multiple_blocks():
+    txt = ("[note] 1-2\n- a ___\n- b ___\n\n"
+           "[tfng] 3-4\nTRUE FALSE NOT GIVEN\n3. x\n4. y\n")
+    gs = q_mod.parse_questions(txt)
+    assert [g.kind for g in gs] == ["gap", "tfng"]
+
+
+# ------------------------------ answers -------------------------------
+
+def test_answers_parse_and_validate():
+    key = ans_mod.parse_answer_key("1. white\n2. TRUE\n3. B\n")
+    assert key == {1: "white", 2: "TRUE", 3: "B"}
+    missing, extra = ans_mod.validate(key, [1, 2, 3, 4])
+    assert missing == [4] and extra == []
+
+
+# ------------------------------- render -------------------------------
+
+def _build_test(reveal="end"):
+    p = passage_mod.parse_passage(
+        "Silk\n\nPara one about emperor and white silk.\n\n"
+        "Para two about taxes and paper.\n")
+    p.groups = q_mod.parse_questions(
+        "[note] 1-2\n- wore ___ silk\n- payment of ___\n\n"
+        "[tfng] 3-3\nTRUE FALSE NOT GIVEN\n3. Silk scared soldiers.\n\n"
+        "[mcq] 4-4\nChoose.\n4. stem?\nA a\nB b\nC c\n")
+    p.answers = ans_mod.parse_answer_key("1. white\n2. taxes\n3. TRUE\n4. B\n")
+    return ReadingTest(title="Silk", passages=[p],
+                       settings=Settings(reveal_mode=reveal))
+
+
+def test_render_produces_inputs_and_data():
+    html = render.render_test(_build_test())
+    for token in ('id="q1"', 'name="q3"', 'name="q4"', "CD_DATA",
+                  "DREAM ZONE", "results-modal"):
+        assert token in html, token
+
+
+def test_render_answer_alternatives_expanded():
+    p = passage_mod.parse_passage("T\n\nBody about vegetables here.\n")
+    p.groups = q_mod.parse_questions("[note] 1-1\n- eats ___\n")
+    p.answers = {1: "vegetable / vegetation"}
+    html = render.render_test(ReadingTest(passages=[p]))
+    # gap javob massiv sifatida (muqobil) JSON'ga kiritilgan
+    assert "vegetable" in html and "vegetation" in html
+
+
+def test_render_reveal_mode_flag():
+    assert '"revealMode":"instant"' in render.render_test(
+        _build_test("instant")).replace(" ", "")
+    assert '"revealMode":"end"' in render.render_test(
+        _build_test("end")).replace(" ", "")
+
+
+if __name__ == "__main__":
+    import traceback
+
+    funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    failed = 0
+    for fn in funcs:
+        try:
+            fn()
+            print(f"PASS  {fn.__name__}")
+        except Exception:  # noqa: BLE001
+            failed += 1
+            print(f"FAIL  {fn.__name__}")
+            traceback.print_exc()
+    print(f"\n{len(funcs) - failed}/{len(funcs)} test o'tdi.")
+    sys.exit(1 if failed else 0)

@@ -22,7 +22,57 @@ def launcher_keyboard() -> InlineKeyboardMarkup:
             )
         ])
     rows.append([InlineKeyboardButton("⌨️ Matn orqali tekshirish", callback_data="nav:books")])
+    rows.append([InlineKeyboardButton("🆕 CD Test yaratish", callback_data="cd:start")])
     return InlineKeyboardMarkup(rows)
+
+
+def cd_skill_keyboard() -> InlineKeyboardMarkup:
+    """CD test bo'limini tanlash: Reading yashil (faol), qolganlari qizil (tez orada)."""
+    rows = [
+        [
+            InlineKeyboardButton("🟢 Reading", callback_data="cd:skill:reading"),
+            InlineKeyboardButton("🔴 Listening", callback_data="cd:skill:listening"),
+        ],
+        [
+            InlineKeyboardButton("🔴 Speaking", callback_data="cd:skill:speaking"),
+            InlineKeyboardButton("🔴 Writing", callback_data="cd:skill:writing"),
+        ],
+        [InlineKeyboardButton(texts.BTN_MENU, callback_data="cd:cancel")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+def cd_reveal_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton("⚡ Darrov ko'rinsin", callback_data="cd:reveal:instant")],
+        [InlineKeyboardButton("🔒 Bosib ko'rsin (bot kabi)", callback_data="cd:reveal:end")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+def cd_explanations_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton("➕ Ha, izoh qo'shaman", callback_data="cd:expl:yes"),
+            InlineKeyboardButton("⏭ Yo'q, kerak emas", callback_data="cd:expl:no"),
+        ],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+def cd_more_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton("➕ Yana passage qo'shish", callback_data="cd:more:add")],
+        [InlineKeyboardButton("✅ CD test yaratish", callback_data="cd:more:finish")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+def cd_next_keyboard() -> InlineKeyboardMarkup:
+    """Passage/questions bosqichida davom etish tugmasi."""
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("➡️ Davom etish", callback_data="cd:go")]]
+    )
 
 
 def books_keyboard() -> InlineKeyboardMarkup:
