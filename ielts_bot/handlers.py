@@ -17,6 +17,7 @@ from telegram.ext import (
 )
 
 from . import answer_keys, checker, database, keyboards, parsing, texts
+from .cd import flow as cd_flow
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,10 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await query.answer()
     data = query.data or ""
     kind, _, value = data.partition(":")
+
+    if kind == "cd":
+        await cd_flow.on_callback(update, context, value)
+        return
 
     handlers = {
         "book": _cb_book,
@@ -230,7 +235,23 @@ def _example_for(section: str, first: int) -> str:
     return f"{first}. cat\n{first + 1}. 10 am\n{first + 2}. B"
 
 
+async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Fayl (PDF/DOCX/DOC/txt) — faqat CD test yaratish oqimida qabul qilinadi."""
+    if cd_flow.active(context):
+        await cd_flow.on_message(update, context)
+        return
+    await update.message.reply_text(
+        "📎 Faylni qabul qilish uchun avval «🆕 CD Test yaratish»ni boshlang (/start)."
+    )
+
+
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # CD test yaratish oqimi faol bo'lsa — o'sha yerga yo'naltiramiz
+    if cd_flow.active(context):
+        handled = await cd_flow.on_message(update, context)
+        if handled:
+            return
+
     if not context.user_data.get("awaiting"):
         # Foydalanuvchi tasodifan matn yubordi — menyuga yo'naltiramiz
         await update.message.reply_text(
@@ -326,5 +347,7 @@ def register(application: Application) -> None:
     application.add_handler(CommandHandler("about", cmd_about))
     application.add_handler(CommandHandler(["guide", "help"], cmd_guide))
     application.add_handler(CommandHandler("stats", cmd_stats))
+    application.add_handler(CommandHandler("qtemplate", cd_flow.cmd_qtemplate))
     application.add_handler(CallbackQueryHandler(on_callback))
+    application.add_handler(MessageHandler(filters.Document.ALL, on_document))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
