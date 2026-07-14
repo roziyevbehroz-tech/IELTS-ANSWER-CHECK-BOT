@@ -12,7 +12,9 @@ on:
       - "supabase/functions/**"
       - "data/answers/**"
       - "docs/**"
+      - "ielts_bot/cd/templates/**"
       - "scripts/build_webapp_data.py"
+      - "scripts/build_cd_template.py"
       - ".github/workflows/deploy-edge-function.yml"
   workflow_dispatch: {}
 
@@ -31,6 +33,9 @@ jobs:
 
       - name: Javob-bazasini qayta generatsiya qilish (answers.json)
         run: python scripts/build_webapp_data.py
+
+      - name: CD test template'ini generatsiya qilish (cd_template.ts)
+        run: python scripts/build_cd_template.py
 
       - uses: supabase/setup-cli@v1
         with:
