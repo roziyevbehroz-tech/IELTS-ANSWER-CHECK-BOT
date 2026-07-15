@@ -22,7 +22,7 @@ APP_FUNC_DIR = ROOT / "supabase" / "functions" / "ielts-app"
 BOT_FUNC_DIR = ROOT / "supabase" / "functions" / "ielts-bot"
 DOCS_DIR = ROOT / "docs"
 
-BOOKS = list(range(10, 21))
+BOOKS = list(range(10, 22))
 TESTS = [1, 2, 3, 4]
 SECTIONS = ["listening", "reading"]
 

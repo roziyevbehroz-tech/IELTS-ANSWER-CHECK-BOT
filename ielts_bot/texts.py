@@ -12,8 +12,8 @@ WELCOME = (
 ABOUT = (
     "🎓 *DREAM ZONE — IELTS yordamchisi*\n\n"
     "Men *DREAM ZONE* o'quv markazi o'quvchilari uchun yaratilganman 💙\n\n"
-    "Cambridge IELTS Academic 10–20 kitoblaridagi Listening va Reading "
-    "testlarini tekshiraman — jami 44 ta to'liq test.\n\n"
+    "Cambridge IELTS Academic 10–21 kitoblaridagi Listening va Reading "
+    "testlarini tekshiraman — jami 48 ta to'liq test.\n\n"
     "Eng muhimi: men *faqat to'g'ri* javoblaringizni ko'rsataman. Xato "
     "javoblarning to'g'ri variantini darrov ochib qo'ymayman — siz ular "
     "ustida o'zingiz ishlaysiz, tayyor bo'lganingizda esa o'zingiz ko'rasiz.\n\n"

@@ -1,6 +1,6 @@
 # IELTS Answer Check Bot 🤖📚
 
-Cambridge IELTS **Academic 10–20** kitoblari bo'yicha **Listening** va **Reading**
+Cambridge IELTS **Academic 10–21** kitoblari bo'yicha **Listening** va **Reading**
 testlari javoblarini tekshirib beruvchi Telegram bot.
 
 O'quvchi istalgan practice testni mustaqil ishlab bo'lgach, javoblarini tartib
@@ -19,7 +19,7 @@ To'liq sozlash: [`MINIAPP.md`](MINIAPP.md).
 ## Imkoniyatlar
 
 - 📱 Telegram Mini App (WebApp) + klassik matnli bot rejimi
-- 📚 11 ta kitob (Cambridge IELTS Academic 10–20), har birida 4 ta test
+- 📚 12 ta kitob (Cambridge IELTS Academic 10–21), har birida 4 ta test
 - 🎧 Listening (Part 1–4) va 📖 Reading (Passage 1–3) — yoki to'liq test (1–40)
 - ✅ Faqat to'g'ri javoblar ko'rsatiladi, xatolar yashiriladi
 - 🔁 «Qaytadan urinish» — xatolar ustida ishlab, qayta yuborish
