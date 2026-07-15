@@ -18,6 +18,7 @@
 import answers from "./answers.json" with { type: "json" };
 import * as CD from "./cd.ts";
 import { unzipSync, strFromU8 } from "https://esm.sh/fflate@0.8.2";
+import { getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
 
 type AnswerMap = Record<string, Record<string, string>>;
 const ANSWERS = answers as AnswerMap;
@@ -682,10 +683,42 @@ function docxToText(data: Uint8Array): string {
   xml = xml.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
   return xml;
 }
-function cdExtractText(data: Uint8Array, filename: string): string {
+// PDF -> matn: pdf.js text-item'laridan qator/paragraf tuzilishini tiklaydi
+// (Y-koordinata bo'yicha). Skanerlangan (rasm) PDF'lar OCR talab qiladi — ular
+// uchun matn topilmaydi va foydalanuvchidan matn/DOCX so'raladi.
+async function pdfToText(data: Uint8Array): Promise<string> {
+  const pdf = await getDocumentProxy(data);
+  let out = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    let prevY: number | null = null, prevH = 0, prevEndX = 0;
+    for (const it of content.items as any[]) {
+      if (typeof it.str !== "string") continue;
+      const x = it.transform[4], y = it.transform[5];
+      const w = it.width || 0, h = it.height || prevH || 11;
+      if (prevY !== null) {
+        const gap = prevY - y;
+        if (gap > h * 1.8) out += "\n\n";           // paragraf oralig'i
+        else if (gap > h * 0.4) out += "\n";        // yangi qator
+        else if (x - prevEndX > h * 0.25 && !out.endsWith(" ")) out += " "; // so'z oralig'i
+      }
+      out += it.str;
+      prevY = y; prevH = h; prevEndX = x + w;
+    }
+    out += "\n\n";
+  }
+  return out;
+}
+
+async function cdExtractText(data: Uint8Array, filename: string): Promise<string> {
   const name = (filename || "").toLowerCase();
   if (name.endsWith(".pdf") || (data[0] === 0x25 && data[1] === 0x50)) {
-    throw new Error("PDF hozircha edge-botda qo'llab-quvvatlanmaydi. Iltimos matnni oddiy matn yoki .docx ko'rinishida yuboring.");
+    const txt = cdCleanText(await pdfToText(data));
+    if (txt.replace(/\s/g, "").length < 20) {
+      throw new Error("PDF ichida matn topilmadi (skanerlangan/rasm PDF bo'lishi mumkin). Iltimos matnni oddiy matn yoki .docx ko'rinishida yuboring.");
+    }
+    return txt;
   }
   if (name.endsWith(".docx") || (data[0] === 0x50 && data[1] === 0x4b)) return cdCleanText(docxToText(data));
   return cdCleanText(new TextDecoder("utf-8").decode(data));
@@ -751,8 +784,9 @@ const CD_INTRO =
 const CD_COMING = "🔴 Bu bo'lim hozircha tayyor emas. Tez orada! Hozircha 🟢 Reading mavjud.";
 const cdAskPassage = (n: number) =>
   `📖 *Reading — Passage ${n}*\n\nIltimos, testning *matn (passage)* qismini yuboring.\n\n` +
-  "Qabul qilinadi: 📄 DOCX yoki oddiy matn. (PDF hozircha edge-botda emas.)\n" +
-  "Matnga savollar aralashib ketgan bo'lsa — bot ularni avtomatik ajratadi.";
+  "Qabul qilinadi: 📄 PDF, DOCX yoki oddiy matn.\n" +
+  "Matnga savollar aralashib ketgan bo'lsa — bot ularni avtomatik ajratadi.\n" +
+  "_(Skanerlangan/rasm PDF emas — matnli PDF bo'lsin.)_";
 const cdAskQuestions = (title: string, paras: number, lettered: string) =>
   `✅ Passage qabul qilindi!\n📌 Sarlavha: *${title}*\n📄 Paragraflar: ${paras} ta${lettered}\n\n` +
   "Endi shu passage'ning *savollarini* yuboring (matn yoki fayl).\n\n" +
@@ -924,7 +958,7 @@ async function handleCdDocument(chatId: number, from: any, doc: any) {
   let text: string;
   try {
     const bytes = await downloadTgFile(doc.file_id);
-    text = cdExtractText(bytes, doc.file_name || "");
+    text = await cdExtractText(bytes, doc.file_name || "");
   } catch (e) {
     await sendMessage(chatId, "⚠️ Faylni o'qib bo'lmadi: " + (e as Error).message);
     return;
