@@ -49,10 +49,12 @@ ASK_QUESTIONS = (
     "✅ Passage qabul qilindi!\n"
     "📌 Sarlavha: *{title}*\n"
     "📄 Paragraflar: {paras} ta{lettered}\n\n"
+    "👀 *Namuna (boshi):*\n_{preview}_\n\n"
+    "Agar matn biroz chalkash chiqsa — xavotir olmang: oxirida tayyor HTML'ni "
+    "*o'zingiz tahrirlab* (bold, markaz, o'lcham) tuzatib olasiz.\n\n"
     "Endi shu passage'ning *savollarini* yuboring (matn yoki fayl).\n\n"
-    "Ikki yo'l bor:\n"
     "1️⃣ *Toza Cambridge matni* — shundoq tashlang, bot turlarni o'zi taniydi.\n"
-    "2️⃣ *Aniq shablon* — 100% ishonchli (quyida namuna). /qtemplate ni yuboring."
+    "2️⃣ *Aniq shablon* — 100% ishonchli. /qtemplate ni yuboring."
 )
 
 QTEMPLATE = (
@@ -150,7 +152,10 @@ DONE = (
     "🎉 *Tayyor!* CD Reading testingiz quyida.\n\n"
     "📊 {total} ta savol · {passages} ta passage · "
     "{reveal} · izoh: {expl}\n\n"
-    "HTML faylni brauzerda oching yoki o'quvchilarga tarqating. 💙"
+    "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → yuqoridagi *✏️* tugmasini "
+    "bosing → matn/savollarni tahrirlang (bold, markaz, o'lcham) → *💾 Saqlash* "
+    "bilan toza yakuniy faylni yuklab oling.\n\n"
+    "So'ng o'quvchilarga tarqating. 💙"
 )
 
 BAD_FILE = (
@@ -286,9 +291,11 @@ async def _handle_passage(update, context, text) -> None:
     cd["cur_passage"] = p
     cd["step"] = "questions"
     lettered = " (A, B, C… belgilangan)" if p.lettered else ""
+    preview = " ".join(p.paragraphs)[:180].strip()
+    preview = (preview + "…") if preview else "(matn topilmadi)"
     await update.message.reply_text(
         ASK_QUESTIONS.format(title=p.title or "—", paras=len(p.paragraphs),
-                             lettered=lettered),
+                             lettered=lettered, preview=preview),
         parse_mode=ParseMode.MARKDOWN,
     )
 
