@@ -69,6 +69,53 @@ def test_passage_lettered_no_blank_lines():
     assert p.paragraphs[0].startswith("On a May morning")
 
 
+def test_strip_ielts_boilerplate():
+    text = ("READING PASSAGE 1\n\n"
+            "You should spend about 20 minutes on Questions 1-13, which are "
+            "based on Reading Passage 1 below.\n\n"
+            "The history of glass\n\n"
+            "From our earliest origins man has been making use of glass in "
+            "many different forms throughout history here today.\n\n"
+            "Archaeologists found evidence of man-made glass dating back to "
+            "the year 4000 BC in that ancient region long ago.\n\n"
+            "3\n\nDiyorbek IELTS")
+    p = passage_mod.parse_passage(text)
+    assert p.title == "The history of glass"
+    assert len(p.paragraphs) == 2
+    joined = " ".join(p.paragraphs)
+    assert "READING PASSAGE" not in joined
+    assert "You should spend" not in joined
+    assert "Diyorbek" not in joined
+    assert "3" not in p.paragraphs
+
+
+def test_strip_page_numbers_in_lettered():
+    text = ("The impact of tourism\n\n"
+            "A Tourism has become one of the world's largest industries in "
+            "recent decades and employs millions of people worldwide now.\n\n"
+            "14\n\n"
+            "B Many developing countries rely heavily on tourism income which "
+            "can create a degree of economic vulnerability for them here.\n\n"
+            "15\n\n"
+            "C Environmental concerns about mass tourism have grown a lot and "
+            "coastal areas are particularly affected by this trend today.")
+    p = passage_mod.parse_passage(text)
+    assert p.lettered is True and len(p.paragraphs) == 3
+    assert "14" not in p.paragraphs and "15" not in p.paragraphs
+
+
+def test_url_warning():
+    text = ("Some topic\n\n"
+            "This is a genuine paragraph about an interesting subject that is "
+            "clearly long enough to be counted as real content here today.\n\n"
+            "Visit www.example-ielts.uz for more practice tests\n\n"
+            "Another real paragraph discussing the topic in enough detail to "
+            "qualify as authentic passage content for the reader here now.")
+    p = passage_mod.parse_passage(text)
+    assert "junk" in p.warnings
+    assert not any("www." in x for x in p.paragraphs)
+
+
 def test_split_passage_and_questions():
     text = ("Title\n\nBody paragraph one.\n\nBody two.\n\n"
             "Questions 1-5\nComplete the notes below.\n1. foo\n")

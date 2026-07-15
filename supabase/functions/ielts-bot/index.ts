@@ -826,6 +826,16 @@ const cdAskQuestions = (title: string, paras: number, lettered: string, preview:
   "2️⃣ Aniq shablon (100% ishonchli) — /qtemplate ni yuboring.";
 const CD_NO_Q =
   "🤔 Savollarni ajratib bo'lmadi. Iltimos aniq shablondan foydalaning — /qtemplate ni yuboring.";
+
+function cdWarnText(warnings: string[]): string {
+  if (!warnings || !warnings.length) return "";
+  const msgs: string[] = [];
+  if (warnings.includes("junk")) msgs.push("• URL/reklama yozuvlari topildi va olib tashlandi");
+  if (warnings.includes("short")) msgs.push("• Matn juda qisqa — to'liq passage yuborilganini tekshiring");
+  if (!msgs.length) return "";
+  return "⚠️ *Diqqat:*\n" + msgs.join("\n") +
+    "\nNamunani ko'rib chiqing; kerak bo'lsa oxirida HTML'da tuzatasiz.\n\n";
+}
 const CD_ASK_REVEAL =
   "⚙️ *Sozlama 1/2 — javoblar qachon ko'rinsin?*\n\n" +
   "⚡ *Darrov* — «Deliver» bosilganda to'g'ri javoblar darrov ko'rinadi.\n" +
@@ -914,7 +924,7 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
     const lettered = p.lettered ? " (A, B, C… belgilangan)" : "";
     let preview = p.paragraphs.join(" ").slice(0, 180).trim();
     preview = preview ? preview + "…" : "(matn topilmadi)";
-    await sendMessage(chatId, cdAskQuestions(p.title || "—", p.paragraphs.length, lettered, preview));
+    await sendMessage(chatId, cdWarnText(p.warnings) + cdAskQuestions(p.title || "—", p.paragraphs.length, lettered, preview));
   } else if (step === "questions") {
     const p = data.curPassage!;
     const groups = CD.parseQuestions(text, p.paragraphs.length).filter((g) => CD.numbersOf(g).length);
