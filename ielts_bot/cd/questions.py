@@ -64,10 +64,11 @@ _INSTRUCTION_RE = re.compile(
     r"nb\b|classify|select)",
     re.IGNORECASE)
 
-# gap belgilari
-_GAP_UNDERSCORE = re.compile(r"_{2,}")
-_GAP_DOTS = re.compile(r"\.{4,}")
+# gap belgilari — chiziqcha, ASCII nuqtalar, Unicode ellipsis (… ‥ ․ · •)
+_GAP_ANY = r"(?:_{2,}|…+|\.{4,}|[…․‥·•‧]{2,})"
 _GAP_EXPLICIT = re.compile(r"\{\s*(\d{1,3})\s*\}")
+_GAP_NUMBERED = re.compile(r"(\d{1,3})\s*(?:" + _GAP_ANY + r")")
+_GAP_BARE = re.compile(_GAP_ANY)
 
 
 # =========================================================================
@@ -207,17 +208,16 @@ def _build_gap(qtype, start, end, instructions, body_lines) -> QuestionGroup:
 
 
 def _has_gap(line: str) -> bool:
-    return bool(_GAP_UNDERSCORE.search(line) or _GAP_DOTS.search(line)
-                or _GAP_EXPLICIT.search(line))
+    return bool(_GAP_EXPLICIT.search(line) or _GAP_BARE.search(line))
 
 
 def _normalize_gaps(body: str, start: Optional[int]) -> Tuple[str, List[int]]:
     """Barcha gap belgilarini `{{Q<N>}}` tokeniga aylantiradi.
 
-    Aniq `{N}` bo'lsa — o'sha raqam; aks holda `start` dan ketma-ket.
+    Tartib: aniq `{N}` -> "N ....." (raqam-oldida) -> qolgan bo'sh joylar ketma-ket.
+    Chiziqcha, ASCII nuqtalar va Unicode ellipsis (…) qo'llab-quvvatlanadi.
     """
     numbers: List[int] = []
-    counter = {"n": start or 1}
 
     # 1) Aniq {N}
     def repl_explicit(m):
@@ -227,19 +227,24 @@ def _normalize_gaps(body: str, start: Optional[int]) -> Tuple[str, List[int]]:
 
     body = _GAP_EXPLICIT.sub(repl_explicit, body)
 
-    has_explicit = bool(numbers)
-    if has_explicit:
-        counter["n"] = max(numbers) + 1
+    # 2) "N ....." — raqam gap oldida (summary completion odatda shunday)
+    def repl_numbered(m):
+        n = int(m.group(1))
+        numbers.append(n)
+        return f"{n} {{{{Q{n}}}}}"
 
-    # 2) Underscore va dot-leader gaplar — ketma-ket
+    body = _GAP_NUMBERED.sub(repl_numbered, body)
+
+    # 3) Qolgan bo'sh joylar — ketma-ket
+    counter = {"n": (max(numbers) + 1) if numbers else (start or 1)}
+
     def repl_seq(m):
         n = counter["n"]
         counter["n"] += 1
         numbers.append(n)
         return f"{{{{Q{n}}}}}"
 
-    body = _GAP_UNDERSCORE.sub(repl_seq, body)
-    body = _GAP_DOTS.sub(repl_seq, body)
+    body = _GAP_BARE.sub(repl_seq, body)
 
     numbers = sorted(set(numbers))
     return body, numbers
@@ -454,7 +459,9 @@ def _auto_one(chunk: str, start, end, para_count) -> Optional[QuestionGroup]:
         qtype = "headings"
     elif re.search(r"which (section|paragraph)", low):
         qtype = "matching_info"
-    elif re.search(r"match each|list of (people|researchers|names)", low):
+    elif re.search(r"match each|list of (people|researchers|names)"
+                   r"|correct ending|from the (box|list) below"
+                   r"|match(ing)? .* (with|to) .* (person|people|option)", low):
         qtype = "matching_features"
     elif re.search(r"choose (two|three|2|3)", low):
         qtype = "mcq_multi"
