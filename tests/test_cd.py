@@ -104,6 +104,40 @@ def test_strip_page_numbers_in_lettered():
     assert "14" not in p.paragraphs and "15" not in p.paragraphs
 
 
+def test_boilerplate_wrapped_timing_and_title_safety():
+    # "You should spend..." ikki qatorga bo'lingan + title himoyasi
+    text = ("READING PASSAGE 2\n\n"
+            "You should spend about 20 minutes on Questions 14-26,\n"
+            "which are based on Reading Passage 2 below.\n\n"
+            "Lapis lazuli\n\n"
+            "Lapis lazuli is a deep blue metamorphic rock that has been prized "
+            "since antiquity for its wonderfully intense blue colour today.\n\n"
+            "For centuries it was ground into powder to make the pigment "
+            "ultramarine which was used by many Renaissance painters back then.")
+    p = passage_mod.parse_passage(text)
+    assert p.title == "Lapis lazuli", p.title
+    assert not any("READING PASSAGE" in x or "You should spend" in x
+                   or "based on Reading" in x for x in p.paragraphs)
+
+
+def test_boilerplate_letter_spaced_header():
+    text = ("R E A D I N G   P A S S A G E   2\n\n"
+            "Lapis lazuli\n\n"
+            "Lapis lazuli is a deep blue rock prized since antiquity for its "
+            "wonderful and intense blue colour all around the world today here.\n\n"
+            "It was ground to make the pigment ultramarine used widely by very "
+            "many famous Renaissance painters across the whole of Europe then.")
+    p = passage_mod.parse_passage(text)
+    assert p.title == "Lapis lazuli", p.title
+    assert not any("READING" in x.upper().replace(" ", "") for x in p.paragraphs)
+
+
+def test_title_safety_rejects_boilerplate():
+    assert passage_mod._looks_like_title("READING PASSAGE 2") is False
+    assert passage_mod._looks_like_title("R E A D I N G   P A S S A G E   2") is False
+    assert passage_mod._looks_like_title("Lapis lazuli") is True
+
+
 def test_url_warning():
     text = ("Some topic\n\n"
             "This is a genuine paragraph about an interesting subject that is "

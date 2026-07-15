@@ -71,9 +71,17 @@ const HEADER_NOISE =
 
 // IELTS "ishchi yozuvlari" — asl passage emas
 const BOILERPLATE =
-  /^\s*(reading\s+passage\s*\d*|part\s+\d+\s*$|section\s+\d+\s*$|you\s+should\s+spend\s+about.*based\s+on\s+reading\s+passage|.*which\s+are\s+based\s+on\s+reading|.*based\s+on\s+reading\s+passage|reading\s+passage\s+\d+\s+has\b|the\s+reading\s+passage\s+below|turn\s+over\b|page\s+\d+\b|\d{1,3}\s+of\s+\d{1,3}\s*$)/i;
+  /^\s*(reading\s+passage\b|part\s+\d+\s*$|section\s+\d+\s*$|you\s+should\s+spend\b|.*\bbased\s+on\s+reading\s+passage\b|.*\bwhich\s+are\s+based\s+on\b|reading\s+passage\s+\d+\s+has\b|the\s+reading\s+passage\s+below\b|turn\s+over\b|page\s+\d+\b|\d{1,3}\s+of\s+\d{1,3}\s*$)/i;
+// Harf-oralig'i: "R E A D I N G  P A S S A G E  2" -> "readingpassage2"
+const BOILERPLATE_DESPACED = /^(readingpassage|passage|part|section)\d+$/;
 const PAGENUM = /^\s*[-–—•·|]*\s*\d{1,3}\s*[-–—•·|]*\s*$/;
 const URLISH = /(https?:\/\/|www\.\w|t\.me\/|@[A-Za-z0-9_]{3,})/i;
+
+function isBoilerplateLine(s: string): boolean {
+  if (BOILERPLATE.test(s) || PAGENUM.test(s)) return true;
+  const despaced = s.replace(/[\s.:|·•–—-]+/g, "").toLowerCase();
+  return despaced.length <= 22 && BOILERPLATE_DESPACED.test(despaced);
+}
 
 // IELTS ishchi yozuvlari, bet raqami, kolontitul va URL'larni olib tashlaydi.
 export function stripBoilerplate(text: string): [string, string[]] {
@@ -86,7 +94,7 @@ export function stripBoilerplate(text: string): [string, string[]] {
   for (const ln of lines) {
     const s = ln.trim();
     if (!s) { out.push(""); continue; }
-    if (BOILERPLATE.test(s) || PAGENUM.test(s)) continue;
+    if (isBoilerplateLine(s)) continue;
     if (URLISH.test(s)) { if (!warnings.includes("junk")) warnings.push("junk"); continue; }
     if ((counts[s] || 0) >= 2 && s.length < 60 && !/[.!?:;"]$/.test(s)) continue;
     out.push(ln);
@@ -149,6 +157,8 @@ export function parsePassage(text: string, index = 1): Passage {
 function looksLikeTitle(line: string): boolean {
   if (!line || line.length > 90) return false;
   if (/[.,:;]$/.test(line)) return false;
+  // Ishchi yozuvni sarlavha deb olmaymiz (himoya to'ri)
+  if (isBoilerplateLine(line) || /reading\s+passage|you\s+should\s+spend|questions?\s+\d/i.test(line)) return false;
   return line.split(/\s+/).length <= 12;
 }
 function looksLikeSubtitle(line: string): boolean {

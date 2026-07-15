@@ -41,25 +41,36 @@ _HEADER_NOISE = re.compile(
 # IELTS "ishchi yozuvlari" (rabochiy matn) — asl passage emas, olib tashlanadi
 _BOILERPLATE = re.compile(
     r"^\s*("
-    r"reading\s+passage\s*\d*"                 # READING PASSAGE 1
+    r"reading\s+passage\b"                     # READING PASSAGE 2 (+ davomi)
     r"|part\s+\d+\s*$"
     r"|section\s+\d+\s*$"
-    r"|you\s+should\s+spend\s+about"           # vaqt yo'riqnomasi
-    r".*based\s+on\s+reading\s+passage"        # "...based on Reading Passage 1 below"
-    r"|.*which\s+are\s+based\s+on\s+reading"
-    r"|.*based\s+on\s+reading\s+passage"
+    r"|you\s+should\s+spend\b"                 # "You should spend about 20 minutes..."
+    r"|.*\bbased\s+on\s+reading\s+passage\b"   # wrap davomi: "...based on Reading Passage 2 below"
+    r"|.*\bwhich\s+are\s+based\s+on\b"
     r"|reading\s+passage\s+\d+\s+has\b"        # "...has seven paragraphs A-G"
-    r"|the\s+reading\s+passage\s+below"
+    r"|the\s+reading\s+passage\s+below\b"
     r"|turn\s+over\b"                          # "TURN OVER"
     r"|page\s+\d+\b"
     r"|\d{1,3}\s+of\s+\d{1,3}\s*$"
     r")",
     re.IGNORECASE,
 )
+# Harf-oralig'i (letter-spacing) uchun: "R E A D I N G  P A S S A G E  2" -> "readingpassage2"
+_BOILERPLATE_DESPACED = re.compile(r"^(readingpassage|passage|part|section)\d+$")
 # Bet raqami: yolg'iz son ("3", "- 3 -", "• 3")
 _PAGENUM = re.compile(r"^\s*[-–—•·|]*\s*\d{1,3}\s*[-–—•·|]*\s*$")
 # URL / telegram / reklama yozuvlari
 _URLISH = re.compile(r"(https?://|www\.\w|t\.me/|@[A-Za-z0-9_]{3,})", re.IGNORECASE)
+
+
+def _is_boilerplate_line(s: str) -> bool:
+    """Ishchi yozuv qatorimi? (harf-oralig'ini ham hisobga oladi)."""
+    if _BOILERPLATE.match(s) or _PAGENUM.match(s):
+        return True
+    despaced = re.sub(r"[\s.:|·•–—-]+", "", s).lower()
+    if len(despaced) <= 22 and _BOILERPLATE_DESPACED.match(despaced):
+        return True
+    return False
 
 
 def strip_boilerplate(text: str) -> Tuple[str, List[str]]:
@@ -80,7 +91,7 @@ def strip_boilerplate(text: str) -> Tuple[str, List[str]]:
         if not s:
             out.append("")
             continue
-        if _BOILERPLATE.match(s) or _PAGENUM.match(s):
+        if _is_boilerplate_line(s):
             continue
         if _URLISH.search(s):
             if "junk" not in warnings:
@@ -184,6 +195,10 @@ def _looks_like_title(line: str) -> bool:
     if not line or len(line) > 90:
         return False
     if line.endswith((".", ",", ":", ";")):
+        return False
+    # Ishchi yozuvni sarlavha deb olmaymiz (himoya to'ri)
+    if _is_boilerplate_line(line) or re.search(
+            r"reading\s+passage|you\s+should\s+spend|questions?\s+\d", line, re.IGNORECASE):
         return False
     # ko'p so'zli gap emas, sarlavhasimon
     return len(line.split()) <= 12
