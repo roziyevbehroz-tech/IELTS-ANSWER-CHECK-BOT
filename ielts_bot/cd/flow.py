@@ -80,7 +80,7 @@ QTEMPLATE = (
     "9. Another stem?\n"
     "A ...\nB ...\nC ...\n\n"
     "[mcq_multi] 10-11\n"
-    "Choose TWO letters. Which TWO ...?\n"
+    "Choose TWO letters. Which TWO ...?  (javob: `10-11. B, D`)\n"
     "A ...\nB ...\nC ...\nD ...\nE ...\n\n"
     "[headings] 12-14\n"
     "List of Headings:\n"
@@ -113,7 +113,8 @@ Q_SUMMARY = (
     "Endi shu savollarning *to'g'ri javoblarini* yuboring. Namuna:\n"
     "```\n{example}\n```\n"
     "Muqobil javob: `24. vegetable / vegetation`. "
-    "TRUE/FALSE/NG uchun: `5. TRUE`. Harflar uchun: `8. B`."
+    "TRUE/FALSE/NG uchun: `5. TRUE`. Harflar uchun: `8. B`.\n"
+    "Ko'p tanlovli (Choose TWO/THREE): `12-13. C, D` — tartib muhim emas."
 )
 
 NO_QUESTIONS = (
@@ -322,7 +323,9 @@ def _answer_example(groups) -> str:
             ex.append(f"{n}. TRUE")
         elif g.kind == "ynng":
             ex.append(f"{n}. YES")
-        elif g.kind in ("mcq", "mcq_multi", "matching"):
+        elif g.kind == "mcq_multi":
+            ex.append(f"{g.start}-{g.end}. B, D")
+        elif g.kind in ("mcq", "matching"):
             ex.append(f"{n}. B")
         else:
             ex.append(f"{n}. answer")

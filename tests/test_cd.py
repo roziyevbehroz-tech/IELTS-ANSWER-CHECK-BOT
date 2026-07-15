@@ -156,6 +156,31 @@ def test_answers_parse_and_validate():
     assert missing == [4] and extra == []
 
 
+def test_answers_range_multi_two():
+    # Choose TWO: "22-23. C, D" -> 22=C, 23=D (tartib muhim emas, tekshirgich to'plamli)
+    key = ans_mod.parse_answer_key("1. white\n22-23. C, D\n24. TRUE\n")
+    assert key == {1: "white", 22: "C", 23: "D", 24: "TRUE"}
+
+
+def test_answers_range_multi_three():
+    assert ans_mod.parse_answer_key("12-14. B, D, F") == {12: "B", 13: "D", 14: "F"}
+
+
+def test_answers_range_variants():
+    assert ans_mod.parse_answer_key("22 & 23. B/E") == {22: "B", 23: "E"}
+
+
+def test_q_multi_and_header_autodetect():
+    txt = ("Questions 22 and 23\nChoose TWO letters, A-E.\n"
+           "Which TWO problems are mentioned?\nA cost\nB noise\nC safety\n"
+           "D time\nE space\n")
+    g = q_mod.parse_questions(txt)
+    assert len(g) == 1
+    assert g[0].kind == "mcq_multi"
+    assert g[0].start == 22 and g[0].end == 23
+    assert [o[0] for o in g[0].options] == list("ABCDE")
+
+
 # ------------------------------- render -------------------------------
 
 def _build_test(reveal="end"):

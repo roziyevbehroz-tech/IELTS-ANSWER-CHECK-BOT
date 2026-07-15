@@ -57,7 +57,7 @@ _OPT_LINE_LOOSE = re.compile(r"^\s*([A-Z])\s+(\S.*)$")            # A text
 _ROMAN_LINE = re.compile(
     r"^\s*(x{0,3}(?:ix|iv|v?i{0,3}))\s*[\.\)]?\s+(.+)$", re.IGNORECASE)
 _QUESTIONS_HDR = re.compile(
-    r"questions?\s+(\d+)\s*[-–—]\s*(\d+)", re.IGNORECASE)
+    r"questions?\s+(\d+)\s*(?:[-–—]|and|&|,)\s*(\d+)", re.IGNORECASE)
 _INSTRUCTION_RE = re.compile(
     r"^\s*(complete|choose|write|do the following|match|label|answer|which|"
     r"the (text|passage|reading)|look at|reading passage|list of headings|"
@@ -480,7 +480,6 @@ def _auto_one(chunk: str, start, end, para_count) -> Optional[QuestionGroup]:
     else:
         qtype = "sentence"
 
-    instr, rest = _split_instructions(body_lines)
-    return _build_group(qtype, start, end, "", rest if instr else body_lines,
-                       para_count) or _build_group(
-        qtype, start, end, "", body_lines, para_count)
+    # _build_group o'zi yo'riqnomani ajratadi — bu yerda oldindan split qilmaymiz
+    # (aks holda birinchi variant/element yo'qoladi).
+    return _build_group(qtype, start, end, "", body_lines, para_count)

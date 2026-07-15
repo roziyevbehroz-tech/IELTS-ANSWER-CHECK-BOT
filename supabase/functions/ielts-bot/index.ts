@@ -648,6 +648,35 @@ function newDraft(): CdDraft {
     settings: CD.newSettings(), explanations: {} };
 }
 
+// Ko'p tanlovli (Choose TWO/THREE) javoblar: "12-13. C, D" -> {12:"C",13:"D"}.
+// Tekshirgich to'plam sifatida solishtiradi (tartib muhim emas).
+const CD_RANGE_LETTERS = /^\s*(\d{1,3})\s*[-–—&,\/]\s*(\d{1,3})\s*[.\):]?\s*([A-Za-z](?:\s*[,\/&]?\s*[A-Za-z])*)\s*$/;
+function parseCdAnswers(text: string): Record<number, string> {
+  const out: Record<number, string> = {};
+  const rest: string[] = [];
+  for (const raw of (text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(CD_RANGE_LETTERS);
+    if (m) {
+      const s = Number(m[1]), e = Number(m[2]);
+      const letters = (m[3].toUpperCase().match(/[A-Z]/g)) || [];
+      if (e >= s && (e - s + 1) >= 2 && (e - s + 1) <= 11 && letters.length) {
+        let i = 0;
+        for (let q = s; q <= e; q++) out[q] = letters[i++] ?? letters[letters.length - 1];
+        continue;
+      }
+    }
+    rest.push(raw);
+  }
+  const base = parseAnswers(rest.join("\n"));
+  for (const k of Object.keys(base)) {
+    const n = Number(k);
+    if (!(n in out)) out[n] = base[n];
+  }
+  return out;
+}
+
 async function getDraft(tgId: number): Promise<{ step: string; data: CdDraft } | null> {
   try {
     const c = await sb();
@@ -807,7 +836,7 @@ const CD_QTEMPLATE =
   "```\n[note] 1-3\nComplete the notes. ONE WORD ONLY.\n- emperor wore ___ silk\n- payment of ___\n- used in ___ trade\n\n" +
   "[tfng] 4-5\nTRUE FALSE NOT GIVEN\n4. Statement one.\n5. Statement two.\n\n" +
   "[mcq] 6-6\nChoose the correct letter.\n6. Question stem?\nA option a\nB option b\nC option c\n\n" +
-  "[mcq_multi] 7-8\nChoose TWO letters.\nA ...\nB ...\nC ...\nD ...\nE ...\n\n" +
+  "[mcq_multi] 7-8\nChoose TWO letters. (javob: `7-8. B, D` — tartib muhim emas)\nA ...\nB ...\nC ...\nD ...\nE ...\n\n" +
   "[headings] 9-10\nList of Headings:\ni Heading one\nii Heading two\niii Heading three\n9. Paragraph A\n10. Paragraph B\n\n" +
   "[matching_info] 11-12 | A-F\nWhich paragraph contains...?\n11. info one\n12. info two\n\n" +
   "[matching_features] 13-14 | A-C\nMatch each statement with a person.\nA Smith\nB Jones\nC Lee\n13. one\n14. two\n\n" +
@@ -894,15 +923,17 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
       const k = CD.kindOf(g);
       if (k === "tfng") return `${g.start}. TRUE`;
       if (k === "ynng") return `${g.start}. YES`;
-      if (k === "mcq" || k === "mcq_multi" || k === "matching") return `${g.start}. B`;
+      if (k === "mcq_multi") return `${g.start}-${g.end}. B, D`;
+      if (k === "mcq" || k === "matching") return `${g.start}. B`;
       return `${g.start}. answer`;
     }).join("\n");
     await sendMessage(chatId,
       `🧩 *Savollar aniqlandi!*\n\n${lines}\nJami: *${new Set(nums).size}* ta (Q${first}–${last}).\n\n` +
       "Endi *to'g'ri javoblarni* yuboring. Namuna:\n```\n" + ex + "\n```\n" +
-      "Muqobil: `24. vegetable / vegetation`.");
+      "Muqobil javob: `24. vegetable / vegetation`.\n" +
+      "Ko'p tanlovli (Choose TWO/THREE): `12-13. C, D` — tartib muhim emas.");
   } else if (step === "answers") {
-    const key = parseAnswers(text);
+    const key = parseCdAnswers(text);
     if (!Object.keys(key).length) { await sendMessage(chatId, "🤔 Javoblarni o'qib bo'lmadi. Namuna: `1. white`  `2. TRUE`  `3. B`"); return; }
     const p = data.curPassage!;
     const groups = data.curGroups!;
