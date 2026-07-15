@@ -105,6 +105,7 @@ class Passage:
     lettered: bool = False           # paragraflar A, B, C bilan belgilanganmi
     groups: List[QuestionGroup] = field(default_factory=list)
     answers: Dict[int, str] = field(default_factory=dict)
+    warnings: List[str] = field(default_factory=list)  # tozalashda topilgan muammolar
 
     @property
     def q_start(self) -> int:

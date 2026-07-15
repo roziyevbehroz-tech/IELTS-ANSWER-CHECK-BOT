@@ -14,7 +14,7 @@ export interface QuestionGroup {
 }
 export interface Passage {
   title: string; subtitle: string; paragraphs: string[]; lettered: boolean;
-  groups: QuestionGroup[]; answers: Record<number, string>;
+  groups: QuestionGroup[]; answers: Record<number, string>; warnings: string[];
 }
 export interface Settings {
   revealMode: string; explanations: boolean; durationMin: number;
@@ -69,7 +69,48 @@ const QUESTION_MARKERS =
 const HEADER_NOISE =
   /^\s*(reading\s+passage\s*\d*|part\s*\d+|passage\s*\d+|you\s+should\s+spend\s+about|read\s+the\s+(text|passage)|the\s+reading\s+passage\s+below)\b.*$/i;
 
+// IELTS "ishchi yozuvlari" — asl passage emas
+const BOILERPLATE =
+  /^\s*(reading\s+passage\s*\d*|part\s+\d+\s*$|section\s+\d+\s*$|you\s+should\s+spend\s+about.*based\s+on\s+reading\s+passage|.*which\s+are\s+based\s+on\s+reading|.*based\s+on\s+reading\s+passage|reading\s+passage\s+\d+\s+has\b|the\s+reading\s+passage\s+below|turn\s+over\b|page\s+\d+\b|\d{1,3}\s+of\s+\d{1,3}\s*$)/i;
+const PAGENUM = /^\s*[-–—•·|]*\s*\d{1,3}\s*[-–—•·|]*\s*$/;
+const URLISH = /(https?:\/\/|www\.\w|t\.me\/|@[A-Za-z0-9_]{3,})/i;
+
+// IELTS ishchi yozuvlari, bet raqami, kolontitul va URL'larni olib tashlaydi.
+export function stripBoilerplate(text: string): [string, string[]] {
+  const lines = text.split("\n");
+  const counts: Record<string, number> = {};
+  for (const ln of lines) { const s = ln.trim(); if (s) counts[s] = (counts[s] || 0) + 1; }
+
+  const out: string[] = [];
+  const warnings: string[] = [];
+  for (const ln of lines) {
+    const s = ln.trim();
+    if (!s) { out.push(""); continue; }
+    if (BOILERPLATE.test(s) || PAGENUM.test(s)) continue;
+    if (URLISH.test(s)) { if (!warnings.includes("junk")) warnings.push("junk"); continue; }
+    if ((counts[s] || 0) >= 2 && s.length < 60 && !/[.!?:;"]$/.test(s)) continue;
+    out.push(ln);
+  }
+  const intermediate = out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  // Blok darajasida — kontentdan keyingi qisqa bir qatorli furnitura
+  const blocks = intermediate.split(/\n\s*\n/);
+  const kept: string[] = [];
+  let seenReal = false;
+  for (const blk of blocks) {
+    const b = blk.trim();
+    if (!b) continue;
+    const isReal = b.length > 60 || /[.!?"”]$/.test(b.trimEnd());
+    const isLetter = /^[A-M]([.\)]|\s|$)/.test(b);
+    if (seenReal && !isReal && b.length < 50 && b.indexOf("\n") === -1 && !isLetter) continue;
+    kept.push(b);
+    if (isReal) seenReal = true;
+  }
+  return [kept.join("\n\n").trim(), warnings];
+}
+
 export function splitPassageAndQuestions(text: string): [string, string] {
+  text = stripBoilerplate(text)[0];   // ishchi yozuvlar cut'ni chalg'itmasin
   const lines = text.split("\n");
   let cut = -1;
   for (let i = 0; i < lines.length; i++) {
@@ -83,7 +124,8 @@ export function splitPassageAndQuestions(text: string): [string, string] {
 }
 
 export function parsePassage(text: string, index = 1): Passage {
-  text = text.trim();
+  const [clean, warnings] = stripBoilerplate(text.trim());
+  text = clean;
   let lines = text.split("\n");
   while (lines.length && (!lines[0].trim() || HEADER_NOISE.test(lines[0]))) lines.shift();
 
@@ -100,7 +142,8 @@ export function parsePassage(text: string, index = 1): Passage {
   }
   const body = lines.join("\n").trim();
   const [paragraphs, lettered] = splitParagraphs(body);
-  return { title, subtitle, paragraphs, lettered, groups: [], answers: {} };
+  if (paragraphs.join("").length < 150 && !warnings.includes("short")) warnings.push("short");
+  return { title, subtitle, paragraphs, lettered, groups: [], answers: {}, warnings };
 }
 
 function looksLikeTitle(line: string): boolean {

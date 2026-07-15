@@ -293,11 +293,24 @@ async def _handle_passage(update, context, text) -> None:
     lettered = " (A, B, C… belgilangan)" if p.lettered else ""
     preview = " ".join(p.paragraphs)[:180].strip()
     preview = (preview + "…") if preview else "(matn topilmadi)"
+    warn = _warn_text(p.warnings)
     await update.message.reply_text(
-        ASK_QUESTIONS.format(title=p.title or "—", paras=len(p.paragraphs),
-                             lettered=lettered, preview=preview),
+        warn + ASK_QUESTIONS.format(title=p.title or "—", paras=len(p.paragraphs),
+                                    lettered=lettered, preview=preview),
         parse_mode=ParseMode.MARKDOWN,
     )
+
+
+def _warn_text(warnings) -> str:
+    if not warnings:
+        return ""
+    msgs = []
+    if "junk" in warnings:
+        msgs.append("• URL/reklama yozuvlari topildi va olib tashlandi")
+    if "short" in warnings:
+        msgs.append("• Matn juda qisqa — to'liq passage yuborilganini tekshiring")
+    return ("⚠️ *Diqqat:*\n" + "\n".join(msgs) +
+            "\nNamunani ko'rib chiqing; kerak bo'lsa oxirida HTML'da tuzatasiz.\n\n")
 
 
 async def _handle_questions(update, context, text) -> None:

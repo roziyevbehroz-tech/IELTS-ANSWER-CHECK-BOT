@@ -38,12 +38,92 @@ _HEADER_NOISE = re.compile(
     re.IGNORECASE,
 )
 
+# IELTS "ishchi yozuvlari" (rabochiy matn) — asl passage emas, olib tashlanadi
+_BOILERPLATE = re.compile(
+    r"^\s*("
+    r"reading\s+passage\s*\d*"                 # READING PASSAGE 1
+    r"|part\s+\d+\s*$"
+    r"|section\s+\d+\s*$"
+    r"|you\s+should\s+spend\s+about"           # vaqt yo'riqnomasi
+    r".*based\s+on\s+reading\s+passage"        # "...based on Reading Passage 1 below"
+    r"|.*which\s+are\s+based\s+on\s+reading"
+    r"|.*based\s+on\s+reading\s+passage"
+    r"|reading\s+passage\s+\d+\s+has\b"        # "...has seven paragraphs A-G"
+    r"|the\s+reading\s+passage\s+below"
+    r"|turn\s+over\b"                          # "TURN OVER"
+    r"|page\s+\d+\b"
+    r"|\d{1,3}\s+of\s+\d{1,3}\s*$"
+    r")",
+    re.IGNORECASE,
+)
+# Bet raqami: yolg'iz son ("3", "- 3 -", "• 3")
+_PAGENUM = re.compile(r"^\s*[-–—•·|]*\s*\d{1,3}\s*[-–—•·|]*\s*$")
+# URL / telegram / reklama yozuvlari
+_URLISH = re.compile(r"(https?://|www\.\w|t\.me/|@[A-Za-z0-9_]{3,})", re.IGNORECASE)
+
+
+def strip_boilerplate(text: str) -> Tuple[str, List[str]]:
+    """IELTS ishchi yozuvlari, bet raqamlari, takror kolontitul va URL'larni olib
+    tashlaydi. (tozalangan_matn, ogohlantirishlar) qaytaradi."""
+    lines = text.split("\n")
+    counts: dict = {}
+    for ln in lines:
+        s = ln.strip()
+        if s:
+            counts[s] = counts.get(s, 0) + 1
+
+    # 1-bosqich: qator darajasida — ishchi yozuvlar, bet raqami, URL, takror kolontitul
+    out: List[str] = []
+    warnings: List[str] = []
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            out.append("")
+            continue
+        if _BOILERPLATE.match(s) or _PAGENUM.match(s):
+            continue
+        if _URLISH.search(s):
+            if "junk" not in warnings:
+                warnings.append("junk")
+            continue
+        # Takrorlanuvchi qisqa qator = kolontitul (header/footer)
+        if counts.get(s, 0) >= 2 and len(s) < 60 and not s.endswith((".", "!", "?", ":", ";", '"')):
+            continue
+        out.append(ln)
+
+    intermediate = re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+    # 2-bosqich: blok darajasida — asl paragraf boshlangach, qisqa "furnitura"
+    # bloklar (footer/watermark/section label) olib tashlanadi. Title/subtitle
+    # (matn boshidagi qisqa bloklar) saqlanadi.
+    blocks = re.split(r"\n\s*\n", intermediate)
+    kept: List[str] = []
+    seen_real = False
+    for blk in blocks:
+        b = blk.strip()
+        if not b:
+            continue
+        is_real = len(b) > 60 or b.rstrip().endswith((".", "!", "?", '"', "”"))
+        is_letter_marker = bool(re.match(r"^[A-M]([.\)]|\s|$)", b))
+        # Asl kontentdan keyingi qisqa, BIR QATORLI, jumla bo'lmagan, harf-markeri
+        # bo'lmagan blok = furnitura (footer/watermark/label) — olib tashlaymiz.
+        if (seen_real and not is_real and len(b) < 50
+                and "\n" not in b and not is_letter_marker):
+            continue
+        kept.append(b)
+        if is_real:
+            seen_real = True
+
+    cleaned = "\n\n".join(kept).strip()
+    return cleaned, warnings
+
 
 def split_passage_and_questions(text: str) -> Tuple[str, str]:
     """Matnni (passage_qismi, savol_qismi) ga ajratadi.
 
     Savol bo'limi topilmasa, hammasi passage deb qaytariladi.
     """
+    text, _ = strip_boilerplate(text)   # ishchi yozuvlar cut'ni chalg'itmasin
     lines = text.split("\n")
     cut = None
     for i, line in enumerate(lines):
@@ -62,7 +142,7 @@ def split_passage_and_questions(text: str) -> Tuple[str, str]:
 
 def parse_passage(text: str, index: int = 1) -> Passage:
     """Toza passage matnidan `Passage` obyektini quradi."""
-    text = text.strip()
+    text, warnings = strip_boilerplate(text.strip())
     lines = [ln for ln in text.split("\n")]
 
     # 1) Boshdagi shovqin sarlavhalarni tashlab yuboramiz
@@ -87,12 +167,16 @@ def parse_passage(text: str, index: int = 1) -> Passage:
     body = "\n".join(lines).strip()
     paragraphs, lettered = _paragraphs(body)
 
+    if len("".join(paragraphs)) < 150 and "short" not in warnings:
+        warnings.append("short")
+
     return Passage(
         index=index,
         title=title,
         subtitle=subtitle,
         paragraphs=paragraphs,
         lettered=lettered,
+        warnings=warnings,
     )
 
 
