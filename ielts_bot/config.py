@@ -27,7 +27,7 @@ SUPABASE_KEY = (
 
 # Loyihada qamrab olingan Cambridge IELTS Academic kitoblari
 FIRST_BOOK = 10
-LAST_BOOK = 20
+LAST_BOOK = 21
 BOOKS = list(range(FIRST_BOOK, LAST_BOOK + 1))
 
 # Har bir kitobdagi testlar soni
