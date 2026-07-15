@@ -213,6 +213,32 @@ def test_q_matching_features_options_inline():
     assert len(g.items) == 2
 
 
+def test_q_summary_unicode_ellipsis_gaps():
+    # Unicode ellipsis "…" gaplar + raqam-oldida ("1 …")
+    txt = ("Questions 1-3\nComplete the summary below.\n\n"
+           "Sport is important, with around 1 ……… participants and it "
+           "starts conversations between 2 ……… , the source of everyday "
+           "3 ……… .")
+    g = q_mod.parse_questions(txt)
+    assert len(g) == 1 and g[0].kind == "gap"
+    assert [i.number for i in g[0].items] == [1, 2, 3]
+    assert "{{Q1}}" in g[0].body and "{{Q3}}" in g[0].body
+
+
+def test_q_matching_sentence_endings():
+    txt = ("Questions 9-11\n"
+           "Complete each sentence with the correct ending A-G from the box below.\n\n"
+           "9 The change in personnel\n10 Growing interest in health\n"
+           "11 Advertising related to sport\n\n"
+           "A is unlikely to continue.\nB lies in how sport is explained.\n"
+           "C shows a change.\nD makes use of pictures.\nE has resulted in salaries.\n"
+           "F is caused by focus.\nG has led to changes.")
+    g = q_mod.parse_questions(txt)
+    assert len(g) == 1 and g[0].kind == "matching"
+    assert len(g[0].items) == 3
+    assert [o[0] for o in g[0].options] == list("ABCDEFG")
+
+
 def test_q_autodetect_tfng():
     txt = ("Questions 1-3\nDo the following statements agree with the "
            "information? Write TRUE, FALSE or NOT GIVEN.\n"

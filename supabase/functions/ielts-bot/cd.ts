@@ -238,9 +238,12 @@ const OPT_LINE_LOOSE = /^\s*([A-Z])\s+(\S.*)$/;
 const ROMAN_LINE = /^\s*(x{0,3}(?:ix|iv|v?i{0,3}))\s*[.\)]?\s+(.+)$/i;
 const QUESTIONS_HDR = /questions?\s+(\d+)\s*(?:[-–—]|and|&|,)\s*(\d+)/i;
 const INSTRUCTION_RE = /^\s*(complete|choose|write|do the following|match|label|answer|which|the (text|passage|reading)|look at|reading passage|list of headings|nb\b|classify|select)/i;
-const GAP_UNDERSCORE = /_{2,}/g;
-const GAP_DOTS = /\.{4,}/g;
+// gap belgilari — chiziqcha, ASCII nuqtalar, Unicode ellipsis (… ‥ ․ · •)
+const GAP_ANY_SRC = "(?:_{2,}|…+|\\.{4,}|[…․‥·•‧]{2,})";
 const GAP_EXPLICIT = /\{\s*(\d{1,3})\s*\}/g;
+const GAP_NUMBERED = new RegExp("(\\d{1,3})\\s*" + GAP_ANY_SRC, "g");
+const GAP_BARE = new RegExp(GAP_ANY_SRC, "g");
+const GAP_TEST = new RegExp(GAP_ANY_SRC);
 
 function normType(raw: string): string {
   return (raw || "").trim().toLowerCase().replace(/[-_]/g, "");
@@ -317,7 +320,7 @@ function splitInstructions(bodyLines: string[]): [string, string[]] {
 
 // ---- gap ----
 function hasGap(line: string): boolean {
-  return /_{2,}/.test(line) || /\.{4,}/.test(line) || /\{\s*\d{1,3}\s*\}/.test(line);
+  return GAP_TEST.test(line) || /\{\s*\d{1,3}\s*\}/.test(line);
 }
 function buildGap(qtype: string, start: number | null, end: number | null,
   instructions: string, bodyLines: string[]): QuestionGroup {
@@ -339,10 +342,14 @@ function buildGap(qtype: string, start: number | null, end: number | null,
 }
 function normalizeGaps(body: string, start: number | null): [string, number[]] {
   const numbers: number[] = [];
+  // 1) aniq {N}
   body = body.replace(GAP_EXPLICIT, (_m, d) => { const n = Number(d); numbers.push(n); return `{{Q${n}}}`; });
+  // 2) "N ....." — raqam gap oldida (summary completion)
+  body = body.replace(GAP_NUMBERED, (_m, d) => { const n = Number(d); numbers.push(n); return `${n} {{Q${n}}}`; });
+  // 3) qolgan bo'sh joylar — ketma-ket
   let counter = numbers.length ? Math.max(...numbers) + 1 : (start ?? 1);
   const seq = () => { const n = counter++; numbers.push(n); return `{{Q${n}}}`; };
-  body = body.replace(GAP_UNDERSCORE, seq).replace(GAP_DOTS, seq);
+  body = body.replace(GAP_BARE, seq);
   const uniq = [...new Set(numbers)].sort((a, b) => a - b);
   return [body, uniq];
 }
@@ -489,7 +496,7 @@ function autoOne(chunk: string, start: number | null, end: number | null, paraCo
   else if (low.includes("yes") && low.includes("no") && low.includes("not given")) qtype = "ynng";
   else if (low.includes("list of headings")) qtype = "headings";
   else if (/which (section|paragraph)/.test(low)) qtype = "matching_info";
-  else if (/match each|list of (people|researchers|names)/.test(low)) qtype = "matching_features";
+  else if (/match each|list of (people|researchers|names)|correct ending|from the (box|list) below|match(ing)? .* (with|to) .* (person|people|option)/.test(low)) qtype = "matching_features";
   else if (/choose (two|three|2|3)/.test(low)) qtype = "mcq_multi";
   else if (low.includes("choose the correct letter") || /^\s*[A-D]\)/m.test(chunk)) qtype = "mcq";
   else if (low.includes("complete the notes")) qtype = "note";
