@@ -816,8 +816,11 @@ const cdAskPassage = (n: number) =>
   "Qabul qilinadi: 📄 PDF, DOCX yoki oddiy matn.\n" +
   "Matnga savollar aralashib ketgan bo'lsa — bot ularni avtomatik ajratadi.\n" +
   "_(Skanerlangan/rasm PDF emas — matnli PDF bo'lsin.)_";
-const cdAskQuestions = (title: string, paras: number, lettered: string) =>
+const cdAskQuestions = (title: string, paras: number, lettered: string, preview: string) =>
   `✅ Passage qabul qilindi!\n📌 Sarlavha: *${title}*\n📄 Paragraflar: ${paras} ta${lettered}\n\n` +
+  `👀 *Namuna (boshi):*\n_${preview}_\n\n` +
+  "Matn biroz chalkash chiqsa — oxirida tayyor HTML'ni *o'zingiz tahrirlab* " +
+  "(bold, markaz, o'lcham) tuzatasiz.\n\n" +
   "Endi shu passage'ning *savollarini* yuboring (matn yoki fayl).\n\n" +
   "1️⃣ Toza Cambridge matni — bot turlarni o'zi taniydi.\n" +
   "2️⃣ Aniq shablon (100% ishonchli) — /qtemplate ni yuboring.";
@@ -909,7 +912,9 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
     data.curPassage = p;
     await setDraft(from.id, "questions", data);
     const lettered = p.lettered ? " (A, B, C… belgilangan)" : "";
-    await sendMessage(chatId, cdAskQuestions(p.title || "—", p.paragraphs.length, lettered));
+    let preview = p.paragraphs.join(" ").slice(0, 180).trim();
+    preview = preview ? preview + "…" : "(matn topilmadi)";
+    await sendMessage(chatId, cdAskQuestions(p.title || "—", p.paragraphs.length, lettered, preview));
   } else if (step === "questions") {
     const p = data.curPassage!;
     const groups = CD.parseQuestions(text, p.paragraphs.length).filter((g) => CD.numbersOf(g).length);
@@ -974,7 +979,9 @@ async function cdFinish(chatId: number, from: any, data: CdDraft) {
   const explLbl = data.settings.explanations ? "bor" : "yo'q";
   const caption =
     `🎉 *Tayyor!* CD Reading testingiz.\n\n📊 ${total} ta savol · ${data.passages.length} ta passage · ${revealLbl} · izoh: ${explLbl}\n\n` +
-    "HTML faylni brauzerda oching yoki o'quvchilarga tarqating. 💙";
+    "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → *✏️* tugmasi → matn/savollarni " +
+    "tahrirlang (bold, markaz, o'lcham) → *💾 Saqlash* bilan toza faylni yuklab oling.\n\n" +
+    "So'ng o'quvchilarga tarqating. 💙";
   await sendDocumentHtml(chatId, "dream_zone_reading.html", html, caption);
   await clearDraft(from.id);
 }

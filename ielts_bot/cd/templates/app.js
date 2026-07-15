@@ -20,6 +20,7 @@
     setupTimer();
     setupResizer();
     setupParts();
+    setupEditor();
     switchToPart(1);
     var db = document.getElementById("deliver-button");
     if (db) db.addEventListener("click", onDeliver);
@@ -318,5 +319,91 @@
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
+  }
+
+  // ------------------------------ editor ------------------------------
+  // Yaratuvchi HTML'ni to'g'ridan-to'g'ri tahrirlaydi: passage/savol matnlari,
+  // bold/kursiv/markaz/o'lcham. So'ng «Saqlash» — toza yakuniy faylni yuklaydi.
+  var EDIT_SEL = ".reading-passage, .question-prompt, .notes-content, .summary-text, " +
+    ".tf-question-text, .matching-form-label, .heading-bank, .part-header";
+
+  function setupEditor() {
+    var toggle = document.getElementById("cd-edit-toggle");
+    var toolbar = document.getElementById("cd-toolbar");
+    if (!toggle || !toolbar) return;
+    var editing = false;
+
+    toggle.addEventListener("click", function () { editing ? exitEdit() : enterEdit(); });
+    var exitBtn = document.getElementById("cd-exit");
+    var saveBtn = document.getElementById("cd-save");
+    if (exitBtn) exitBtn.addEventListener("click", exitEdit);
+    if (saveBtn) saveBtn.addEventListener("click", saveClean);
+
+    toolbar.querySelectorAll("[data-cmd]").forEach(function (b) {
+      b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      b.addEventListener("click", function (e) {
+        e.preventDefault();
+        try { document.execCommand(b.getAttribute("data-cmd"), false, null); } catch (err) {}
+      });
+    });
+    toolbar.querySelectorAll("[data-size]").forEach(function (b) {
+      b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      b.addEventListener("click", function (e) { e.preventDefault(); changeSize(b.getAttribute("data-size")); });
+    });
+
+    function enterEdit() {
+      editing = true;
+      document.body.classList.add("cd-editing");
+      document.querySelectorAll(EDIT_SEL).forEach(function (el) { el.setAttribute("contenteditable", "true"); });
+      // Form elementlarini "atomik" qilamiz (ichi tahrirlanmasin)
+      document.querySelectorAll("input, select, textarea, button").forEach(function (el) {
+        if (el.closest(".cd-toolbar") || el.id === "cd-edit-toggle") return;
+        el.setAttribute("contenteditable", "false");
+      });
+      toolbar.classList.remove("hidden");
+      toggle.textContent = "✅";
+    }
+    function exitEdit() {
+      editing = false;
+      document.body.classList.remove("cd-editing");
+      document.querySelectorAll('[contenteditable="true"]').forEach(function (el) {
+        if (el.closest(".cd-toolbar")) return;
+        el.setAttribute("contenteditable", "false");
+      });
+      toolbar.classList.add("hidden");
+      toggle.textContent = "✏️";
+    }
+    function changeSize(dir) {
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+      var span = document.createElement("span");
+      span.style.fontSize = dir === "up" ? "1.2em" : "0.85em";
+      try {
+        var r = sel.getRangeAt(0);
+        span.appendChild(r.extractContents());
+        r.insertNode(span);
+        sel.removeAllRanges();
+      } catch (e) {}
+    }
+    function saveClean() {
+      exitEdit();
+      var clone = document.documentElement.cloneNode(true);
+      ["cd-edit-toggle", "cd-toolbar"].forEach(function (id) {
+        var e = clone.querySelector("#" + id); if (e) e.remove();
+      });
+      clone.querySelectorAll("[contenteditable]").forEach(function (e) { e.removeAttribute("contenteditable"); });
+      var cls = clone.querySelector("body"); if (cls) cls.classList.remove("cd-editing", "results-mode");
+      var html = "<!DOCTYPE html>\n" + clone.outerHTML;
+      try {
+        var blob = new Blob([html], { type: "text/html" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "dream_zone_reading.html";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+      } catch (e) {
+        alert("Saqlashda xato. Iltimos faylni tashqi brauzerda (Chrome/Safari) oching.");
+      }
+    }
   }
 })();
