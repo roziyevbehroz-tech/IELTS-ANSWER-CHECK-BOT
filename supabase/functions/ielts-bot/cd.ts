@@ -183,7 +183,7 @@ const NUM_LINE = /^\s*(\d{1,3})\s*[.\):]?\s+(.*)$/;
 const OPT_LINE = /^\s*([A-Z])\s*[.\)]\s+(.+)$/;
 const OPT_LINE_LOOSE = /^\s*([A-Z])\s+(\S.*)$/;
 const ROMAN_LINE = /^\s*(x{0,3}(?:ix|iv|v?i{0,3}))\s*[.\)]?\s+(.+)$/i;
-const QUESTIONS_HDR = /questions?\s+(\d+)\s*[-–—]\s*(\d+)/i;
+const QUESTIONS_HDR = /questions?\s+(\d+)\s*(?:[-–—]|and|&|,)\s*(\d+)/i;
 const INSTRUCTION_RE = /^\s*(complete|choose|write|do the following|match|label|answer|which|the (text|passage|reading)|look at|reading passage|list of headings|nb\b|classify|select)/i;
 const GAP_UNDERSCORE = /_{2,}/g;
 const GAP_DOTS = /\.{4,}/g;
@@ -448,10 +448,9 @@ function autoOne(chunk: string, start: number | null, end: number | null, paraCo
   else if (low.includes("complete the sentences")) qtype = "sentence";
   else if (hasGap(chunk)) qtype = "note";
   else qtype = "sentence";
-  const bodyLines = chunk.split("\n");
-  const [instr, rest] = splitInstructions(bodyLines);
-  return buildGroup(qtype, start, end, "", instr ? rest : bodyLines, paraCount)
-      || buildGroup(qtype, start, end, "", bodyLines, paraCount);
+  // buildGroup o'zi yo'riqnomani ajratadi — oldindan split qilmaymiz
+  // (aks holda birinchi variant/element yo'qoladi).
+  return buildGroup(qtype, start, end, "", chunk.split("\n"), paraCount);
 }
 
 // ============================ render ============================
