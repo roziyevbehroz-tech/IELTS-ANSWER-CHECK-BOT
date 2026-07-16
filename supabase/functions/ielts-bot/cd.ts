@@ -180,23 +180,35 @@ function splitParagraphs(body: string): [string[], boolean] {
 
 // Ketma-ket A, B, C... markerlari bo'yicha paragraflarga bo'ladi (>=3 marker bo'lsa).
 function tryLetteredSplit(body: string): string[] | null {
-  const lines = body.split("\n");
-  const paras: string[] = [];
-  let cur = "", count = 0, expected = "A";
-  for (const raw of lines) {
-    const s = raw.trim();
-    if (!s) continue;
-    const m = s.match(/^([A-M])[.\)]?\s+(.+)/);
-    if (m && m[1] === expected) {
-      if (cur) paras.push(cur.trim());
-      cur = m[2]; count++;
-      expected = String.fromCharCode(expected.charCodeAt(0) + 1);
-    } else {
-      cur = cur ? cur + " " + s : s;
-    }
+  // Markerlar satr boshida HAM, matn oqimi ichida HAM bo'lishi mumkin (PDF
+  // bir tekis oqim bo'lganda). Bet raqami markerga yopishgan bo'lsa ("2D The...")
+  // ham to'g'ri ajratadi. Ketma-ket A, B, C... (>=3) qidiriladi.
+  const flat = body.replace(/\s+/g, " ").trim();
+  if (!flat) return null;
+  const markers: [number, number][] = []; // [cut, textStart]
+  let code = "A".charCodeAt(0);
+  let pos = 0;
+  while (code <= "M".charCodeAt(0)) {
+    const letter = String.fromCharCode(code);
+    // (bosh|bo'shliq) + ixtiyoriy bet raqami + MARKER + ixtiyoriy [.)] +
+    // bo'shliq(lar) + katta harf/raqam/qo'shtirnoq (paragraf boshi)
+    const pat = new RegExp("(?:^|\\s)\\d{0,3}" + letter + "[.\\)]?\\s+(?=[\"'‘“(A-Z0-9])", "g");
+    pat.lastIndex = pos;
+    const m = pat.exec(flat);
+    if (!m) break;
+    markers.push([m.index, pat.lastIndex]);
+    pos = pat.lastIndex;
+    code++;
   }
-  if (cur) paras.push(cur.trim());
-  return count >= 3 ? paras : null;
+  if (markers.length < 3) return null;
+  const paras: string[] = [];
+  for (let i = 0; i < markers.length; i++) {
+    const tstart = markers[i][1];
+    const tend = i + 1 < markers.length ? markers[i + 1][0] : flat.length;
+    const seg = flat.slice(tstart, tend).trim();
+    if (seg) paras.push(seg);
+  }
+  return paras.length >= 3 ? paras : null;
 }
 
 // Yoyilgan matnni ~450+ belgidan iborat mazmunli paragraflarga bo'ladi (gap chegarasida).

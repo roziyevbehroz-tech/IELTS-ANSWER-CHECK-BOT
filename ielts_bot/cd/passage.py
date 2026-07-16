@@ -239,27 +239,40 @@ def _paragraphs(body: str) -> Tuple[List[str], bool]:
 
 
 def _try_lettered_split(body: str) -> List[str] | None:
-    """Ketma-ket A, B, C... markerlari bo'yicha bo'ladi (>=3 marker bo'lsa)."""
+    """Ketma-ket A, B, C... markerlari bo'yicha bo'ladi (>=3 marker bo'lsa).
+
+    Markerlar satr boshida HAM, matn oqimi ichida HAM bo'lishi mumkin (PDF
+    matni bir tekis oqim bo'lib chiqqanda). Bet raqami markerga yopishib
+    qolgan bo'lsa ("2D The...") ham to'g'ri ajratadi.
+    """
+    flat = re.sub(r"\s+", " ", body).strip()
+    if not flat:
+        return None
+    # (cut, text_start): cut — markerdan oldingi kesim joyi; text_start — paragraf matni boshi
+    markers: List[Tuple[int, int]] = []
+    expected = ord("A")
+    pos = 0
+    while expected <= ord("M"):
+        letter = re.escape(chr(expected))
+        # (bosh|bo'shliq) + ixtiyoriy bet raqami + MARKER + ixtiyoriy [.)] +
+        # bo'shliq(lar) + katta harf/raqam/qo'shtirnoq (paragraf boshi)
+        pat = re.compile(
+            r"(?:^|\s)\d{0,3}" + letter + r"[.\)]?\s+(?=[\"'‘“(A-Z0-9])")
+        m = pat.search(flat, pos)
+        if not m:
+            break
+        markers.append((m.start(), m.end()))
+        pos = m.end()
+        expected += 1
+    if len(markers) < 3:
+        return None
     paras: List[str] = []
-    cur = ""
-    count = 0
-    expected = "A"
-    for raw in body.split("\n"):
-        s = raw.strip()
-        if not s:
-            continue
-        m = re.match(r"^([A-M])[.\)]?\s+(.+)", s)
-        if m and m.group(1) == expected:
-            if cur:
-                paras.append(cur.strip())
-            cur = m.group(2)
-            count += 1
-            expected = chr(ord(expected) + 1)
-        else:
-            cur = (cur + " " + s) if cur else s
-    if cur:
-        paras.append(cur.strip())
-    return paras if count >= 3 else None
+    for i, (_cut, tstart) in enumerate(markers):
+        tend = markers[i + 1][0] if i + 1 < len(markers) else len(flat)
+        seg = flat[tstart:tend].strip()
+        if seg:
+            paras.append(seg)
+    return paras if len(paras) >= 3 else None
 
 
 def _chunk_paragraphs(flat: str) -> List[str]:

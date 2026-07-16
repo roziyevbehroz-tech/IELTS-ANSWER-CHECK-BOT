@@ -104,6 +104,34 @@ def test_strip_page_numbers_in_lettered():
     assert "14" not in p.paragraphs and "15" not in p.paragraphs
 
 
+def test_lettered_inline_markers_and_glued_pagenum():
+    # PDF oqim bo'lib chiqqanda markerlar matn ichida; bet raqami markerga
+    # yopishgan ("2D The...") — D/E/F ham to'g'ri ajratilishi kerak.
+    text = (
+        "The history of the biro\n\n"
+        "A One chilly autumn morning in 1945, five thousand shoppers crowded "
+        "the pavements outside Gimbels Department Store in New York City.\n\n"
+        "B In fact, this new pen was not new after all, and was just the "
+        "latest development in a long search for a better pen design here.\n\n"
+        "C Almost fifty years later, Ladislas and Georg Biro came up with a "
+        "solution and fitted the pen with a ball bearing which delivered ink "
+        "to the\n\n"
+        "1\n\n"
+        "2D The first Biro pen relied on gravity for the ink to flow to the "
+        "ball bearing. The Biro brothers eventually devised a new design. "
+        "E The Biros pen soon came to the attention of American fighter "
+        "pilots and the Department of War contacted several companies. "
+        "F Meanwhile, the delay ultimately cost them their advantage as a "
+        "rival firm set up production first in the United States market.")
+    p = passage_mod.parse_passage(text)
+    assert p.lettered is True
+    assert len(p.paragraphs) == 6
+    # "2" bet raqami D ga qo'shilmagan
+    assert p.paragraphs[3].startswith("The first Biro pen")
+    assert p.paragraphs[4].startswith("The Biros pen soon")
+    assert p.paragraphs[5].startswith("Meanwhile")
+
+
 def test_boilerplate_wrapped_timing_and_title_safety():
     # "You should spend..." ikki qatorga bo'lingan + title himoyasi
     text = ("READING PASSAGE 2\n\n"
