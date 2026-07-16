@@ -582,9 +582,11 @@ def _detect_qtype(chunk: str, low: str) -> str:
             r"in which paragraph|paragraph contains|paragraph mentions"
             r"|paragraph refers", low):
         return "matching_info"
-    # --- Matching Features (match X with Y, list of people/companies...) ---
+    # --- Matching Features / Classification (match X with Y, classify...) ---
     if re.search(
             r"match each|match the following"
+            r"|classify (the|each|these|those|them)|classify the following"
+            r"|belong(s|ing)?\s+to"
             r"|list of (people|researchers|names|companies|scientists|"
             r"places|dates|options|statements|inventions|theories)"
             r"|correct ending|from the (box|list) below"
