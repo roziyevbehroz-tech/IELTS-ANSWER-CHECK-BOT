@@ -24,6 +24,8 @@ type AnswerMap = Record<string, Record<string, string>>;
 const ANSWERS = answers as AnswerMap;
 
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") ?? "";
+// Bot egasi(lari) Telegram ID — vergul bilan. /admin analitikasi shular uchun.
+const ADMIN_IDS = (Deno.env.get("ADMIN_IDS") ?? "").split(/[,\s]+/).filter(Boolean);
 const WEBAPP_URL = (Deno.env.get("WEBAPP_URL") ??
   "https://roziyevbehroz-tech.github.io/IELTS-ANSWER-CHECK-BOT/").trim();
 const TG_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
@@ -414,6 +416,14 @@ async function recordAttempt(tgId: number, book: number, test: number, section: 
   } catch (_) { /* ignore */ }
 }
 
+// Funksiya ishlatilishini kuzatish (masalan "cd_created") — analitika uchun
+async function logEvent(tgId: number | null, event: string, meta: Record<string, unknown> = {}): Promise<void> {
+  try {
+    const c = await sb();
+    if (c) await c.from("ielts_bot_events").insert({ telegram_id: tgId, event, meta });
+  } catch (_) { /* ignore */ }
+}
+
 // ------------------------------- update'larni qayta ishlash -------------------------------
 
 function bg(task: Promise<unknown>) {
@@ -488,9 +498,42 @@ async function handleCommand(chatId: number, from: any, text: string) {
     await sendStats(chatId, from.id);
   } else if (cmd === "/qtemplate") {
     await sendMessage(chatId, CD_QTEMPLATE);
+  } else if (cmd === "/myid") {
+    await sendMessage(chatId, `🆔 Sizning Telegram ID: \`${from.id}\``);
+  } else if (cmd === "/admin") {
+    await sendAdminStats(chatId, from);
   } else {
     await sendMessage(chatId, "Boshlash uchun /start ni bosing.");
   }
+}
+
+// Bot egasi uchun umumiy analitika (ADMIN_IDS env orqali himoyalangan)
+async function sendAdminStats(chatId: number, from: any) {
+  if (!ADMIN_IDS.length || !ADMIN_IDS.includes(String(from.id))) {
+    await sendMessage(chatId, "⛔ Bu buyruq faqat bot egasi uchun.");
+    return;
+  }
+  const c = await sb();
+  if (!c) { await sendMessage(chatId, "⚠️ Baza ulanmagan."); return; }
+  const { data, error } = await c.rpc("ielts_bot_admin_stats");
+  if (error || !data) { await sendMessage(chatId, "⚠️ Statistikani olishda xato."); return; }
+  const s = data as any;
+  const books = (s.top_books ?? []).map((b: any) => `${b.book}-kitob (${b.c})`).join(", ") || "—";
+  const secs = (s.top_sections ?? []).map((x: any) =>
+    `${SECTION_NAMES[x.section] ?? x.section} (${x.c})`).join(", ") || "—";
+  const msg =
+    "📊 *Bot analitikasi*\n\n" +
+    `👥 *Foydalanuvchilar:* ${s.users_total} ta\n` +
+    `   🆕 Yangi: bugun *${s.users_new_1d}*, 7 kun *${s.users_new_7d}*, 30 kun *${s.users_new_30d}*\n` +
+    `   🟢 Faol: 24 soat *${s.users_active_1d}*, 7 kun *${s.users_active_7d}*\n\n` +
+    `✅ *Javob tekshirish:* ${s.attempts_total} marta (bugun ${s.attempts_1d})\n` +
+    `   📈 O'rtacha natija: *${s.attempts_avg_pct}%*\n\n` +
+    `🆕 *CD test yaratildi:* ${s.cd_created_total} ta (bugun ${s.cd_created_1d})\n` +
+    `📝 *Custom testlar:* ${s.custom_tests} ta\n` +
+    `⏳ *Hozir yaratilyapti:* ${s.drafts_active} ta qoralama\n\n` +
+    `📚 *Top kitoblar:* ${books}\n` +
+    `🎧📖 *Top bo'limlar:* ${secs}`;
+  await sendMessage(chatId, msg);
 }
 
 async function sendStats(chatId: number, tgId: number) {
@@ -1101,6 +1144,7 @@ async function cdFinish(chatId: number, from: any, data: CdDraft) {
     "So'ng o'quvchilarga tarqating. 💙";
   await sendDocumentHtml(chatId, fileName, html, caption);
   await clearDraft(from.id);
+  bg(logEvent(from.id, "cd_created", { questions: total, passages: data.passages.length }));
   await sendMessage(chatId,
     "✅ Test tayyor! Yana bittasini yaratasizmi?", cdDoneKb());
 }
