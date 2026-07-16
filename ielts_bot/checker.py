@@ -27,6 +27,21 @@ _TF_NG = {
     "no": "no", "n": "no",
 }
 
+# Rim raqami <-> oddiy raqam ekvivalenti (matching headings: "viii" == "8")
+_ROMAN = {
+    "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8,
+    "ix": 9, "x": 10, "xi": 11, "xii": 12, "xiii": 13, "xiv": 14, "xv": 15,
+    "xvi": 16, "xvii": 17, "xviii": 18, "xix": 19, "xx": 20,
+}
+
+
+def _numeral_val(s: str):
+    """Rim raqami (i, ii…) yoki oddiy raqam (1, 2…) -> butun son; aks holda None."""
+    t = re.sub(r"[).\s]+$", "", (s or "").strip().lower())
+    if re.fullmatch(r"\d+", t):
+        return int(t)
+    return _ROMAN.get(t)
+
 
 def _basic_normalize(text: str) -> str:
     """Matnni taqqoslash uchun soddalashtiradi."""
@@ -93,7 +108,15 @@ def is_correct(user_answer: str, key_answer: str) -> bool:
     """Foydalanuvchi javobi to'g'ri kalit bilan mos kelishini tekshiradi."""
     if not user_answer or not key_answer:
         return False
-    return _canonical_tokenset(user_answer) in acceptable_variants(key_answer)
+    if _canonical_tokenset(user_answer) in acceptable_variants(key_answer):
+        return True
+    # Rim raqami <-> oddiy raqam ekvivalenti (masalan kalit "viii", javob "8")
+    uv = _numeral_val(user_answer)
+    if uv is not None:
+        for alt in key_answer.split("/"):
+            if _numeral_val(alt) == uv:
+                return True
+    return False
 
 
 @dataclass
