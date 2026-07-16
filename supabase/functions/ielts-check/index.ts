@@ -341,6 +341,21 @@ async function handleCustom(body: any, auth: any): Promise<Response> {
     return response;
   }
 
+  // Yakka (joyida) tekshirish — statistikaga YOZILMAYDI
+  if (action === "ct_check_one") {
+    const t = await fetchTest(String(body.id));
+    if (!t) return json({ error: "Test topilmadi." }, 404);
+    if (effectiveStatus(t) !== "active") return json({ error: "Test faol emas." }, 403);
+    const key: Record<string, string> = t.answers || {};
+    const userAnswers = body.answers ?? {};
+    const correct: number[] = [];
+    for (const q of Object.keys(key).map(Number)) {
+      const ua = userAnswers[String(q)];
+      if (ua !== undefined && String(ua).trim() && isCorrect(String(ua), key[String(q)])) correct.push(q);
+    }
+    return json({ correct });
+  }
+
   if (action === "ct_reveal") {
     const t = await fetchTest(String(body.id));
     if (!t) return json({ error: "Test topilmadi." }, 404);
@@ -473,6 +488,17 @@ Deno.serve(async (req) => {
       .map(Number).sort((a, b) => a - b)
       .map((q) => ({ q, answer: keyMap[q] }));
     return json({ answers: sorted, total });
+  }
+
+  // Yakka (joyida) tekshirish — statistikaga YOZILMAYDI
+  if (body.action === "check_one") {
+    const userAnswers: Record<string, string> = body.answers ?? {};
+    const correct: number[] = [];
+    for (const q of Object.keys(keyMap).map(Number)) {
+      const ua = userAnswers[String(q)];
+      if (ua !== undefined && String(ua).trim() && isCorrect(String(ua), keyMap[q])) correct.push(q);
+    }
+    return json({ correct, total });
   }
 
   if (body.action === "check") {

@@ -23,6 +23,13 @@
     setupParts();
     setupEditor();
     setupHighlight();
+    injectPerQuestion();
+    // Yakka «tekshirish» tugmalari (event delegation)
+    var mc = document.getElementById("main-container") || document.body;
+    mc.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".q-check") : null;
+      if (btn) { e.preventDefault(); checkOne(parseInt(btn.getAttribute("data-q"), 10)); }
+    });
     switchToPart(1);
     var db = document.getElementById("deliver-button");
     if (db) db.addEventListener("click", onDeliver);
@@ -328,6 +335,7 @@
   var revealed = false;
   var locked = {};
   var rowSeen = {};   // natija oynasida yakka ochilgan xato javoblar
+  var attempts = {};  // har bir savol necha marta tekshirilgani (to'g'ri topilguncha)
 
   function norm(s) {
     // Punktuatsiyani BO'SHLIQQA aylantiramiz (defis/sana shakllari mos kelsin:
@@ -400,11 +408,13 @@
       if (res.correct) score++;
       rows.push(res.row);
     });
+    updateAllTries();
 
     showResults(score, rows);
   }
 
   function checkSingle(q, kind, key) {
+    if (!locked[q]) attempts[q] = (attempts[q] || 0) + 1;
     var user = "", correct = false, mark;
     if (kind === "tfng" || kind === "ynng" || kind === "mcq") {
       var checked = document.querySelector('input[name="q' + q + '"]:checked');
@@ -444,6 +454,7 @@
   }
 
   function checkMulti(g) {
+    for (var qa = g.start; qa <= g.end; qa++) if (!locked[qa]) attempts[qa] = (attempts[qa] || 0) + 1;
     var boxes = document.querySelectorAll('input[name="qm' + g.start + '"]');
     var chosen = [];
     boxes.forEach(function (b) { if (b.checked) chosen.push(b.value.toUpperCase()); });
@@ -465,6 +476,7 @@
       }
       if (allCorrect) b.disabled = true;           // to'liq to'g'ri -> qulf
     });
+    if (allCorrect) for (var ql = g.start; ql <= g.end; ql++) locked[ql] = true;
     var rows = [], label = expected.join(", ");
     var chosenLabel = chosen.length ? chosen.join(", ") : "Not Answered";
     for (var i = 0; i < expected.length; i++) {
@@ -475,6 +487,69 @@
 
   function rowData(q, user, key, correct) {
     return { q: q, user: user || "Not Answered", key: Array.isArray(key) ? key.join(" / ") : key, correct: correct };
+  }
+
+  // -------------------- yakka (joyida) tekshirish --------------------
+  function qAnchor(q) {
+    var el = document.getElementById("q" + q);            // gap / select / diagram
+    if (el) return { el: el, mode: "after" };
+    var grp = document.querySelector('[data-qgroup="q' + q + '"]');  // tfng/ynng/mcq
+    if (grp) return { el: grp, mode: "append" };
+    var g = groupOf(q);                                   // mcq_multi (guruh boshiga bitta)
+    if (g && g.kind === "mcq_multi" && q === g.start) {
+      var box = document.querySelector('input[name="qm' + g.start + '"]');
+      var cont = box && box.closest ? box.closest(".question") : null;
+      if (cont) return { el: cont, mode: "append" };
+    }
+    return null;
+  }
+  function injectPerQuestion() {
+    Object.keys(D.answers).map(Number).forEach(function (q) {
+      if (document.querySelector('.q-check[data-q="' + q + '"]')) return;
+      var a = qAnchor(q);
+      if (!a) return;
+      var wrap = document.createElement("span");
+      wrap.className = "q-check-wrap";
+      wrap.innerHTML =
+        '<button type="button" class="q-check" data-q="' + q + '" ' +
+        'title="Shu javobni tekshirish" aria-label="check">↻</button>' +
+        '<span class="q-tries" data-q="' + q + '"></span>';
+      if (a.mode === "after") {
+        if (a.el.parentNode) a.el.parentNode.insertBefore(wrap, a.el.nextSibling);
+      } else { a.el.appendChild(wrap); }
+    });
+    updateAllTries();
+  }
+  function clearQMark(q) {
+    var el = document.getElementById("q" + q);
+    if (el) {
+      el.classList.remove("incorrect");
+      var d = el.parentNode && el.parentNode.querySelector(".correct-answer-display");
+      if (d) d.remove();
+      var mr = el.closest ? el.closest(".matching-form-row") : null;
+      if (mr) mr.classList.remove("incorrect");
+    }
+    var grp = document.querySelector('[data-qgroup="q' + q + '"]');
+    if (grp) grp.querySelectorAll(".incorrect").forEach(function (x) { x.classList.remove("incorrect"); });
+  }
+  function checkOne(q) {
+    if (locked[q]) { updateTries(q); return; }
+    var g = groupOf(q), kind = g ? g.kind : "gap";
+    clearQMark(q);
+    if (kind === "mcq_multi") { checkMulti(g); for (var n = g.start; n <= g.end; n++) updateTries(n); }
+    else { checkSingle(q, kind, D.answers[q]); updateTries(q); }
+  }
+  function updateTries(q) {
+    var span = document.querySelector('.q-tries[data-q="' + q + '"]');
+    if (!span) return;
+    var n = attempts[q] || 0;
+    span.textContent = n ? String(n) : "";
+    span.classList.toggle("solved", !!locked[q]);
+    var btn = document.querySelector('.q-check[data-q="' + q + '"]');
+    if (btn) btn.classList.toggle("q-ok", !!locked[q]);
+  }
+  function updateAllTries() {
+    Object.keys(D.answers).map(Number).forEach(updateTries);
   }
 
   function showInline(inputEl, key) {

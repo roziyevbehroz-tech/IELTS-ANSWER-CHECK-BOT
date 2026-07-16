@@ -204,6 +204,8 @@
 
     var listWrap = el("div", "q-list");
     var inputs = {};
+    var attempts = {};   // har savol necha marta yakka tekshirilgani
+    var rowsA = {};
     qs.forEach(function (q) {
       var qr = el("div", "q-row");
       qr.appendChild(el("div", "q-num", String(q)));
@@ -215,6 +217,15 @@
       if (prefill && prefill[q] != null) inp.value = prefill[q];
       inputs[q] = inp;
       qr.appendChild(inp);
+      // Yakka (joyida) tekshirish: xira urinishlar soni + ↻ tugma
+      var tries = el("span", "q-tries");
+      var chk = el("button", "q-check");
+      chk.type = "button"; chk.textContent = "↻";
+      chk.title = "Shu javobni tekshirish";
+      (function (qq) { chk.onclick = function () { haptic(); checkRow(qq); }; })(q);
+      qr.appendChild(tries);
+      qr.appendChild(chk);
+      rowsA[q] = { row: qr, inp: inp, tries: tries, chk: chk, solved: false };
       listWrap.appendChild(qr);
     });
     wrap.appendChild(listWrap);
@@ -227,6 +238,41 @@
         if (v) a[q] = v;
       });
       return a;
+    }
+
+    // Bitta savolni joyida tekshiradi (statistikaga yozilmaydi).
+    function checkRow(q) {
+      var r = rowsA[q];
+      if (!r || r.solved) return;
+      var v = r.inp.value.trim();
+      if (!v) return;
+      var obj = {}; obj[String(q)] = v;
+      var payload = (state.mode === "custom")
+        ? { action: "ct_check_one", id: state.ct.id, answers: obj }
+        : { action: "check_one", book: state.book, test: state.test,
+            section: state.section, part: state.part, answers: obj };
+      r.chk.classList.add("loading");
+      attempts[q] = (attempts[q] || 0) + 1;
+      r.tries.textContent = String(attempts[q]);
+      api(payload).then(function (res) {
+        r.chk.classList.remove("loading");
+        var ok = res && res.correct && res.correct.indexOf(Number(q)) !== -1;
+        if (ok) {
+          r.solved = true;
+          r.row.classList.add("correct");
+          r.inp.disabled = true;
+          r.chk.classList.add("q-ok");
+          r.tries.classList.add("solved");
+          haptic("light");
+        } else {
+          r.row.classList.add("q-miss");
+          setTimeout(function () { r.row.classList.remove("q-miss"); }, 600);
+        }
+      }).catch(function () {
+        r.chk.classList.remove("loading");
+        attempts[q] = Math.max(0, attempts[q] - 1);  // tarmoq xatosi urinish sanalmasin
+        r.tries.textContent = attempts[q] ? String(attempts[q]) : "";
+      });
     }
 
     setupMain("✅ Tekshirish", function () {
