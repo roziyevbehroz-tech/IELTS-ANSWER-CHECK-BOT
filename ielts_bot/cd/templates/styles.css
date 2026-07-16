@@ -1485,6 +1485,27 @@
             border: 1px solid #a7f3d0;
             padding: 4px 8px;
             border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+        .result-row .row-eye {
+            flex: 0 0 auto;
+            background: #ffffff;
+            border: 1px solid #cfe9db;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1;
+            padding: 3px 7px;
+            transition: background 0.15s, transform 0.1s;
+        }
+        .result-row .row-eye:hover {
+            background: #e6f7ef;
+        }
+        .result-row .row-eye:active {
+            transform: scale(0.92);
         }
         .correct-answer-display {
             font-weight: bold;

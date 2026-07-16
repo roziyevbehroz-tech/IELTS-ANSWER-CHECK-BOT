@@ -31,6 +31,15 @@
     if (cl) cl.addEventListener("click", function () {
       document.getElementById("results-modal").classList.add("hidden");
     });
+    // Yakka javob ko'z ikonkasi (event delegation — qatorlar qayta chiziladi)
+    var rd = document.getElementById("results-details");
+    if (rd) rd.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".row-eye") : null;
+      if (!btn) return;
+      var q = btn.getAttribute("data-q");
+      rowSeen[q] = !rowSeen[q];
+      renderRows();
+    });
   }
 
   // ------------------------------ timer ------------------------------
@@ -116,6 +125,7 @@
   // belgilanadi; xatolarning to'g'ri varianti «Javoblarni ko'rish»da ochiladi.
   var revealed = false;
   var locked = {};
+  var rowSeen = {};   // natija oynasida yakka ochilgan xato javoblar
 
   function norm(s) {
     // Punktuatsiyani BO'SHLIQQA aylantiramiz (defis/sana shakllari mos kelsin:
@@ -165,6 +175,7 @@
   function onDeliver() {
     if (timerId) { clearInterval(timerId); timerId = null; }
     document.body.classList.add("results-mode");
+    rowSeen = {};   // har Deliver'da yakka-ochilganlar qaytadan yashiriladi
     // Eski xato belgilarini tozalaymiz (to'g'ri/qulflangan belgilar qoladi)
     document.querySelectorAll(".incorrect").forEach(function (e) { e.classList.remove("incorrect"); });
     document.querySelectorAll(".correct-answer-display").forEach(function (e) { e.remove(); });
@@ -301,14 +312,23 @@
     lastRows.forEach(function (r) {
       var div = document.createElement("div");
       div.className = "result-row " + (r.correct ? "correct" : "incorrect");
-      // To'g'ri javob: darrov ko'rinadi. Xato: «ko'rish» bosilmaguncha yashirin.
-      var keyHtml = (r.correct || revealed)
+      // To'g'ri javob: darrov ko'rinadi. Xato: umumiy «ko'rish» yoki
+      // yondagi 👁 ikonkasi bilan yakka ochilmaguncha yashirin.
+      var seen = r.correct || revealed || rowSeen[r.q];
+      var keyHtml = seen
         ? "<span class='correct-answer-highlight'>" + esc(r.key) + "</span>"
         : "<span class='muted'>•••</span>";
+      // Xato javoblarga yakka ochish/yashirish ko'z ikonkasi
+      var eye = "";
+      if (!r.correct && !revealed) {
+        eye = "<button type='button' class='row-eye' data-q='" + r.q +
+              "' title='Javobni koʻrish/yashirish' aria-label='toggle'>" +
+              (rowSeen[r.q] ? "🙈" : "👁") + "</button>";
+      }
       div.innerHTML =
         "<div class='q-num'>" + r.q + "</div>" +
         "<div class='user-ans'>" + (r.correct ? "✅ " : "❌ ") + esc(r.user) + "</div>" +
-        "<div class='correct-ans'>" + keyHtml + "</div>";
+        "<div class='correct-ans'>" + keyHtml + eye + "</div>";
       box.appendChild(div);
     });
   }
