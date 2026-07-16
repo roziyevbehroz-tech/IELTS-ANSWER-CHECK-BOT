@@ -243,9 +243,9 @@
     // Bitta savolni joyida tekshiradi (statistikaga yozilmaydi).
     function checkRow(q) {
       var r = rowsA[q];
-      if (!r || r.solved) return;
+      if (!r || r.solved) { if (r && r.solved) showToast(true); return; }
       var v = r.inp.value.trim();
-      if (!v) return;
+      if (!v) { showToast(null); return; }
       var obj = {}; obj[String(q)] = v;
       var payload = (state.mode === "custom")
         ? { action: "ct_check_one", id: state.ct.id, answers: obj }
@@ -264,9 +264,11 @@
           r.chk.classList.add("q-ok");
           r.tries.classList.add("solved");
           haptic("light");
+          showToast(true);
         } else {
           r.row.classList.add("q-miss");
           setTimeout(function () { r.row.classList.remove("q-miss"); }, 600);
+          showToast(false);
         }
       }).catch(function () {
         r.chk.classList.remove("loading");
@@ -596,6 +598,18 @@
   // ============== Foydalanuvchi testlari: profil / yaratish / boshqaruv ==============
 
   function popup(msg) { if (tg && tg.showPopup) tg.showPopup({ message: msg }); else alert(msg); }
+  var _toastTimer = null;
+  function showToast(ok) {
+    var t = document.getElementById("dz-toast");
+    if (!t) return;
+    var kind = ok === null ? "info" : ok ? "ok" : "err";
+    t.textContent = ok === null ? "✍️ Iltimos, avval javob kiriting."
+      : ok ? "🎉 Barakalla! To'g'ri javob."
+      : "❌ Javobingiz xato. Boshqa javob bilan yana urinib ko'ring.";
+    t.className = "dz-toast show " + kind;
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function () { t.className = "dz-toast " + kind; }, 3000);
+  }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function fmtDur(sec) { sec = Math.max(0, sec | 0); var m = Math.floor(sec / 60), s = sec % 60; return m + ":" + (s < 10 ? "0" : "") + s; }
   function fmtDate(s) {

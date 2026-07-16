@@ -149,6 +149,19 @@ body::before {
 .q-row.q-miss { animation: qshake .3s; border-color: var(--wrong); }
 @keyframes qshake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
 
+/* Yuqoridan tushadigan ogohlantirish (toast) */
+.dz-toast {
+  position: fixed; top: 0; left: 50%; transform: translate(-50%, -130%);
+  z-index: 1000; padding: 12px 20px; border-radius: 0 0 14px 14px;
+  font-size: 15px; font-weight: 700; color: #fff; max-width: 92vw; text-align: center;
+  box-shadow: 0 6px 18px rgba(12,44,74,.28); pointer-events: none;
+  transition: transform .5s cubic-bezier(.2,.85,.25,1);
+}
+.dz-toast.show { transform: translate(-50%, 0); }
+.dz-toast.ok { background: var(--green); }
+.dz-toast.err { background: var(--wrong); }
+.dz-toast.info { background: var(--muted); }
+
 .q-row.correct { border-color: var(--green); background: var(--green-bg); }
 .q-row.correct .q-num { background: var(--green); }
 .q-row.reveal-wrong { border-color: var(--amber); }
