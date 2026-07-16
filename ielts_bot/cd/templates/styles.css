@@ -225,19 +225,28 @@
         @media (max-width: 768px) {
             .panels-container { flex-direction: column !important; }
             .passage-panel {
-                flex: 0 0 auto !important;
+                flex: 0 0 auto;
                 max-height: 42vh;
                 min-width: 0 !important;
                 padding: 14px 14px 18px;
-                border-bottom: 3px solid #e0e0e0;
             }
             .questions-panel {
-                flex: 1 1 auto !important;
+                flex: 1 1 auto;
                 min-width: 0 !important;
                 border-left: none !important;
                 padding: 14px 14px 88px;
             }
-            .resizer { display: none !important; }
+            /* Ajratuvchi dastak — telefonda gorizontal (tepa/past surish) */
+            .resizer {
+                display: block !important;
+                width: auto !important;
+                height: 16px;
+                cursor: row-resize;
+                border-top: 1px solid #e0e0e0;
+                border-bottom: 1px solid #e0e0e0;
+                background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="34" height="8" viewBox="0 0 34 8"><path d="M11 3h2v2h-2zM16 3h2v2h-2zM21 3h2v2h-2z" fill="%23888"/></svg>');
+                touch-action: none;
+            }
             .brand-sub { display: none; }
             .reading-passage h4 { font-size: 18px; }
             .cd-toolbar { flex-wrap: wrap; max-width: 94vw; }

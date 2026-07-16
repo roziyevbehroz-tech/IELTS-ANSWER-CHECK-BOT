@@ -84,23 +84,45 @@
   }
 
   // ----------------------------- resizer -----------------------------
+  // Kompyuterda chap/o'ng (col-resize), telefonda tepa/past (row-resize).
+  // Sichqoncha VA teginish (touch) qo'llab-quvvatlanadi.
   function setupResizer() {
     var rez = document.getElementById("resizer");
     var left = document.getElementById("passage-panel");
     var right = document.getElementById("questions-panel");
-    if (!rez || !left || !right) return;
+    var cont = document.querySelector(".panels-container");
+    if (!rez || !left || !right || !cont) return;
     var dragging = false;
-    rez.addEventListener("mousedown", function () { dragging = true; document.body.style.userSelect = "none"; });
-    window.addEventListener("mouseup", function () { dragging = false; document.body.style.userSelect = ""; });
-    window.addEventListener("mousemove", function (e) {
+    function isVertical() { return getComputedStyle(cont).flexDirection === "column"; }
+    function start(e) { dragging = true; document.body.style.userSelect = "none"; if (e.cancelable) e.preventDefault(); }
+    function end() { dragging = false; document.body.style.userSelect = ""; }
+    function move(clientX, clientY) {
       if (!dragging) return;
-      var c = document.querySelector(".panels-container");
-      var rect = c.getBoundingClientRect();
-      var pct = ((e.clientX - rect.left) / rect.width) * 100;
-      pct = Math.max(25, Math.min(75, pct));
-      left.style.flex = "0 0 " + pct + "%";
-      right.style.flex = "0 0 " + (100 - pct) + "%";
-    });
+      var rect = cont.getBoundingClientRect();
+      if (isVertical()) {
+        var pv = ((clientY - rect.top) / rect.height) * 100;
+        pv = Math.max(18, Math.min(82, pv));
+        left.style.flex = "0 0 " + pv + "%";
+        left.style.maxHeight = "none";       // 42vh cheklovini olib tashlaymiz
+        right.style.flex = "1 1 auto";
+      } else {
+        var ph = ((clientX - rect.left) / rect.width) * 100;
+        ph = Math.max(25, Math.min(75, ph));
+        left.style.flex = "0 0 " + ph + "%";
+        right.style.flex = "0 0 " + (100 - ph) + "%";
+      }
+    }
+    rez.addEventListener("mousedown", start);
+    window.addEventListener("mouseup", end);
+    window.addEventListener("mousemove", function (e) { move(e.clientX, e.clientY); });
+    rez.addEventListener("touchstart", start, { passive: false });
+    window.addEventListener("touchend", end);
+    window.addEventListener("touchmove", function (e) {
+      if (!dragging) return;
+      var t = e.touches[0]; if (!t) return;
+      if (e.cancelable) e.preventDefault();
+      move(t.clientX, t.clientY);
+    }, { passive: false });
   }
 
   // -------------------------- parts / nav ----------------------------
