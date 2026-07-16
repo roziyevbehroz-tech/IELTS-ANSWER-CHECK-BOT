@@ -129,9 +129,30 @@
     var alts = Array.isArray(key) ? key : String(key).split("/");
     return alts.some(function (a) { return norm(a) === u; });
   }
+  var ROMAN = { i:1, ii:2, iii:3, iv:4, v:5, vi:6, vii:7, viii:8, ix:9, x:10,
+                xi:11, xii:12, xiii:13, xiv:14, xv:15, xvi:16, xvii:17, xviii:18,
+                xix:19, xx:20 };
+  function numeralVal(s) {
+    // Rim raqami (i, ii, iii…) yoki oddiy raqam (1, 2, 3…) -> butun son.
+    // Boshqa hollarda null (harflar A–H, TRUE va h.k. ta'sirlanmaydi).
+    var t = (s || "").toString().trim().toLowerCase().replace(/[).\s]+$/g, "");
+    if (/^\d+$/.test(t)) return parseInt(t, 10);
+    if (ROMAN.hasOwnProperty(t)) return ROMAN[t];
+    return null;
+  }
   function letterCorrect(user, key) {
-    return (user || "").toString().trim().toUpperCase() ===
-           String(key).trim().toUpperCase();
+    var u = (user || "").toString().trim().toUpperCase();
+    if (!u) return false;
+    var alts = Array.isArray(key) ? key : String(key).split("/");
+    var uv = numeralVal(user);
+    return alts.some(function (a) {
+      a = String(a).trim();
+      if (u === a.toUpperCase()) return true;
+      // Matching headings: rim raqami <-> oddiy raqam ekvivalent
+      // (masalan kalit "6" bo'lsa, "vi" tanlansa ham to'g'ri).
+      var av = numeralVal(a);
+      return uv !== null && av !== null && uv === av;
+    });
   }
 
   function groupOf(q) {
