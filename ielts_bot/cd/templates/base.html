@@ -126,6 +126,15 @@
         .cd-toast.ok { background: #16a34a; }
         .cd-toast.err { background: #d8345b; }
         .cd-toast.info { background: #6b7280; }
+
+        /* --- Tahrirlash: rasmlarni o'chirish (✖) --- */
+        .cd-img-wrap { position: relative; display: inline-block; max-width: 100%; }
+        .cd-deletable { outline: 2px dashed #d8345b; outline-offset: 2px; }
+        .cd-img-del { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px;
+            border-radius: 50%; border: none; background: #d8345b; color: #fff; font-size: 13px;
+            cursor: pointer; z-index: 6; display: inline-flex; align-items: center;
+            justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+        .cd-img-del:hover { background: #b0102f; }
     </style>
 </head>
 <body>
@@ -166,7 +175,7 @@
         <span class="sep"></span>
         <button id="cd-save" class="primary" title="Yakuniy faylni saqlash">💾 Saqlash</button>
         <button id="cd-exit" class="exit" title="Chiqish">✖</button>
-        <span class="cd-hint">Matnni belgilab, tugmani bosing</span>
+        <span class="cd-hint">Matn/savollarni tahrirlang · rasmlarni ✖ bilan o'chiring</span>
     </div>
 
     <div id="hl-popup" class="hl-popup hidden">🖍 Highlight</div>
