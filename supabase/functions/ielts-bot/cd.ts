@@ -16,6 +16,7 @@ export interface Passage {
   title: string; subtitle: string; paragraphs: string[]; lettered: boolean;
   groups: QuestionGroup[]; answers: Record<number, string>; warnings: string[];
   images?: string[];   // diagram rasmlari (data URI)
+  partNo?: number;     // matndan aniqlangan "READING PASSAGE N"
 }
 export interface Settings {
   durationMin: number;
@@ -133,7 +134,11 @@ export function splitPassageAndQuestions(text: string): [string, string] {
 }
 
 export function parsePassage(text: string, index = 1): Passage {
-  const [clean, warnings] = stripBoilerplate(text.trim());
+  const raw = text.trim();
+  // "READING PASSAGE 2" / "...based on Reading Passage 2" -> part raqami
+  const pm = raw.replace(/[\s.:|·•–—-]+/g, " ").match(/reading\s+passage\s+(\d+)/i);
+  const partNo = pm ? Number(pm[1]) : 0;
+  const [clean, warnings] = stripBoilerplate(raw);
   text = clean;
   let lines = text.split("\n");
   while (lines.length && (!lines[0].trim() || HEADER_NOISE.test(lines[0]))) lines.shift();
@@ -152,7 +157,7 @@ export function parsePassage(text: string, index = 1): Passage {
   const body = lines.join("\n").trim();
   const [paragraphs, lettered] = splitParagraphs(body);
   if (paragraphs.join("").length < 150 && !warnings.includes("short")) warnings.push("short");
-  return { title, subtitle, paragraphs, lettered, groups: [], answers: {}, warnings };
+  return { title, subtitle, paragraphs, lettered, groups: [], answers: {}, warnings, partNo };
 }
 
 function looksLikeTitle(line: string): boolean {
@@ -697,7 +702,8 @@ function renderPartHeader(p: Passage, idx: number, hidden: boolean): string {
   const cls = "part-header" + (hidden ? " hidden" : "");
   const rng = qStart(p) ? `${qStart(p)}-${qEnd(p)}` : "";
   const tail = rng ? `Read the text and answer questions ${rng}.` : "Read the text.";
-  return `<div id="part-header-${idx}" class="${cls}"><p><strong>Part ${idx}</strong></p><span class="ph-sep">·</span><p>${tail}</p></div>`;
+  const partLabel = p.partNo || idx;   // matndan aniqlangan raqam, bo'lmasa pozitsion
+  return `<div id="part-header-${idx}" class="${cls}"><p><strong>Part ${partLabel}</strong></p><span class="ph-sep">·</span><p>${tail}</p></div>`;
 }
 function renderQuestionSet(p: Passage, idx: number, hidden: boolean): string {
   const cls = "question-set" + (hidden ? " hidden" : "");
@@ -877,10 +883,11 @@ function buildData(test: ReadingTest) {
     }
   }
   const parts = test.passages.map((p) => [qStart(p), qEnd(p)]);
+  const partNos = test.passages.map((p, i) => p.partNo || (i + 1));
   // Vaqt passage soniga qarab: 1→20, 2→40, 3→60 daqiqa (faqat eslatma)
   const duration = 20 * Math.max(1, test.passages.length);
   return {
-    answers, groups, parts,
+    answers, groups, parts, partNos,
     settings: { duration },
   };
 }

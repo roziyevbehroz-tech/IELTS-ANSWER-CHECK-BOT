@@ -151,9 +151,16 @@ def split_passage_and_questions(text: str) -> Tuple[str, str]:
     return passage, questions
 
 
+_PART_NO_RE = re.compile(r"reading\s+passage\s+(\d+)", re.IGNORECASE)
+
+
 def parse_passage(text: str, index: int = 1) -> Passage:
     """Toza passage matnidan `Passage` obyektini quradi."""
-    text, warnings = strip_boilerplate(text.strip())
+    raw = text.strip()
+    # "READING PASSAGE 2" / "...based on Reading Passage 2" -> part raqami
+    m = _PART_NO_RE.search(re.sub(r"[\s.:|·•–—-]+", " ", raw))
+    part_no = int(m.group(1)) if m else 0
+    text, warnings = strip_boilerplate(raw)
     lines = [ln for ln in text.split("\n")]
 
     # 1) Boshdagi shovqin sarlavhalarni tashlab yuboramiz
@@ -183,6 +190,7 @@ def parse_passage(text: str, index: int = 1) -> Passage:
 
     return Passage(
         index=index,
+        part_no=part_no,
         title=title,
         subtitle=subtitle,
         paragraphs=paragraphs,
