@@ -135,6 +135,10 @@ def _render_question_set(p: Passage, idx: int, hidden: bool) -> str:
 
 def _render_group(g: QuestionGroup, p: Passage) -> str:
     prompt = _prompt(g)
+    if g.kind == "gap" and g.qtype == "flowchart":
+        return _render_flowchart(g, prompt)
+    if g.kind == "gap" and g.qtype == "diagram":
+        return _render_diagram(g, prompt, p)
     if g.kind == "gap":
         body = _render_gap_body(g)
         title = f'<h4 class="text-center" style="font-weight:bold;margin:12px 0;">{html.escape(g.title)}</h4>' if g.title else ""
@@ -223,6 +227,54 @@ def _inject_inputs(s: str) -> str:
                 f'id="q{n}" placeholder="{n}">')
     # token escape'dan keyin ham o'zgarmaydi ({{Q1}} da maxsus belgi yo'q)
     return _TOKEN_RE.sub(repl, esc)
+
+
+def _render_flowchart(g: QuestionGroup, prompt: str) -> str:
+    """Flow-chart: har bir qator = quti, ular orasida pastga strelka (↓)."""
+    title = (f'<h4 class="text-center" style="font-weight:bold;margin:6px 0 14px;">'
+             f'{html.escape(g.title)}</h4>' if g.title else "")
+    boxes = [ln.strip() for ln in (g.body or "").split("\n") if ln.strip()]
+    parts = []
+    for i, box in enumerate(boxes):
+        parts.append(f'<div class="fc-box">{_inject_inputs(box)}</div>')
+        if i < len(boxes) - 1:
+            parts.append('<div class="fc-arrow">↓</div>')
+    return (f'<div class="question" data-q-start="{g.start}" data-q-end="{g.end}">'
+            f'{prompt}<div class="flowchart">{title}{"".join(parts)}</div></div>')
+
+
+def _render_diagram(g: QuestionGroup, prompt: str, p: Passage) -> str:
+    """Diagram label: rasm (bo'lsa) + variant qutisi (bo'lsa) + raqamli inputlar."""
+    title = (f'<h4 class="text-center" style="font-weight:bold;margin:6px 0 12px;">'
+             f'{html.escape(g.title)}</h4>' if g.title else "")
+    # rasm — passage'dan ajratib olingan bo'lsa
+    img_html = ""
+    imgs = getattr(p, "images", None) or []
+    if imgs:
+        img_html = '<div class="diagram-images">' + "".join(
+            f'<img class="diagram-img" src="{src}" alt="diagram">' for src in imgs
+        ) + '</div>'
+    else:
+        img_html = ('<div class="diagram-drop">📷 Diagramma rasmini shu yerga '
+                    'joylang (✏️ tahrirlash rejimida)</div>')
+    # variant qutisi (A-E) — bo'lsa
+    bank = ""
+    if g.options and any(txt for _, txt in g.options):
+        rows = "".join(
+            f'<li><strong>{html.escape(letter)}</strong>&nbsp;{html.escape(txt)}</li>'
+            for letter, txt in g.options)
+        bank = ('<div class="heading-bank"><p><strong>' +
+                (html.escape(g.options_title) if g.options_title else "Options") +
+                f'</strong></p><ul class="opt-list">{rows}</ul></div>')
+    # raqamli inputlar ro'yxati
+    nums = [it.number for it in g.items] or list(range(g.start, g.end + 1))
+    rows_html = "".join(
+        f'<div class="diagram-row"><span class="diagram-lbl">{n}</span>'
+        f'<input type="text" class="answer-input gap-input" id="q{n}" placeholder="{n}"></div>'
+        for n in nums)
+    return (f'<div class="question" data-q-start="{g.start}" data-q-end="{g.end}">'
+            f'{prompt}<div class="diagram-block">{title}{img_html}{bank}'
+            f'<div class="diagram-rows">{rows_html}</div></div></div>')
 
 
 def _render_table(body: str) -> str:

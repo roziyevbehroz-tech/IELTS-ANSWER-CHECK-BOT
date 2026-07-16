@@ -17,8 +17,8 @@
 
 import answers from "./answers.json" with { type: "json" };
 import * as CD from "./cd.ts";
-import { unzipSync, strFromU8 } from "https://esm.sh/fflate@0.8.2";
-import { getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
+import { unzipSync, strFromU8, zlibSync } from "https://esm.sh/fflate@0.8.2";
+import { getDocumentProxy, getResolvedPDFJS } from "https://esm.sh/unpdf@0.12.1";
 
 type AnswerMap = Record<string, Record<string, string>>;
 const ANSWERS = answers as AnswerMap;
@@ -758,6 +758,90 @@ async function pdfToText(data: Uint8Array): Promise<string> {
   return out;
 }
 
+// ---- PDF'dan diagramma rasmlarini ajratish (PNG encode, canvas kerak emas) ----
+const _CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function _crc32(buf: Uint8Array): number {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = _CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function _pngChunk(type: string, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, data.length);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  dv.setUint32(8 + data.length, _crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+// pdf.js image kind: 1=GRAYSCALE_1BPP, 2=RGB_24BPP, 3=RGBA_32BPP
+function _encodePng(w: number, h: number, kind: number, data: Uint8Array): Uint8Array {
+  const ch = kind === 3 ? 4 : kind === 1 ? 1 : 3;
+  const colorType = kind === 3 ? 6 : kind === 1 ? 0 : 2;
+  const stride = w * ch;
+  const raw = new Uint8Array(h * (1 + stride));
+  for (let y = 0; y < h; y++) { raw[y * (1 + stride)] = 0; raw.set(data.subarray(y * stride, (y + 1) * stride), y * (1 + stride) + 1); }
+  const idat = zlibSync(raw, { level: 6 });
+  const ihdr = new Uint8Array(13);
+  const dv = new DataView(ihdr.buffer);
+  dv.setUint32(0, w); dv.setUint32(4, h); ihdr[8] = 8; ihdr[9] = colorType;
+  const sig = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const parts = [sig, _pngChunk("IHDR", ihdr), _pngChunk("IDAT", idat), _pngChunk("IEND", new Uint8Array(0))];
+  const total = parts.reduce((a, p) => a + p.length, 0);
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+function _b64(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+// Sahifalardagi barcha mazmunli rasmlarni PNG data URI sifatida qaytaradi
+async function pdfToImages(data: Uint8Array): Promise<string[]> {
+  try {
+    const pdf = await getDocumentProxy(data);
+    const { OPS } = await getResolvedPDFJS();
+    const imgOps = new Set([OPS.paintImageXObject, OPS.paintInlineImageXObject]);
+    const uris: string[] = [];
+    let totalBytes = 0;
+    for (let pn = 1; pn <= pdf.numPages && uris.length < 6; pn++) {
+      const page = await pdf.getPage(pn);
+      const ops = await page.getOperatorList();
+      for (let i = 0; i < ops.fnArray.length && uris.length < 6; i++) {
+        if (!imgOps.has(ops.fnArray[i])) continue;
+        const objId = ops.argsArray[i][0];
+        let obj: any = null;
+        try { obj = page.objs.get(objId); } catch (_) { try { obj = (pdf as any).commonObjs.get(objId); } catch (_) { obj = null; } }
+        if (!obj || !obj.data || !obj.width || !obj.height) continue;
+        const px = obj.width * obj.height;
+        if (px < 3000 || px > 4_000_000) continue;   // ikonlarni va ulkan rasmlarni o'tkazamiz
+        const kind = obj.kind || 2;
+        const bytes = obj.data instanceof Uint8Array ? obj.data : new Uint8Array(obj.data.buffer || obj.data);
+        try {
+          const png = _encodePng(obj.width, obj.height, kind, bytes);
+          totalBytes += png.length;
+          if (totalBytes > 3_500_000) break;         // umumiy hajmni cheklaymiz (draft/telegram uchun)
+          uris.push("data:image/png;base64," + _b64(png));
+        } catch (_) { /* bu rasmni o'tkazamiz */ }
+      }
+    }
+    return uris;
+  } catch (_) {
+    return [];
+  }
+}
+async function cdExtractImages(data: Uint8Array, filename: string): Promise<string[]> {
+  const name = (filename || "").toLowerCase();
+  if (name.endsWith(".pdf") || (data[0] === 0x25 && data[1] === 0x50)) return await pdfToImages(data);
+  return [];
+}
+
 async function cdExtractText(data: Uint8Array, filename: string): Promise<string> {
   const name = (filename || "").toLowerCase();
   if (name.endsWith(".pdf") || (data[0] === 0x25 && data[1] === 0x50)) {
@@ -909,7 +993,7 @@ async function handleCdCallback(cq: any, sub: string[]) {
 }
 
 // ---- xabar (matn/fayl) ----
-async function cdHandleInput(chatId: number, from: any, step: string, data: CdDraft, text: string) {
+async function cdHandleInput(chatId: number, from: any, step: string, data: CdDraft, text: string, images: string[] = []) {
   if (step === "passage") {
     const [passagePart] = CD.splitPassageAndQuestions(text);
     const idx = data.passages.length + 1;
@@ -926,6 +1010,9 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
     const groups = CD.parseQuestions(text, p.paragraphs.length).filter((g) => CD.numbersOf(g).length);
     if (!groups.length) { await sendMessage(chatId, CD_NO_Q); return; }
     data.curGroups = groups;
+    // Diagram/flow-chart bo'lsa — PDF'dan ajratilgan rasmlarni passage'ga biriktiramiz
+    const hasVisual = groups.some((g) => g.qtype === "diagram" || g.qtype === "flowchart");
+    if (images.length && hasVisual) p.images = images;
     await setDraft(from.id, "answers", data);
     const lines = groups.map((g) => `• ${CD.labelOf(g)}: Q${g.start}–${g.end}`).join("\n");
     const nums = groups.flatMap((g) => CD.numbersOf(g));
@@ -1009,14 +1096,19 @@ async function handleCdDocument(chatId: number, from: any, doc: any) {
   }
   if (doc.file_size && doc.file_size > CD_MAX_FILE) { await sendMessage(chatId, "⚠️ Fayl juda katta (8 MB dan kichik bo'lsin)."); return; }
   let text: string;
+  let images: string[] = [];
   try {
     const bytes = await downloadTgFile(doc.file_id);
     text = await cdExtractText(bytes, doc.file_name || "");
+    // Savollar bosqichida diagramma rasmlarini ajratib olamiz
+    if (d.step === "questions") {
+      try { images = await cdExtractImages(bytes, doc.file_name || ""); } catch (_) { images = []; }
+    }
   } catch (e) {
     await sendMessage(chatId, "⚠️ Faylni o'qib bo'lmadi: " + (e as Error).message);
     return;
   }
-  await cdHandleInput(chatId, from, d.step, d.data, text);
+  await cdHandleInput(chatId, from, d.step, d.data, text, images);
 }
 
 // ======================= update'larni qayta ishlash =======================

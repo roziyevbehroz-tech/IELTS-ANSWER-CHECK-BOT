@@ -58,6 +58,10 @@ _ROMAN_LINE = re.compile(
     r"^\s*(x{0,3}(?:ix|iv|v?i{0,3}))\s*[\.\)]?\s+(.+)$", re.IGNORECASE)
 _QUESTIONS_HDR = re.compile(
     r"questions?\s+(\d+)\s*(?:[-–—]|and|&|,)\s*(\d+)", re.IGNORECASE)
+# Blok chegarasini faqat qator BOSHIDAGI "Questions X-Y" bilan aniqlaymiz
+# (yo'riqnoma ichidagi "...next to questions 11-13" soxta bo'linishga sabab bo'lmasin)
+_QUESTIONS_HDR_LINE = re.compile(
+    r"^\s*questions?\s+(\d+)\s*(?:[-–—]|and|&|,)\s*(\d+)", re.IGNORECASE)
 _INSTRUCTION_RE = re.compile(
     r"^\s*(complete|choose|write|do the following|match|label|answer|which|"
     r"the (text|passage|reading)|look at|reading passage|list of headings|"
@@ -145,6 +149,16 @@ def _build_group(qtype, start, end, opts_str, body_lines, para_count):
 
     kind = qtype
     if kind in GAP_KINDS:
+        # Diagram box-variant: "Choose ... from the box A-E" — variant qutisini ajratamiz
+        if qtype == "diagram":
+            opts = _collect_options(rest)
+            if len(opts) >= 3 and opts[0][0] == "A":
+                non_opt = [ln for ln in rest if not _looks_like_option(ln)]
+                g = _build_gap(qtype, start, end, instructions, non_opt)
+                if g:
+                    g.options = opts
+                    g.options_title = "Options"
+                return g
         return _build_gap(qtype, start, end, instructions, rest)
     if kind in ("tfng", "ynng"):
         return _build_statements(qtype, start, end, instructions, rest)
@@ -514,8 +528,8 @@ def _auto_detect(text: str, para_count: int) -> List[QuestionGroup]:
     yo'riqnoma jumlasidan tur tayinlaydi.
     """
     lines = text.split("\n")
-    # bo'laklarni "Questions X-Y" bo'yicha ajratamiz
-    idxs = [i for i, ln in enumerate(lines) if _QUESTIONS_HDR.search(ln)]
+    # bo'laklarni faqat qator boshidagi "Questions X-Y" bo'yicha ajratamiz
+    idxs = [i for i, ln in enumerate(lines) if _QUESTIONS_HDR_LINE.match(ln)]
     groups: List[QuestionGroup] = []
     if not idxs:
         # yagona blok — turini aniqlab ko'ramiz
@@ -538,6 +552,15 @@ def _detect_qtype(chunk: str, low: str) -> str:
     Barcha 14 turni va ularning har xil yozilish ko'rinishlarini qamraydi.
     Tartib muhim — eng aniq (spetsifik) belgilar birinchi tekshiriladi.
     """
+    # --- Struktura-belgili turlar (eng aniq — birinchi) ---
+    # Bular "choose two/three" (variant qutili) bo'lsa ham o'z turida qoladi.
+    if re.search(r"complete the flow[\s-]*chart|flow[\s-]*chart below", low):
+        return "flowchart"
+    if "label the diagram" in low or ("label the" in low and "diagram" in low) \
+            or "label the plan" in low or "label the map" in low:
+        return "diagram"
+    if "complete the table" in low:
+        return "table"
     # --- True/False/Not Given (identifying information) ---
     if ("not given" in low
             and ("true" in low or "false" in low)
@@ -582,12 +605,6 @@ def _detect_qtype(chunk: str, low: str) -> str:
         return "note"
     if "complete the summary" in low:
         return "summary"
-    if "complete the table" in low:
-        return "table"
-    if re.search(r"complete the flow[\s-]*chart|flow[\s-]*chart below", low):
-        return "flowchart"
-    if "label the diagram" in low or "label the" in low and "diagram" in low:
-        return "diagram"
     if re.search(r"answer the questions|write no more than", low) and not _has_gap(chunk):
         return "shortanswer"
     if "complete the sentences" in low or "complete each sentence" in low:
