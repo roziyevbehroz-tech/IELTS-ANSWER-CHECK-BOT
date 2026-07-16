@@ -23,6 +23,7 @@
     setupParts();
     setupEditor();
     setupHighlight();
+    setupDarkMode();
     injectPerQuestion();
     // Yakka «tekshirish» tugmalari (event delegation)
     var mc = document.getElementById("main-container") || document.body;
@@ -81,6 +82,23 @@
       var el = document.querySelector(".timer-display");
       if (el) el.textContent = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
     }
+  }
+
+  // ---------------------------- dark mode ----------------------------
+  function setupDarkMode() {
+    var btn = document.getElementById("cd-theme-toggle");
+    if (!btn) return;
+    function apply(dark) {
+      document.body.classList.toggle("cd-dark", dark);
+      btn.textContent = dark ? "☀️" : "🌙";
+      try { localStorage.setItem("cd-theme", dark ? "dark" : "light"); } catch (e) {}
+    }
+    var saved = null;
+    try { saved = localStorage.getItem("cd-theme"); } catch (e) {}
+    apply(saved === "dark");
+    btn.addEventListener("click", function () {
+      apply(!document.body.classList.contains("cd-dark"));
+    });
   }
 
   // ----------------------------- resizer -----------------------------
