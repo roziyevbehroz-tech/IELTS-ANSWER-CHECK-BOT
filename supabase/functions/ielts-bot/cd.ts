@@ -376,7 +376,66 @@ function collectNumbered(bodyLines: string[]): Item[] {
     if (m) items.push({ number: Number(m[1]), text: m[2].trim(), options: [] });
     else if (items.length) items[items.length - 1].text = (items[items.length - 1].text + " " + s).trim();
   }
+  // Yopishgan ro'yxat: "Corpe Nove2 Nexia..." — ketma-ket raqamli glued-splitter
+  if (items.length <= 1) {
+    const joined = bodyLines.map((l) => l.trim()).filter(Boolean).join(" ");
+    const glued = splitGluedNumbers(joined);
+    if (glued && glued.length > items.length) return glued;
+  }
   return items;
+}
+// Ketma-ket raqamli elementlarni (yopishgan bo'lsa ham) ajratadi (kamida 3 ta)
+function splitGluedNumbers(text: string): Item[] | null {
+  const flat = (text || "").replace(/\s+/g, " ").trim();
+  if (!flat) return null;
+  const first = flat.match(/(?:^|\s)(\d{1,3})[.\):]?\s+\S/);
+  if (!first) return null;
+  let expected = Number(first[1]);
+  const markers: [number, number, number][] = [];
+  let pos = 0;
+  while (expected <= 999) {
+    const pat = new RegExp(
+      "(?:^|(?<=[\\sA-Za-z,;.:\\)\\-]))" + expected + "(?!\\d)[.\\):]?\\s+(?=\\S)", "g");
+    pat.lastIndex = pos;
+    const m = pat.exec(flat);
+    if (!m) break;
+    markers.push([m.index, pat.lastIndex, expected]);
+    pos = pat.lastIndex;
+    expected++;
+  }
+  if (markers.length < 3) return null;
+  const out: Item[] = [];
+  for (let i = 0; i < markers.length; i++) {
+    const te = i + 1 < markers.length ? markers[i + 1][0] : flat.length;
+    out.push({ number: markers[i][2], text: flat.slice(markers[i][1], te).trim(), options: [] });
+  }
+  return out;
+}
+// Ketma-ket A, B, C... variantlarni (yopishgan bo'lsa ham) ajratadi (kamida 3 ta)
+function splitGluedOptions(text: string): [string, string][] {
+  const flat = (text || "").replace(/\s+/g, " ").trim();
+  if (!flat) return [];
+  const markers: [number, number][] = [];
+  let code = "A".charCodeAt(0);
+  let pos = 0;
+  while (code <= "Z".charCodeAt(0)) {
+    const letter = String.fromCharCode(code);
+    const pat = new RegExp(
+      "(?:^|(?<=[\\sa-z,;.:\\)\\-]))" + letter + "[.\\)]?\\s+(?=\\S)", "g");
+    pat.lastIndex = pos;
+    const m = pat.exec(flat);
+    if (!m) break;
+    markers.push([m.index, pat.lastIndex]);
+    pos = pat.lastIndex;
+    code++;
+  }
+  if (markers.length < 3) return [];
+  const out: [string, string][] = [];
+  for (let i = 0; i < markers.length; i++) {
+    const te = i + 1 < markers.length ? markers[i + 1][0] : flat.length;
+    out.push([String.fromCharCode(65 + i), flat.slice(markers[i][1], te).trim()]);
+  }
+  return out;
 }
 function buildStatements(qtype: string, start: number | null, end: number | null,
   instructions: string, bodyLines: string[]): QuestionGroup | null {
@@ -442,10 +501,16 @@ function buildHeadings(qtype: string, start: number | null, end: number | null,
 // ---- matching ----
 function collectOptions(bodyLines: string[]): [string, string][] {
   const opts: [string, string][] = [];
+  const optLineTexts: string[] = [];
   for (const line of bodyLines) {
     const s = line.trim();
     const m = s.match(OPT_LINE) || s.match(OPT_LINE_LOOSE);
-    if (m) opts.push([m[1].toUpperCase(), m[2].trim()]);
+    if (m) { opts.push([m[1].toUpperCase(), m[2].trim()]); optLineTexts.push(s); }
+  }
+  // Yopishgan variantlar: faqat variant-simon qatorlarni birlashtiramiz
+  if (opts.length <= 1 && optLineTexts.length) {
+    const glued = splitGluedOptions(optLineTexts.join(" "));
+    if (glued.length > opts.length) return glued;
   }
   return opts;
 }
@@ -501,25 +566,46 @@ function autoDetect(text: string, paraCount: number): QuestionGroup[] {
   }
   return groups;
 }
+// Yo'riqnoma matnidan IELTS Reading savol turini aniqlaydi (14 tur + variantlar)
+function detectQtype(chunk: string, low: string): string {
+  // True/False/Not Given
+  if (low.includes("not given") && (low.includes("true") || low.includes("false"))
+      && !(low.includes("yes") && low.includes("no") && low.includes("claim"))) {
+    if (low.includes("true") && low.includes("false")) return "tfng";
+  }
+  // Yes/No/Not Given
+  if (low.includes("not given") && /\byes\b/.test(low) && /\bno\b/.test(low)) return "ynng";
+  if (/claims?\s+of\s+the\s+writer|views?\s+of\s+the\s+writer/.test(low)) return "ynng";
+  // Matching Headings
+  if (low.includes("list of headings") || low.includes("choose the correct heading")
+      || /suitable heading|appropriate heading/.test(low)
+      || (low.includes("heading") && /paragraph[s]?\s+[a-k]/.test(low))) return "headings";
+  // Matching Paragraph Information
+  if (/which (section|paragraph)/.test(low)
+      || /in which paragraph|paragraph contains|paragraph mentions|paragraph refers/.test(low)) return "matching_info";
+  // Matching Features
+  if (/match each|match the following|list of (people|researchers|names|companies|scientists|places|dates|options|statements|inventions|theories)|correct ending|from the (box|list) below|look at the following list|match(ing)? .* (with|to) .* (person|people|option|feature|category|group|company|researcher)/.test(low))
+    return "matching_features";
+  // Multiple choice II (TWO/THREE)
+  if (/choose\s+(two|three|four|2|3|4)\b/.test(low)) return "mcq_multi";
+  // Multiple choice I (single)
+  if (/choose the correct (letter|answer|option)/.test(low)
+      || /\b[a-d],\s*[a-d],?\s*[a-d]\s*(or|,)\s*[a-d]\b/.test(low)
+      || /^\s*[A-E][.\)]\s+\S/m.test(chunk)) return "mcq";
+  // gap-completion
+  if (low.includes("complete the notes") || low.includes("complete the note")) return "note";
+  if (low.includes("complete the summary")) return "summary";
+  if (low.includes("complete the table")) return "table";
+  if (/complete the flow[\s-]*chart|flow[\s-]*chart below/.test(low)) return "flowchart";
+  if (low.includes("label the diagram") || (low.includes("label the") && low.includes("diagram"))) return "diagram";
+  if (/answer the questions|write no more than/.test(low) && !hasGap(chunk)) return "shortanswer";
+  if (low.includes("complete the sentences") || low.includes("complete each sentence")) return "sentence";
+  if (hasGap(chunk)) return "note";
+  return "sentence";
+}
 function autoOne(chunk: string, start: number | null, end: number | null, paraCount: number): QuestionGroup | null {
   const low = chunk.toLowerCase();
-  let qtype: string;
-  if (low.includes("true") && low.includes("false") && low.includes("not given")) qtype = "tfng";
-  else if (low.includes("yes") && low.includes("no") && low.includes("not given")) qtype = "ynng";
-  else if (low.includes("list of headings")) qtype = "headings";
-  else if (/which (section|paragraph)/.test(low)) qtype = "matching_info";
-  else if (/match each|list of (people|researchers|names)|correct ending|from the (box|list) below|match(ing)? .* (with|to) .* (person|people|option)/.test(low)) qtype = "matching_features";
-  else if (/choose (two|three|2|3)/.test(low)) qtype = "mcq_multi";
-  else if (low.includes("choose the correct letter") || /^\s*[A-D]\)/m.test(chunk)) qtype = "mcq";
-  else if (low.includes("complete the notes")) qtype = "note";
-  else if (low.includes("complete the summary")) qtype = "summary";
-  else if (low.includes("complete the table")) qtype = "table";
-  else if (low.includes("complete the flow")) qtype = "flowchart";
-  else if (low.includes("label the diagram")) qtype = "diagram";
-  else if (/answer the questions|no more than/.test(low) && !hasGap(chunk)) qtype = "shortanswer";
-  else if (low.includes("complete the sentences")) qtype = "sentence";
-  else if (hasGap(chunk)) qtype = "note";
-  else qtype = "sentence";
+  const qtype = detectQtype(chunk, low);
   // buildGroup o'zi yo'riqnomani ajratadi — oldindan split qilmaymiz
   // (aks holda birinchi variant/element yo'qoladi).
   return buildGroup(qtype, start, end, "", chunk.split("\n"), paraCount);

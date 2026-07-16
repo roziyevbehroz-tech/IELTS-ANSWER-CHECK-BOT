@@ -263,7 +263,11 @@ def _build_statements(qtype, start, end, instructions, body_lines):
 
 
 def _collect_numbered(body_lines: List[str]) -> List[Item]:
-    """`1. matn` qatorlarini yig'adi (ko'p qatorli matnni ham biriktiradi)."""
+    """`1. matn` qatorlarini yig'adi (ko'p qatorli matnni ham biriktiradi).
+
+    PDF elementlarni yopishtirib qo'ygan bo'lsa ("Corpe Nove2 Nexia...") —
+    ketma-ket raqamli glued-splitter bilan ajratadi.
+    """
     items: List[Item] = []
     for line in body_lines:
         s = line.strip()
@@ -275,7 +279,80 @@ def _collect_numbered(body_lines: List[str]) -> List[Item]:
         elif items:
             # oldingi item matnining davomi
             items[-1].text = (items[-1].text + " " + s).strip()
+    # Yopishgan ro'yxat: bitta "element" ichida yana ketma-ket raqamlar bo'lsa
+    if len(items) <= 1:
+        joined = " ".join(ln.strip() for ln in body_lines if ln.strip())
+        glued = _split_glued_numbers(joined)
+        if glued and len(glued) > len(items):
+            return glued
     return items
+
+
+def _split_glued_numbers(text: str) -> Optional[List[Item]]:
+    """Ketma-ket raqamli elementlarni (yopishgan bo'lsa ham) ajratadi.
+
+    "1. Corpe Nove2 Nexia Biotechnologies3 Nano-Tex..." -> [1:..., 2:..., 3:...]
+    Kamida 3 ketma-ket raqam bo'lsa qaytaradi (soxta mos kelishning oldini olish).
+    """
+    flat = re.sub(r"\s+", " ", text or "").strip()
+    if not flat:
+        return None
+    first = re.search(r"(?:^|\s)(\d{1,3})[.\):]?\s+\S", flat)
+    if not first:
+        return None
+    expected = int(first.group(1))
+    markers: List[Tuple[int, int, int]] = []
+    pos = 0
+    while expected <= 999:
+        # (bosh|bo'shliq|kichik/katta harf|punktuatsiya) + RAQAM + (keyingi raqam emas)
+        pat = re.compile(
+            r"(?:^|(?<=[\sA-Za-z,;.:\)\-]))" + str(expected)
+            + r"(?!\d)[.\):]?\s+(?=\S)")
+        m = pat.search(flat, pos)
+        if not m:
+            break
+        markers.append((m.start(), m.end(), expected))
+        pos = m.end()
+        expected += 1
+    if len(markers) < 3:
+        return None
+    out: List[Item] = []
+    for i, (_cut, tstart, num) in enumerate(markers):
+        tend = markers[i + 1][0] if i + 1 < len(markers) else len(flat)
+        out.append(Item(number=num, text=flat[tstart:tend].strip()))
+    return out
+
+
+def _split_glued_options(text: str) -> List[Tuple[str, str]]:
+    """Ketma-ket A, B, C... variantlarni (yopishgan bo'lsa ham) ajratadi.
+
+    "A material ... coolerB clothing ... natureH clothes ..." ->
+    [(A,...),(B,...),...,(H,...)]. Kamida 3 ketma-ket harf talab qilinadi.
+    """
+    flat = re.sub(r"\s+", " ", text or "").strip()
+    if not flat:
+        return []
+    markers: List[Tuple[int, int]] = []
+    code = ord("A")
+    pos = 0
+    while code <= ord("Z"):
+        letter = chr(code)
+        # (bosh|bo'shliq|kichik harf|punktuatsiya) + HARF + ixtiyoriy [.)] + bo'shliq + kontent
+        pat = re.compile(
+            r"(?:^|(?<=[\sa-z,;.:\)\-]))" + letter + r"[.\)]?\s+(?=\S)")
+        m = pat.search(flat, pos)
+        if not m:
+            break
+        markers.append((m.start(), m.end()))
+        pos = m.end()
+        code += 1
+    if len(markers) < 3:
+        return []
+    out: List[Tuple[str, str]] = []
+    for i, (_cut, tstart) in enumerate(markers):
+        tend = markers[i + 1][0] if i + 1 < len(markers) else len(flat)
+        out.append((chr(ord("A") + i), flat[tstart:tend].strip()))
+    return out
 
 
 # ------------------------------- MCQ ------------------------------------
@@ -387,11 +464,19 @@ def _build_matching(qtype, start, end, instructions, body_lines, opts_str,
 
 def _collect_options(body_lines: List[str]) -> List[tuple]:
     opts: List[tuple] = []
+    opt_line_texts: List[str] = []
     for line in body_lines:
         s = line.strip()
         m = _OPT_LINE.match(s) or _OPT_LINE_LOOSE.match(s)
         if m:
             opts.append((m.group(1).upper(), m.group(2).strip()))
+            opt_line_texts.append(s)
+    # Yopishgan variantlar: bitta "A ..." qatori ichida yana B, C, D... bo'lsa.
+    # Faqat variant-simon qatorlarni birlashtiramiz (raqamli elementlar emas).
+    if len(opts) <= 1 and opt_line_texts:
+        glued = _split_glued_options(" ".join(opt_line_texts))
+        if len(glued) > len(opts):
+            return glued
     return opts
 
 
@@ -447,45 +532,76 @@ def _auto_detect(text: str, para_count: int) -> List[QuestionGroup]:
     return groups
 
 
+def _detect_qtype(chunk: str, low: str) -> str:
+    """Yo'riqnoma matnidan IELTS Reading savol turini aniqlaydi.
+
+    Barcha 14 turni va ularning har xil yozilish ko'rinishlarini qamraydi.
+    Tartib muhim — eng aniq (spetsifik) belgilar birinchi tekshiriladi.
+    """
+    # --- True/False/Not Given (identifying information) ---
+    if ("not given" in low
+            and ("true" in low or "false" in low)
+            and not ("yes" in low and "no" in low and "claim" in low)):
+        if "true" in low and "false" in low:
+            return "tfng"
+    # --- Yes/No/Not Given (writer's claims/views) ---
+    if "not given" in low and re.search(r"\byes\b", low) and re.search(r"\bno\b", low):
+        return "ynng"
+    if re.search(r"claims?\s+of\s+the\s+writer|views?\s+of\s+the\s+writer", low):
+        return "ynng"
+    # --- Matching Headings ---
+    if ("list of headings" in low or "choose the correct heading" in low
+            or re.search(r"suitable heading|appropriate heading", low)
+            or (("heading" in low) and re.search(r"paragraph[s]?\s+[a-k]", low))):
+        return "headings"
+    # --- Matching Paragraph Information ---
+    if re.search(r"which (section|paragraph)", low) or re.search(
+            r"in which paragraph|paragraph contains|paragraph mentions"
+            r"|paragraph refers", low):
+        return "matching_info"
+    # --- Matching Features (match X with Y, list of people/companies...) ---
+    if re.search(
+            r"match each|match the following"
+            r"|list of (people|researchers|names|companies|scientists|"
+            r"places|dates|options|statements|inventions|theories)"
+            r"|correct ending|from the (box|list) below"
+            r"|look at the following list"
+            r"|match(ing)? .* (with|to) .* (person|people|option|feature|"
+            r"category|group|company|researcher)", low):
+        return "matching_features"
+    # --- Multiple choice II (TWO/THREE answers) ---
+    if re.search(r"choose\s+(two|three|four|2|3|4)\b", low):
+        return "mcq_multi"
+    # --- Multiple choice I (single answer) ---
+    if (re.search(r"choose the correct (letter|answer|option)", low)
+            or re.search(r"\b[a-d],\s*[a-d],?\s*[a-d]\s*(or|,)\s*[a-d]\b", low)
+            or re.search(r"^\s*[A-E][.\)]\s+\S", chunk, re.MULTILINE)):
+        return "mcq"
+    # --- gap-completion turlari ---
+    if "complete the notes" in low or "complete the note" in low:
+        return "note"
+    if "complete the summary" in low:
+        return "summary"
+    if "complete the table" in low:
+        return "table"
+    if re.search(r"complete the flow[\s-]*chart|flow[\s-]*chart below", low):
+        return "flowchart"
+    if "label the diagram" in low or "label the" in low and "diagram" in low:
+        return "diagram"
+    if re.search(r"answer the questions|write no more than", low) and not _has_gap(chunk):
+        return "shortanswer"
+    if "complete the sentences" in low or "complete each sentence" in low:
+        return "sentence"
+    # --- oxirgi chora: gap bo'lsa note, aks holda sentence ---
+    if _has_gap(chunk):
+        return "note"
+    return "sentence"
+
+
 def _auto_one(chunk: str, start, end, para_count) -> Optional[QuestionGroup]:
     low = chunk.lower()
     body_lines = chunk.split("\n")
-    # yo'riqnoma bo'yicha turni aniqlaymiz
-    if "true" in low and "false" in low and "not given" in low:
-        qtype = "tfng"
-    elif "yes" in low and "no" in low and "not given" in low:
-        qtype = "ynng"
-    elif "list of headings" in low:
-        qtype = "headings"
-    elif re.search(r"which (section|paragraph)", low):
-        qtype = "matching_info"
-    elif re.search(r"match each|list of (people|researchers|names)"
-                   r"|correct ending|from the (box|list) below"
-                   r"|match(ing)? .* (with|to) .* (person|people|option)", low):
-        qtype = "matching_features"
-    elif re.search(r"choose (two|three|2|3)", low):
-        qtype = "mcq_multi"
-    elif "choose the correct letter" in low or re.search(
-            r"^\s*[A-D]\)", chunk, re.MULTILINE):
-        qtype = "mcq"
-    elif "complete the notes" in low:
-        qtype = "note"
-    elif "complete the summary" in low:
-        qtype = "summary"
-    elif "complete the table" in low:
-        qtype = "table"
-    elif "complete the flow" in low:
-        qtype = "flowchart"
-    elif "label the diagram" in low:
-        qtype = "diagram"
-    elif re.search(r"answer the questions|no more than", low) and _has_gap(chunk) is False:
-        qtype = "shortanswer"
-    elif "complete the sentences" in low:
-        qtype = "sentence"
-    elif _has_gap(chunk):
-        qtype = "note"
-    else:
-        qtype = "sentence"
+    qtype = _detect_qtype(chunk, low)
 
     # _build_group o'zi yo'riqnomani ajratadi — bu yerda oldindan split qilmaymiz
     # (aks holda birinchi variant/element yo'qoladi).
