@@ -533,11 +533,25 @@
     if (grp) grp.querySelectorAll(".incorrect").forEach(function (x) { x.classList.remove("incorrect"); });
   }
   function checkOne(q) {
-    if (locked[q]) { updateTries(q); return; }
-    var g = groupOf(q), kind = g ? g.kind : "gap";
+    if (locked[q]) { updateTries(q); showToast(true); return; }
+    if (!isAnswered(q)) { showToast(null); return; }
+    var g = groupOf(q), kind = g ? g.kind : "gap", ok;
     clearQMark(q);
-    if (kind === "mcq_multi") { checkMulti(g); for (var n = g.start; n <= g.end; n++) updateTries(n); }
-    else { checkSingle(q, kind, D.answers[q]); updateTries(q); }
+    if (kind === "mcq_multi") { checkMulti(g); for (var n = g.start; n <= g.end; n++) updateTries(n); ok = !!locked[g.start]; }
+    else { checkSingle(q, kind, D.answers[q]); updateTries(q); ok = !!locked[q]; }
+    showToast(ok);
+  }
+  var toastTimer = null;
+  function showToast(ok) {
+    var t = document.getElementById("cd-toast");
+    if (!t) return;
+    var kind = ok === null ? "info" : ok ? "ok" : "err";
+    t.textContent = ok === null ? "✍️ Iltimos, avval javob kiriting."
+      : ok ? "🎉 Barakalla! To'g'ri javob."
+      : "❌ Javobingiz xato. Boshqa javob bilan yana urinib ko'ring.";
+    t.className = "cd-toast show " + kind;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = "cd-toast " + kind; }, 3000);
   }
   function updateTries(q) {
     var span = document.querySelector('.q-tries[data-q="' + q + '"]');
