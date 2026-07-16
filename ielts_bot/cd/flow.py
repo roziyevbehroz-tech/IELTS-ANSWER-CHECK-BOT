@@ -114,9 +114,13 @@ Q_SUMMARY = (
     "Jami: *{total}* ta savol (Q{first}–{last}).\n\n"
     "Endi shu savollarning *to'g'ri javoblarini* yuboring. Namuna:\n"
     "```\n{example}\n```\n"
-    "Muqobil javob: `24. vegetable / vegetation`. "
-    "TRUE/FALSE/NG uchun: `5. TRUE`. Harflar uchun: `8. B`.\n"
-    "Ko'p tanlovli (Choose TWO/THREE): `12-13. C, D` — tartib muhim emas."
+    "*Bir javobning bir necha shakli* bo'lsa `/` bilan ajrating, ixtiyoriy so'zni "
+    "`( )` ichiga oling:\n"
+    "• `24. vegetable / vegetation`\n"
+    "• `3. (the) book`  (kitob ham, the book ham to'g'ri)\n"
+    "• `7. 1st May / 1 May / May 1`\n"
+    "TRUE/FALSE/NG: `5. TRUE`. Harflar: `8. B`. "
+    "Choose TWO/THREE: `12-13. C, D` (tartib muhim emas)."
 )
 
 NO_QUESTIONS = (
@@ -129,32 +133,16 @@ ANS_OK = (
     "Bu passage tayyor. Yana passage qo'shasizmi yoki testni yaratamizmi?"
 )
 
-ASK_REVEAL = (
-    "⚙️ *Sozlama 1/2 — javoblar qachon ko'rinsin?*\n\n"
-    "⚡ *Darrov* — «Deliver» bosilganda to'g'ri javoblar darrov ko'rinadi.\n"
-    "🔒 *Bosib ko'rsin* — avval faqat ball chiqadi, to'g'ri javoblar «Javoblarni "
-    "ko'rish» bosilgandagina ochiladi (bot uslubi)."
-)
-
-ASK_EXPL = (
-    "⚙️ *Sozlama 2/2 — izoh qo'shasizmi?*\n\n"
-    "Har bir savol uchun qisqa izoh (nega bu javob to'g'ri) qo'shishingiz mumkin."
-)
-
-ASK_EXPL_TEXT = (
-    "✍️ Izohlarni yuboring (ixtiyoriy savollar uchun). Namuna:\n"
-    "```\n1. matnda 'white silk' deb aytilgan\n5. bu haqda ma'lumot yo'q\n```"
-)
-
 BUILDING = "⏳ CD test tayyorlanmoqda…"
 
 DONE = (
     "🎉 *Tayyor!* CD Reading testingiz quyida.\n\n"
-    "📊 {total} ta savol · {passages} ta passage · "
-    "{reveal} · izoh: {expl}\n\n"
-    "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → yuqoridagi *✏️* tugmasini "
-    "bosing → matn/savollarni tahrirlang (bold, markaz, o'lcham) → *💾 Saqlash* "
-    "bilan toza yakuniy faylni yuklab oling.\n\n"
+    "📊 {total} ta savol · {passages} ta passage\n\n"
+    "▶️ *Ishlashi:* o'quvchi javoblarni kiritib «Deliver» bosadi — to'g'rilari "
+    "yashil bo'lib qulflanadi, xatolarini tuzatib *cheksiz* qayta tekshirishi "
+    "mumkin. Xato javoblarning to'g'ri varianti «Javoblarni ko'rish»da ochiladi.\n\n"
+    "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → *✏️* tugmasi → matn/savollarni "
+    "tahrirlang → *💾 Saqlash* bilan toza faylni yuklab oling.\n\n"
     "So'ng o'quvchilarga tarqating. 💙"
 )
 
@@ -197,7 +185,7 @@ async def on_skill(update, context, value) -> None:
         return
     cd = _reset(context)
     cd.update(step="passage", skill="reading", passages=[],
-              settings=Settings(), explanations={})
+              settings=Settings())
     await update.callback_query.edit_message_text(
         ASK_PASSAGE.format(n=1), parse_mode=ParseMode.MARKDOWN,
     )
@@ -222,10 +210,6 @@ async def on_callback(update, context, value) -> None:
         await on_skill(update, context, arg)
     elif sub == "cancel":
         await cancel(update, context)
-    elif sub == "reveal":
-        await _set_reveal(update, context, arg)
-    elif sub == "expl":
-        await _set_expl(update, context, arg)
     elif sub == "more":
         await _on_more(update, context, arg)
 
@@ -236,7 +220,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool
     """CD faol bo'lsa xabarni qayta ishlaydi. True qaytarsa — qabul qilindi."""
     cd = context.user_data.get("cd") or {}
     step = cd.get("step")
-    if step not in ("passage", "questions", "answers", "expl"):
+    if step not in ("passage", "questions", "answers"):
         return False
 
     text = await _read_input(update, context)
@@ -249,8 +233,6 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool
         await _handle_questions(update, context, text)
     elif step == "answers":
         await _handle_answers(update, context, text)
-    elif step == "expl":
-        await _handle_expl(update, context, text)
     return True
 
 
@@ -376,18 +358,17 @@ async def _handle_answers(update, context, text) -> None:
     cd["cur_groups"] = None
     cd["step"] = "await_more"
 
-    kb = keyboards.cd_more_keyboard()
     if len(cd["passages"]) >= 3:
-        # 3 passage limiti — to'g'ridan-to'g'ri yakunga
+        # 3 passage limiti — to'g'ridan-to'g'ri testni yaratamiz
         await update.message.reply_text(
             ANS_OK.format(n=len(p.answers), warn=warn) +
             "\n\n(3 passage limiti — testni yaratamiz)",
             parse_mode=ParseMode.MARKDOWN)
-        await _ask_reveal(update, context)
+        await _finish(update, context)
         return
     await update.message.reply_text(
         ANS_OK.format(n=len(p.answers), warn=warn),
-        reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        reply_markup=keyboards.cd_more_keyboard(), parse_mode=ParseMode.MARKDOWN)
 
 
 async def _on_more(update, context, arg) -> None:
@@ -398,46 +379,7 @@ async def _on_more(update, context, arg) -> None:
         await update.callback_query.edit_message_text(
             ASK_PASSAGE.format(n=n), parse_mode=ParseMode.MARKDOWN)
     elif arg == "finish":
-        await _ask_reveal(update, context, edit=True)
-
-
-async def _ask_reveal(update, context, edit=False) -> None:
-    _cd(context)["step"] = "await_reveal"
-    kb = keyboards.cd_reveal_keyboard()
-    if edit and update.callback_query:
-        await update.callback_query.edit_message_text(
-            ASK_REVEAL, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
-    else:
-        await update.message.reply_text(
-            ASK_REVEAL, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
-
-
-async def _set_reveal(update, context, arg) -> None:
-    cd = _cd(context)
-    cd["settings"].reveal_mode = "instant" if arg == "instant" else "end"
-    cd["step"] = "await_expl"
-    await update.callback_query.edit_message_text(
-        ASK_EXPL, reply_markup=keyboards.cd_explanations_keyboard(),
-        parse_mode=ParseMode.MARKDOWN)
-
-
-async def _set_expl(update, context, arg) -> None:
-    cd = _cd(context)
-    if arg == "yes":
-        cd["settings"].explanations = True
-        cd["step"] = "expl"
-        await update.callback_query.edit_message_text(
-            ASK_EXPL_TEXT, parse_mode=ParseMode.MARKDOWN)
-    else:
-        cd["settings"].explanations = False
         await _finish(update, context)
-
-
-async def _handle_expl(update, context, text) -> None:
-    cd = _cd(context)
-    expl = ans_mod.parse_answer_key(text)   # {q: izoh}
-    cd["explanations"] = {int(k): v for k, v in expl.items()}
-    await _finish(update, context)
 
 
 # ------------------------------ yakun ---------------------------------
@@ -454,17 +396,13 @@ async def _finish(update, context) -> None:
         title=title,
         passages=cd["passages"],
         settings=settings,
-        explanations=cd.get("explanations", {}),
     )
     html = render.render_test(test)
     buf = io.BytesIO(html.encode("utf-8"))
     buf.name = "dream_zone_reading.html"
 
-    reveal_lbl = "⚡ darrov" if settings.reveal_mode == "instant" else "🔒 bosib ko'rish"
-    expl_lbl = "bor" if settings.explanations else "yo'q"
     caption = DONE.format(
-        total=test.total_questions, passages=len(test.passages),
-        reveal=reveal_lbl, expl=expl_lbl)
+        total=test.total_questions, passages=len(test.passages))
 
     await msg_obj.reply_document(
         document=buf, filename="dream_zone_reading.html",

@@ -290,7 +290,7 @@ def test_q_multi_and_header_autodetect():
 
 # ------------------------------- render -------------------------------
 
-def _build_test(reveal="end"):
+def _build_test():
     p = passage_mod.parse_passage(
         "Silk\n\nPara one about emperor and white silk.\n\n"
         "Para two about taxes and paper.\n")
@@ -299,8 +299,7 @@ def _build_test(reveal="end"):
         "[tfng] 3-3\nTRUE FALSE NOT GIVEN\n3. Silk scared soldiers.\n\n"
         "[mcq] 4-4\nChoose.\n4. stem?\nA a\nB b\nC c\n")
     p.answers = ans_mod.parse_answer_key("1. white\n2. taxes\n3. TRUE\n4. B\n")
-    return ReadingTest(title="Silk", passages=[p],
-                       settings=Settings(reveal_mode=reveal))
+    return ReadingTest(title="Silk", passages=[p], settings=Settings())
 
 
 def test_render_produces_inputs_and_data():
@@ -319,11 +318,12 @@ def test_render_answer_alternatives_expanded():
     assert "vegetable" in html and "vegetation" in html
 
 
-def test_render_reveal_mode_flag():
-    assert '"revealMode":"instant"' in render.render_test(
-        _build_test("instant")).replace(" ", "")
-    assert '"revealMode":"end"' in render.render_test(
-        _build_test("end")).replace(" ", "")
+def test_render_settings_has_duration_only():
+    html = render.render_test(_build_test()).replace(" ", "")
+    # Yagona sozlama — taymer davomiyligi; reveal/izoh sozlamalari olib tashlangan
+    assert '"duration":60' in html
+    assert "revealMode" not in html
+    assert "explanations" not in html
 
 
 if __name__ == "__main__":
