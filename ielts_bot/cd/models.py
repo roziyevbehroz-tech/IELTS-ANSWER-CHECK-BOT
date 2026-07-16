@@ -98,7 +98,8 @@ class QuestionGroup:
 class Passage:
     """Bitta reading passage (Part) — matn + unga tegishli savol bloklari."""
 
-    index: int                       # 1, 2, 3
+    index: int                       # 1, 2, 3 (pozitsion)
+    part_no: int = 0                 # matndan aniqlangan "READING PASSAGE N" (0 = noma'lum)
     title: str = ""
     subtitle: str = ""
     paragraphs: List[str] = field(default_factory=list)

@@ -188,7 +188,7 @@
       sec.setAttribute("data-part", i);
       var lbl = document.createElement("button");
       lbl.className = "bn-label";
-      lbl.textContent = "Part " + i;
+      lbl.textContent = "Part " + ((D.partNos && D.partNos[i - 1]) || i);
       (function (pi) { lbl.addEventListener("click", function () { switchToPart(pi); }); })(i);
       sec.appendChild(lbl);
       if (i === currentPart && r[0]) {

@@ -346,6 +346,26 @@ def test_render_answer_alternatives_expanded():
     assert "vegetable" in html and "vegetation" in html
 
 
+def test_part_number_from_reading_passage_label():
+    # Part raqami matndagi "READING PASSAGE N" dan olinadi (pozitsion emas)
+    p = passage_mod.parse_passage(
+        "READING PASSAGE 2\n\nThe crisis in advertising\n\n"
+        "Advertisers have known for a long time about ads and money here today now.\n\n"
+        "Second paragraph about media across the country there always now here.")
+    assert p.part_no == 2
+    p2 = passage_mod.parse_passage(
+        "You should spend about 20 minutes on Questions 14-26, which are based "
+        "on Reading Passage 2 below.\n\nMarie Curie\n\n"
+        "Marie was a scientist who worked very hard in this passage about her life.")
+    assert p2.part_no == 2
+    # Render: part yorlig'i 2, savol oralig'i real savollardan
+    p.groups = q_mod.parse_questions("[tfng] 14-15\nTRUE FALSE NOT GIVEN\n"
+                                     "14. Ads waste money.\n15. TV is old.\n")
+    p.answers = {14: "TRUE", 15: "FALSE"}
+    html = render.render_test(ReadingTest(passages=[p]))
+    assert "Part 2" in html and '"partNos": [2]' in html.replace(" ", " ")
+
+
 def test_classify_belonging_to_is_matching():
     # "Classify ... as belonging to A/B/C" — matching bo'lishi kerak (mcq emas),
     # A)/B)/C) variant qatorlari bo'lsa ham guruh tashlab yuborilmasin.
