@@ -118,9 +118,26 @@ function acceptableVariants(keyAnswer: string): Set<string> {
   return out;
 }
 
+// Rim raqami <-> oddiy raqam ekvivalenti (matching headings: "viii" == "8")
+const ROMAN: Record<string, number> = {
+  i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10,
+  xi: 11, xii: 12, xiii: 13, xiv: 14, xv: 15, xvi: 16, xvii: 17, xviii: 18, xix: 19, xx: 20,
+};
+function numeralVal(s: string): number | null {
+  const t = (s || "").trim().toLowerCase().replace(/[).\s]+$/, "");
+  if (/^\d+$/.test(t)) return parseInt(t, 10);
+  return t in ROMAN ? ROMAN[t] : null;
+}
+
 function isCorrect(userAnswer: string, keyAnswer: string): boolean {
   if (!userAnswer || !keyAnswer) return false;
-  return acceptableVariants(keyAnswer).has(canonical(userAnswer));
+  if (acceptableVariants(keyAnswer).has(canonical(userAnswer))) return true;
+  // Rim raqami <-> oddiy raqam (kalit "viii", javob "8")
+  const uv = numeralVal(userAnswer);
+  if (uv !== null) {
+    for (const alt of keyAnswer.split("/")) if (numeralVal(alt) === uv) return true;
+  }
+  return false;
 }
 
 // ----------------------------- javoblarni o'qish -----------------------------

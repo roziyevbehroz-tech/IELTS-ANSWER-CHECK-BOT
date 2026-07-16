@@ -20,6 +20,19 @@ def test_extra_spaces_and_punct():
     assert checker.is_correct("ticket.", "ticket")
 
 
+def test_roman_arabic_equivalence():
+    # Matching headings: kalit rim raqamida ("viii"), o'quvchi oddiy raqam ("8")
+    assert checker.is_correct("8", "viii")
+    assert checker.is_correct("viii", "viii")
+    assert checker.is_correct("VIII", "viii")
+    assert checker.is_correct("iv", "4")
+    assert checker.is_correct("vi", "6")
+    # Soxta mos kelish yo'q
+    assert not checker.is_correct("9", "x")      # 9 != 10
+    assert not checker.is_correct("B", "viii")   # harf != raqam
+    assert not checker.is_correct("cat", "viii")
+
+
 def test_slash_alternatives():
     assert checker.is_correct("10", "10/ten")
     assert checker.is_correct("ten", "10/ten")
