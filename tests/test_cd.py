@@ -318,6 +318,25 @@ def test_render_answer_alternatives_expanded():
     assert "vegetable" in html and "vegetation" in html
 
 
+def test_render_headings_roman_options_arabic_key():
+    # Matching headings: variantlar rim raqamlarida (i, ii…) render qilinadi,
+    # ammo kalit oddiy raqamlarda (1, 2…) kiritilishi mumkin. HTML ikkalasini
+    # ekvivalent deb hisoblaydi (app.js: letterCorrect + numeralVal).
+    p = passage_mod.parse_passage("Ads\n\nPara A here.\n\nPara B here.\n")
+    p.groups = q_mod.parse_questions(
+        "[headings] 1-2\nList of Headings.\n"
+        "i First\nii Second\niii Third\niv Fourth\nv Fifth\nvi Sixth\n"
+        "1. Statement one\n2. Statement two\n")
+    p.answers = {1: "6", 2: "1"}          # oddiy raqamli kalit (vi, i degani)
+    html = render.render_test(ReadingTest(passages=[p]))
+    # select variantlari rim raqamlarida
+    assert 'value="vi"' in html and 'value="i"' in html
+    # kalit JSON'ga oddiy raqam sifatida kiritilgan
+    assert '"1": "6"' in html.replace(" ", " ")
+    # ekvivalentlik mantig'i mavjud (numeralVal helper)
+    assert "numeralVal" in html
+
+
 def test_render_settings_has_duration_only():
     html = render.render_test(_build_test()).replace(" ", "")
     # Yagona sozlama — taymer davomiyligi; reveal/izoh sozlamalari olib tashlangan
