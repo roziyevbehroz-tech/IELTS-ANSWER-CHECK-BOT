@@ -133,6 +133,22 @@ body::before {
 }
 .q-input::placeholder { color: var(--muted); opacity: .6; }
 
+/* Yakka (joyida) tekshirish: ↻ tugma + xira urinishlar soni */
+.q-tries { font-size: 11px; color: var(--muted); opacity: .55; min-width: 12px; text-align: center; user-select: none; }
+.q-tries.solved { color: var(--green); opacity: .9; font-weight: 700; }
+.q-check {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--card); color: var(--green);
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s, transform .1s;
+}
+.q-check:active { transform: scale(0.9); }
+.q-check.q-ok { color: #fff; background: var(--green); border-color: var(--green); }
+.q-check.loading { opacity: .5; pointer-events: none; }
+.q-row.q-miss { animation: qshake .3s; border-color: var(--wrong); }
+@keyframes qshake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
 .q-row.correct { border-color: var(--green); background: var(--green-bg); }
 .q-row.correct .q-num { background: var(--green); }
 .q-row.reveal-wrong { border-color: var(--amber); }
