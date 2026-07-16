@@ -106,6 +106,7 @@ class Passage:
     groups: List[QuestionGroup] = field(default_factory=list)
     answers: Dict[int, str] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)  # tozalashda topilgan muammolar
+    images: List[str] = field(default_factory=list)    # diagram rasmlari (data URI)
 
     @property
     def q_start(self) -> int:

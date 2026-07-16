@@ -346,6 +346,51 @@ def test_render_answer_alternatives_expanded():
     assert "vegetable" in html and "vegetation" in html
 
 
+def test_flowchart_detected_and_rendered_as_boxes():
+    src = (
+        "Questions 8-10\n"
+        "Complete the flow-chart below. Choose NO MORE THAN TWO WORDS.\n"
+        "Generating biogas for domestic use in Dunga\n"
+        "First, place water hyacinth together with some 8 ________ into a digester\n"
+        "Leave the mixture until the 9 ________ is completed\n"
+        "Capture the gas and use 10 ________ to transport it to homes\n"
+        "Then use the gas for cooking")
+    groups = q_mod.parse_questions(src)
+    assert len(groups) == 1
+    g = groups[0]
+    assert g.qtype == "flowchart"
+    assert len(g.items) == 3
+    html = render.render_test(
+        ReadingTest(passages=[_mk_passage(g)]))
+    assert "fc-box" in html and "fc-arrow" in html
+
+
+def test_diagram_box_variant_choose_three_stays_diagram():
+    # "Choose THREE" bo'lsa ham "label the diagram" -> diagram (mcq_multi emas)
+    src = (
+        "Questions 11-13\n"
+        "Label the diagram below. Choose THREE answers from the box and write "
+        "the correct letter, A-E, next to questions 11-13.\n"
+        "A electricity indicator\nB on/off switch\nC reset button\n"
+        "D time control\nE warning indicator\n"
+        "Water Heater\n11 ________\n12 ________\n13 ________")
+    groups = q_mod.parse_questions(src)
+    assert len(groups) == 1
+    g = groups[0]
+    assert g.qtype == "diagram"
+    assert len(g.items) == 3
+    assert len(g.options) == 5 and g.options[0][0] == "A"
+    html = render.render_test(ReadingTest(passages=[_mk_passage(g)]))
+    assert "diagram-block" in html and "diagram-row" in html
+
+
+def _mk_passage(group):
+    p = passage_mod.parse_passage("T\n\nSome passage body text here for the test now.\n")
+    p.groups = [group]
+    p.answers = {n: "x" for n in range(group.start, group.end + 1)}
+    return p
+
+
 def test_mcq_choose_correct_answer_dot_options():
     # "Choose the correct answer, A, B, C or D" + "A." variantlar — mcq bo'lishi kerak
     src = (

@@ -15,6 +15,7 @@ export interface QuestionGroup {
 export interface Passage {
   title: string; subtitle: string; paragraphs: string[]; lettered: boolean;
   groups: QuestionGroup[]; answers: Record<number, string>; warnings: string[];
+  images?: string[];   // diagram rasmlari (data URI)
 }
 export interface Settings {
   durationMin: number;
@@ -249,6 +250,8 @@ const OPT_LINE = /^\s*([A-Z])\s*[.\)]\s+(.+)$/;
 const OPT_LINE_LOOSE = /^\s*([A-Z])\s+(\S.*)$/;
 const ROMAN_LINE = /^\s*(x{0,3}(?:ix|iv|v?i{0,3}))\s*[.\)]?\s+(.+)$/i;
 const QUESTIONS_HDR = /questions?\s+(\d+)\s*(?:[-–—]|and|&|,)\s*(\d+)/i;
+// Blok chegarasi — faqat qator BOSHIDAGI "Questions X-Y" ("...next to questions 11-13" emas)
+const QUESTIONS_HDR_LINE = /^\s*questions?\s+(\d+)\s*(?:[-–—]|and|&|,)\s*(\d+)/i;
 const INSTRUCTION_RE = /^\s*(complete|choose|write|do the following|match|label|answer|which|the (text|passage|reading)|look at|reading passage|list of headings|nb\b|classify|select)/i;
 // gap belgilari — chiziqcha, ASCII nuqtalar, Unicode ellipsis (… ‥ ․ · •)
 const GAP_ANY_SRC = "(?:_{2,}|…+|\\.{4,}|[…․‥·•‧]{2,})";
@@ -299,7 +302,19 @@ function buildGroup(qtype: string, start: number | null, end: number | null,
     const hdr = instructions.match(QUESTIONS_HDR);
     if (hdr) { start = Number(hdr[1]); end = Number(hdr[2]); }
   }
-  if (GAP_KINDS.has(qtype)) return buildGap(qtype, start, end, instructions, rest);
+  if (GAP_KINDS.has(qtype)) {
+    // Diagram box-variant: "Choose ... from the box A-E" — variant qutisini ajratamiz
+    if (qtype === "diagram") {
+      const opts = collectOptions(rest);
+      if (opts.length >= 3 && opts[0][0] === "A") {
+        const nonOpt = rest.filter((ln) => !looksLikeOption(ln));
+        const g = buildGap(qtype, start, end, instructions, nonOpt);
+        if (g) { g.options = opts; g.optionsTitle = "Options"; }
+        return g;
+      }
+    }
+    return buildGap(qtype, start, end, instructions, rest);
+  }
   if (qtype === "tfng" || qtype === "ynng") return buildStatements(qtype, start, end, instructions, rest);
   if (qtype === "mcq") return buildMcq(qtype, start, end, instructions, rest);
   if (qtype === "mcq_multi") return buildMcqMulti(qtype, start, end, instructions, rest, optsStr);
@@ -551,7 +566,7 @@ function buildMatching(qtype: string, start: number | null, end: number | null,
 function autoDetect(text: string, paraCount: number): QuestionGroup[] {
   const lines = text.split("\n");
   const idxs: number[] = [];
-  for (let i = 0; i < lines.length; i++) if (QUESTIONS_HDR.test(lines[i])) idxs.push(i);
+  for (let i = 0; i < lines.length; i++) if (QUESTIONS_HDR_LINE.test(lines[i])) idxs.push(i);
   if (!idxs.length) {
     const g = autoOne(text, null, null, paraCount);
     return g ? [g] : [];
@@ -568,6 +583,11 @@ function autoDetect(text: string, paraCount: number): QuestionGroup[] {
 }
 // Yo'riqnoma matnidan IELTS Reading savol turini aniqlaydi (14 tur + variantlar)
 function detectQtype(chunk: string, low: string): string {
+  // Struktura-belgili turlar (eng aniq — "choose two/three" bo'lsa ham o'z turida)
+  if (/complete the flow[\s-]*chart|flow[\s-]*chart below/.test(low)) return "flowchart";
+  if (low.includes("label the diagram") || (low.includes("label the") && low.includes("diagram"))
+      || low.includes("label the plan") || low.includes("label the map")) return "diagram";
+  if (low.includes("complete the table")) return "table";
   // True/False/Not Given
   if (low.includes("not given") && (low.includes("true") || low.includes("false"))
       && !(low.includes("yes") && low.includes("no") && low.includes("claim"))) {
@@ -595,9 +615,6 @@ function detectQtype(chunk: string, low: string): string {
   // gap-completion
   if (low.includes("complete the notes") || low.includes("complete the note")) return "note";
   if (low.includes("complete the summary")) return "summary";
-  if (low.includes("complete the table")) return "table";
-  if (/complete the flow[\s-]*chart|flow[\s-]*chart below/.test(low)) return "flowchart";
-  if (low.includes("label the diagram") || (low.includes("label the") && low.includes("diagram"))) return "diagram";
   if (/answer the questions|write no more than/.test(low) && !hasGap(chunk)) return "shortanswer";
   if (low.includes("complete the sentences") || low.includes("complete each sentence")) return "sentence";
   if (hasGap(chunk)) return "note";
@@ -692,6 +709,8 @@ function renderQuestionSet(p: Passage, idx: number, hidden: boolean): string {
 function renderGroup(g: QuestionGroup, p: Passage): string {
   const prompt = promptHtml(g);
   const kind = kindOf(g);
+  if (kind === "gap" && g.qtype === "flowchart") return renderFlowchart(g, prompt);
+  if (kind === "gap" && g.qtype === "diagram") return renderDiagram(g, prompt, p);
   if (kind === "gap") {
     const body = renderGapBody(g);
     const title = g.title ? `<h4 class="text-center" style="font-weight:bold;margin:12px 0;">${esc(g.title)}</h4>` : "";
@@ -715,6 +734,33 @@ function promptHtml(g: QuestionGroup): string {
   return `<div class="question-prompt"><p><strong>${hdr}</strong></p><p>${instr}</p>${extra}</div>`;
 }
 
+function renderFlowchart(g: QuestionGroup, prompt: string): string {
+  const title = g.title ? `<h4 class="text-center" style="font-weight:bold;margin:6px 0 14px;">${esc(g.title)}</h4>` : "";
+  const boxes = (g.body || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const parts: string[] = [];
+  boxes.forEach((box, i) => {
+    parts.push(`<div class="fc-box">${injectInputs(box)}</div>`);
+    if (i < boxes.length - 1) parts.push('<div class="fc-arrow">↓</div>');
+  });
+  return `<div class="question" data-q-start="${g.start}" data-q-end="${g.end}">${prompt}<div class="flowchart">${title}${parts.join("")}</div></div>`;
+}
+function renderDiagram(g: QuestionGroup, prompt: string, p: Passage): string {
+  const title = g.title ? `<h4 class="text-center" style="font-weight:bold;margin:6px 0 12px;">${esc(g.title)}</h4>` : "";
+  const imgs = p.images || [];
+  const imgHtml = imgs.length
+    ? '<div class="diagram-images">' + imgs.map((s) => `<img class="diagram-img" src="${s}" alt="diagram">`).join("") + "</div>"
+    : '<div class="diagram-drop">📷 Diagramma rasmini shu yerga joylang (✏️ tahrirlash rejimida)</div>';
+  let bank = "";
+  if (g.options && g.options.length && g.options.some(([, t]) => t)) {
+    const rows = g.options.map(([l, t]) => `<li><strong>${esc(l)}</strong>&nbsp;${esc(t)}</li>`).join("");
+    bank = `<div class="heading-bank"><p><strong>${g.optionsTitle ? esc(g.optionsTitle) : "Options"}</strong></p><ul class="opt-list">${rows}</ul></div>`;
+  }
+  const nums = (g.items && g.items.length) ? g.items.map((it) => it.number) : [];
+  const range: number[] = nums.length ? nums : Array.from({ length: g.end - g.start + 1 }, (_, i) => g.start + i);
+  const rowsHtml = range.map((n) =>
+    `<div class="diagram-row"><span class="diagram-lbl">${n}</span><input type="text" class="answer-input gap-input" id="q${n}" placeholder="${n}"></div>`).join("");
+  return `<div class="question" data-q-start="${g.start}" data-q-end="${g.end}">${prompt}<div class="diagram-block">${title}${imgHtml}${bank}<div class="diagram-rows">${rowsHtml}</div></div></div>`;
+}
 const TOKEN_RE = /\{\{Q(\d+)\}\}/g;
 function injectInputs(s: string): string {
   return esc(s).replace(TOKEN_RE, (_m, n) => `<input type="text" class="answer-input gap-input" id="q${n}" placeholder="${n}">`);

@@ -85,6 +85,25 @@
 
         /* Text ekranini kattalashtirish uchun main-container'ni pastki panelga moslash */
         .main-container { height: calc(100vh - 60px - 60px) !important; }
+
+        /* --- Flow-chart completion --- */
+        .flowchart { max-width: 560px; margin: 10px auto; }
+        .fc-box { border: 1.5px solid #374151; border-radius: 4px; padding: 12px 14px;
+            background: #fff; line-height: 1.9; font-size: 15px; }
+        .fc-arrow { text-align: center; color: #374151; font-size: 22px; line-height: 1.1; margin: 2px 0; }
+
+        /* --- Diagram label completion --- */
+        .diagram-block { max-width: 640px; margin: 8px auto; }
+        .diagram-images { text-align: center; margin: 8px 0 14px; }
+        .diagram-img { max-width: 100%; height: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
+        .diagram-drop { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 26px 16px;
+            text-align: center; color: #6b7280; background: #f8fafc; margin: 8px 0 14px; font-size: 14px; }
+        .diagram-rows { display: flex; flex-direction: column; gap: 8px; max-width: 380px; margin: 0 auto; }
+        .diagram-row { display: flex; align-items: center; gap: 10px; }
+        .diagram-lbl { flex: 0 0 30px; height: 30px; display: inline-flex; align-items: center;
+            justify-content: center; font-weight: 700; color: #111827; border: 1px solid #d1d5db;
+            border-radius: 6px; background: #fff; }
+        .diagram-row .answer-input { flex: 1; }
     </style>
 </head>
 <body>
