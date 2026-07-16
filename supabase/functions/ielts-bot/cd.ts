@@ -70,9 +70,10 @@ const HEADER_NOISE =
 
 // IELTS "ishchi yozuvlari" — asl passage emas
 const BOILERPLATE =
-  /^\s*(reading\s+passage\b|part\s+\d+\s*$|section\s+\d+\s*$|you\s+should\s+spend\b|.*\bbased\s+on\s+reading\s+passage\b|.*\bwhich\s+are\s+based\s+on\b|reading\s+passage\s+\d+\s+has\b|the\s+reading\s+passage\s+below\b|turn\s+over\b|page\s+\d+\b|\d{1,3}\s+of\s+\d{1,3}\s*$)/i;
+  /^\s*\d{0,3}\s*(reading\s+passage\b|part\s+\d+\s*$|section\s+\d+\s*$|you\s+should\s+spend\b|.*\bbased\s+on\s+reading\s+passage\b|.*\bwhich\s+are\s+based\s+on\b|reading\s+passage\s+\d+\s+has\b|the\s+reading\s+passage\s+below\b|turn\s+over\b|page\s+\d+\b|\d{1,3}\s+of\s+\d{1,3}\s*$)/i;
 // Harf-oralig'i: "R E A D I N G  P A S S A G E  2" -> "readingpassage2"
-const BOILERPLATE_DESPACED = /^(readingpassage|passage|part|section)\d+$/;
+// (oldida bet raqami bo'lishi mumkin: "1READING PASSAGE 2")
+const BOILERPLATE_DESPACED = /^\d{0,3}(readingpassage|passage|part|section)\d+$/;
 const PAGENUM = /^\s*[-–—•·|]*\s*\d{1,3}\s*[-–—•·|]*\s*$/;
 const URLISH = /(https?:\/\/|www\.\w|t\.me\/|@[A-Za-z0-9_]{3,})/i;
 
@@ -580,7 +581,8 @@ function renderPassage(p: Passage, idx: number, hidden: boolean): string {
 function renderPartHeader(p: Passage, idx: number, hidden: boolean): string {
   const cls = "part-header" + (hidden ? " hidden" : "");
   const rng = qStart(p) ? `${qStart(p)}-${qEnd(p)}` : "";
-  return `<div id="part-header-${idx}" class="${cls}"><p><strong>Part ${idx}</strong></p><p>Read the text and answer questions ${rng}.</p></div>`;
+  const tail = rng ? `Read the text and answer questions ${rng}.` : "Read the text.";
+  return `<div id="part-header-${idx}" class="${cls}"><p><strong>Part ${idx}</strong></p><span class="ph-sep">·</span><p>${tail}</p></div>`;
 }
 function renderQuestionSet(p: Passage, idx: number, hidden: boolean): string {
   const cls = "question-set" + (hidden ? " hidden" : "");
@@ -731,8 +733,10 @@ function buildData(test: ReadingTest) {
     }
   }
   const parts = test.passages.map((p) => [qStart(p), qEnd(p)]);
+  // Vaqt passage soniga qarab: 1→20, 2→40, 3→60 daqiqa (faqat eslatma)
+  const duration = 20 * Math.max(1, test.passages.length);
   return {
     answers, groups, parts,
-    settings: { duration: test.settings.durationMin },
+    settings: { duration },
   };
 }

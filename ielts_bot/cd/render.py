@@ -113,10 +113,11 @@ def _render_passage(p: Passage, idx: int, hidden: bool) -> str:
 def _render_part_header(p: Passage, idx: int, hidden: bool) -> str:
     cls = "part-header" + (" hidden" if hidden else "")
     rng = f"{p.q_start}-{p.q_end}" if p.q_start else ""
+    tail = f"Read the text and answer questions {rng}." if rng else "Read the text."
     return (
         f'<div id="part-header-{idx}" class="{cls}">'
         f'<p><strong>Part {idx}</strong></p>'
-        f'<p>Read the text and answer questions {rng}.</p></div>'
+        f'<span class="ph-sep">·</span><p>{tail}</p></div>'
     )
 
 
@@ -337,11 +338,13 @@ def _build_data(test: ReadingTest) -> Dict:
             kind = g.kind if g else "gap"
             answers[str(q)] = _answer_value(ans, kind)
     parts = [[p.q_start, p.q_end] for p in test.passages]
+    # Vaqt passage soniga qarab: 1→20, 2→40, 3→60 daqiqa (faqat eslatma sifatida)
+    duration = 20 * max(1, len(test.passages))
     return {
         "answers": answers,
         "groups": groups,
         "parts": parts,
-        "settings": {"duration": test.settings.duration_min},
+        "settings": {"duration": duration},
     }
 
 

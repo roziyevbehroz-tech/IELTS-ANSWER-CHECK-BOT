@@ -968,13 +968,25 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
   }
 }
 
+function slugify(s: string): string {
+  const base = (s || "").toLowerCase().normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")   // diakritiklar
+    .replace(/[^a-z0-9\s-]/g, "").trim()
+    .replace(/[\s-]+/g, "_").slice(0, 40).replace(/^_+|_+$/g, "");
+  return base || "reading";
+}
+
 async function cdFinish(chatId: number, from: any, data: CdDraft) {
   await sendMessage(chatId, "⏳ CD test tayyorlanmoqda…");
   data.settings.brand = "DREAM ZONE";
-  const title = (data.passages[0] && data.passages[0].title) || "IELTS Reading Practice";
+  // Sarlavha (yo'q bo'lsa passage boshidan) — fayl nomi uchun
+  const rawTitle = (data.passages[0] && data.passages[0].title) || "";
+  const firstText = (data.passages[0] && data.passages[0].paragraphs && data.passages[0].paragraphs[0]) || "";
+  const title = rawTitle || "IELTS Reading Practice";
   const test: CD.ReadingTest = { title, passages: data.passages, settings: data.settings };
   const html = CD.renderTest(test);
   const total = CD.totalQuestions(test);
+  const fileName = "dream_zone_" + slugify(rawTitle || firstText) + ".html";
   const caption =
     `🎉 *Tayyor!* CD Reading testingiz quyida.\n\n📊 ${total} ta savol · ${data.passages.length} ta passage\n\n` +
     "▶️ *Ishlashi:* o'quvchi javoblarni kiritib «Deliver» bosadi — to'g'rilari " +
@@ -983,7 +995,7 @@ async function cdFinish(chatId: number, from: any, data: CdDraft) {
     "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → *✏️* tugmasi → matn/savollarni " +
     "tahrirlang → *💾 Saqlash* bilan toza faylni yuklab oling.\n\n" +
     "So'ng o'quvchilarga tarqating. 💙";
-  await sendDocumentHtml(chatId, "dream_zone_reading.html", html, caption);
+  await sendDocumentHtml(chatId, fileName, html, caption);
   await clearDraft(from.id);
   await sendMessage(chatId,
     "✅ Test tayyor! Yana bittasini yaratasizmi?", cdDoneKb());

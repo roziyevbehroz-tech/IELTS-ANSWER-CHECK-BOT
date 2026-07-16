@@ -36,6 +36,55 @@
         .opt-list { list-style: none; padding-left: 0; margin: 10px 0; }
         .opt-list li { padding: 3px 0; }
         .heading-bank { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; background: #f9fafb; margin-bottom: 14px; }
+
+        /* --- Ixcham part-header (bir qatorli, tepaga yopishgan) --- */
+        .part-header { background:#eef0e9; padding:6px 14px !important; margin:0 !important;
+            border:0; border-bottom:1px solid #e0e0e0; border-radius:0; font-size:13.5px; color:#333; }
+        .part-header p { display:inline; margin:0; }
+        .part-header .ph-sep { color:#9ca3af; margin:0 6px; }
+        #passage-header-container { position:sticky; top:0; z-index:5; }
+
+        /* Vaqt tugaganda taymer qizil (faqat eslatma) */
+        .timer-display.time-up { color:#c1121f; font-weight:700; }
+
+        /* --- Highlight --- */
+        .cd-hl { background:#fff59d; border-radius:2px; cursor:pointer; }
+        .hl-popup { position:absolute; z-index:300; background:#1f2937; color:#fff;
+            font-size:13px; font-weight:600; padding:6px 12px; border-radius:8px; cursor:pointer;
+            box-shadow:0 3px 10px rgba(0,0,0,.3); white-space:nowrap; user-select:none; }
+        .hl-popup::after { content:""; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%);
+            border:5px solid transparent; border-top-color:#1f2937; border-bottom:0; }
+        .hl-popup:hover { background:#111827; }
+
+        /* Faol savol belgisi */
+        .q-active { box-shadow:-3px 0 0 0 #c1121f; background:#fff8f8; border-radius:4px; }
+
+        /* --- Pastki ixcham Part navigatsiyasi (IDP uslubi) --- */
+        .bottom-nav { position:fixed; bottom:0; left:0; right:0; height:60px; background:#fff;
+            border-top:1px solid #e0e0e0; display:flex; align-items:stretch; z-index:100;
+            box-shadow:0 -2px 8px rgba(0,0,0,.06); }
+        .bn-parts { flex:1; display:flex; align-items:stretch; overflow-x:auto; }
+        .bn-part { display:flex; align-items:center; gap:6px; padding:0 14px; border-right:1px solid #eef0f2; flex:0 0 auto; }
+        .bn-part.active { background:#faf7f7; }
+        .bn-label { border:none; background:none; font-size:14px; font-weight:700; color:#374151; cursor:pointer; padding:4px 2px; white-space:nowrap; }
+        .bn-part.active .bn-label { color:#c1121f; }
+        .bn-count { font-size:13px; color:#6b7280; }
+        .bn-chips { display:flex; gap:3px; flex-wrap:nowrap; }
+        .bn-q { width:26px; height:26px; border:1px solid #d1d5db; background:#fff; border-radius:5px;
+            font-size:12.5px; color:#374151; cursor:pointer; padding:0; }
+        .bn-q:hover { background:#f3f4f6; }
+        .bn-q.answered { background:#111827; color:#fff; border-color:#111827; }
+        .bn-q.current { outline:2px solid #c1121f; outline-offset:1px; }
+        .bn-deliver { flex:0 0 auto; margin:8px 14px; padding:0 26px; background:#c1121f; color:#fff;
+            border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; }
+        .bn-deliver:hover { background:#a20e19; }
+
+        /* Strelkalarni pastki panel ustiga ko'taramiz + kichraytiramiz */
+        .nav-arrows { bottom:72px !important; }
+        .nav-arrow { width:42px !important; height:42px !important; border-radius:8px; }
+
+        /* Text ekranini kattalashtirish uchun main-container'ni pastki panelga moslash */
+        .main-container { height: calc(100vh - 60px - 60px) !important; }
     </style>
 </head>
 <body>
@@ -79,9 +128,7 @@
         <span class="cd-hint">Matnni belgilab, tugmani bosing</span>
     </div>
 
-    <div class="part-tabs">
-{{PART_TABS}}
-    </div>
+    <div id="hl-popup" class="hl-popup hidden">🖍 Highlight</div>
 
     <div class="main-container" id="main-container">
         <div id="passage-header-container">
@@ -107,8 +154,9 @@
         </button>
     </div>
 
-    <div style="position:fixed;bottom:20px;left:0;right:0;display:flex;justify-content:center;z-index:101;">
-        <button id="deliver-button" aria-label="Submit answers" class="footer__deliverButton___3FM07">Deliver</button>
+    <div id="bottom-nav" class="bottom-nav">
+        <div id="bn-parts" class="bn-parts"></div>
+        <button id="deliver-button" aria-label="Submit answers" class="bn-deliver">Deliver ✓</button>
     </div>
 
     <div id="results-modal" class="modal-overlay hidden">

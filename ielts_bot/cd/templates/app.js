@@ -22,6 +22,7 @@
     setupResizer();
     setupParts();
     setupEditor();
+    setupHighlight();
     switchToPart(1);
     var db = document.getElementById("deliver-button");
     if (db) db.addEventListener("click", onDeliver);
@@ -50,8 +51,14 @@
     if (t) t.addEventListener("click", toggle);
     if (r) r.addEventListener("click", function () { timeLeft = (S.duration || 60) * 60; render(); if (!timerId) toggle(); });
     function tick() { timerId = setInterval(function () {
-      if (timeLeft > 0) { timeLeft--; render(); } else { clearInterval(timerId); timerId = null; onDeliver(); }
+      if (timeLeft > 0) { timeLeft--; render(); }
+      else { clearInterval(timerId); timerId = null; onTimeUp(); }
     }, 1000); }
+    function onTimeUp() {
+      // Vaqt tugadi — faqat eslatma; o'quvchi ishlashda davom etaveradi
+      var el = document.querySelector(".timer-display");
+      if (el) { el.textContent = "00:00"; el.classList.add("time-up"); }
+    }
     function toggle() {
       if (timerId) { clearInterval(timerId); timerId = null; setIcon(true); }
       else { tick(); setIcon(false); }
@@ -89,34 +96,201 @@
     });
   }
 
-  // ------------------------------ parts ------------------------------
+  // -------------------------- parts / nav ----------------------------
+  var qList = Object.keys(D.answers).map(Number).sort(function (a, b) { return a - b; });
+  var currentQuestion = qList.length ? qList[0] : 1;
+
   function setupParts() {
     var prev = document.getElementById("prevBtn");
     var next = document.getElementById("nextBtn");
-    if (prev) prev.addEventListener("click", function () { switchToPart(Math.max(1, currentPart - 1)); });
-    if (next) next.addEventListener("click", function () { switchToPart(Math.min(partCount, currentPart + 1)); });
-    document.querySelectorAll(".part-tab").forEach(function (t) {
-      t.addEventListener("click", function () { switchToPart(parseInt(t.dataset.part, 10)); });
+    // Strelkalar: bitta savol oldinga/orqaga (IDP kabi)
+    if (prev) prev.addEventListener("click", function () { stepQuestion(-1); });
+    if (next) next.addEventListener("click", function () { stepQuestion(1); });
+    buildBottomNav();
+    // Savolga javob kiritilganda pastki panel yangilanadi
+    var qp = document.getElementById("questions-panel");
+    if (qp) {
+      qp.addEventListener("input", refreshBottomNav);
+      qp.addEventListener("change", refreshBottomNav);
+    }
+  }
+
+  function partRange(p) { return (D.parts && D.parts[p - 1]) || [qList[0] || 1, qList[qList.length - 1] || 1]; }
+  function partOf(q) {
+    for (var i = 1; i <= partCount; i++) {
+      var r = partRange(i);
+      if (r[0] && q >= r[0] && q <= r[1]) return i;
+    }
+    var g = groupOf(q);
+    if (g) { for (var j = 0; j < D.groups.length; j++) if (D.groups[j] === g) { /* noop */ } }
+    return currentPart;
+  }
+  function qEl(q) {
+    var e = document.getElementById("q" + q);
+    if (e) return e;
+    var r = document.querySelector('input[name="q' + q + '"]');
+    if (r) return r;
+    var g = groupOf(q);
+    if (g && g.kind === "mcq_multi") return document.querySelector('input[name="qm' + g.start + '"]');
+    return null;
+  }
+  function isAnswered(q) {
+    var g = groupOf(q);
+    if (g && (g.kind === "tfng" || g.kind === "ynng" || g.kind === "mcq")) {
+      return !!document.querySelector('input[name="q' + q + '"]:checked');
+    }
+    if (g && g.kind === "mcq_multi") {
+      var n = document.querySelectorAll('input[name="qm' + g.start + '"]:checked').length;
+      return n >= (q - g.start + 1);
+    }
+    var e = document.getElementById("q" + q);
+    return !!(e && String(e.value || "").trim());
+  }
+
+  // Pastki ixcham part navigatsiyasi (IDP uslubi)
+  function buildBottomNav() {
+    var host = document.getElementById("bn-parts");
+    if (!host) return;
+    host.innerHTML = "";
+    for (var i = 1; i <= partCount; i++) {
+      var r = partRange(i);
+      var sec = document.createElement("div");
+      sec.className = "bn-part" + (i === currentPart ? " active" : "");
+      sec.setAttribute("data-part", i);
+      var lbl = document.createElement("button");
+      lbl.className = "bn-label";
+      lbl.textContent = "Part " + i;
+      (function (pi) { lbl.addEventListener("click", function () { switchToPart(pi); }); })(i);
+      sec.appendChild(lbl);
+      if (i === currentPart && r[0]) {
+        var chips = document.createElement("div");
+        chips.className = "bn-chips";
+        for (var q = r[0]; q <= r[1]; q++) {
+          var b = document.createElement("button");
+          b.className = "bn-q";
+          b.setAttribute("data-q", q);
+          b.textContent = q;
+          (function (qq) { b.addEventListener("click", function () { gotoQuestion(qq); }); })(q);
+          chips.appendChild(b);
+        }
+        sec.appendChild(chips);
+      } else if (r[0]) {
+        var cnt = document.createElement("span");
+        cnt.className = "bn-count";
+        sec.appendChild(cnt);
+      }
+      host.appendChild(sec);
+    }
+    refreshBottomNav();
+  }
+  function refreshBottomNav() {
+    for (var i = 1; i <= partCount; i++) {
+      var r = partRange(i);
+      var done = 0, tot = 0;
+      if (r[0]) for (var q = r[0]; q <= r[1]; q++) { tot++; if (isAnswered(q)) done++; }
+      var sec = document.querySelector('.bn-part[data-part="' + i + '"]');
+      if (!sec) continue;
+      var cnt = sec.querySelector(".bn-count");
+      if (cnt) cnt.textContent = done + " / " + tot;
+    }
+    document.querySelectorAll(".bn-q").forEach(function (b) {
+      var q = parseInt(b.getAttribute("data-q"), 10);
+      b.classList.toggle("answered", isAnswered(q));
+      b.classList.toggle("current", q === currentQuestion);
     });
   }
-  function switchToPart(p) {
+
+  function gotoQuestion(q) {
+    var p = partOf(q);
+    if (p !== currentPart) switchToPart(p, true);
+    currentQuestion = q;
+    var el = qEl(q);
+    if (el) {
+      var wrap = (el.closest && (el.closest(".statement") || el.closest(".matching-form-row") || el.closest(".question"))) || el;
+      document.querySelectorAll(".q-active").forEach(function (x) { x.classList.remove("q-active"); });
+      if (wrap.classList) wrap.classList.add("q-active");
+      if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    refreshBottomNav();
+  }
+  function stepQuestion(dir) {
+    var idx = qList.indexOf(currentQuestion);
+    if (idx === -1) idx = 0;
+    var ni = idx + dir;
+    if (ni < 0 || ni >= qList.length) return;
+    gotoQuestion(qList[ni]);
+  }
+
+  function switchToPart(p, keepQuestion) {
     currentPart = p;
     for (var i = 1; i <= partCount; i++) {
       toggle("passage-text-" + i, i === p);
       toggle("questions-" + i, i === p);
       toggle("part-header-" + i, i === p);
     }
-    document.querySelectorAll(".part-tab").forEach(function (t) {
+    document.querySelectorAll(".bn-part").forEach(function (t) {
       t.classList.toggle("active", parseInt(t.dataset.part, 10) === p);
     });
     var pb = document.getElementById("prevBtn"), nb = document.getElementById("nextBtn");
-    if (pb) pb.disabled = p <= 1;
-    if (nb) nb.disabled = p >= partCount;
-    window.scrollTo(0, 0);
+    if (pb) pb.disabled = qList.indexOf(currentQuestion) <= 0;
+    if (nb) nb.disabled = qList.indexOf(currentQuestion) >= qList.length - 1;
+    if (!keepQuestion) {
+      var r = partRange(p);
+      if (r[0]) currentQuestion = r[0];
+    }
     var pp = document.getElementById("passage-panel"); if (pp) pp.scrollTop = 0;
     var qp = document.getElementById("questions-panel"); if (qp) qp.scrollTop = 0;
+    buildBottomNav();
   }
   function toggle(id, show) { var e = document.getElementById(id); if (e) e.classList.toggle("hidden", !show); }
+
+  // ---------------------------- highlight ----------------------------
+  function setupHighlight() {
+    var panel = document.getElementById("passage-panel");
+    var pop = document.getElementById("hl-popup");
+    if (!panel || !pop) return;
+    // Mavjud highlightni bosib olib tashlash
+    panel.addEventListener("click", function (e) {
+      var m = e.target.closest ? e.target.closest(".cd-hl") : null;
+      if (m && !document.body.classList.contains("cd-editing")) {
+        var par = m.parentNode;
+        while (m.firstChild) par.insertBefore(m.firstChild, m);
+        par.removeChild(m); par.normalize();
+      }
+    });
+    panel.addEventListener("mouseup", function () {
+      if (document.body.classList.contains("cd-editing")) return;
+      setTimeout(function () {
+        var sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) { pop.classList.add("hidden"); return; }
+        var range = sel.getRangeAt(0);
+        if (!panel.contains(range.commonAncestorContainer)) { pop.classList.add("hidden"); return; }
+        var rect = range.getBoundingClientRect();
+        pop.style.top = (window.scrollY + rect.top - 42) + "px";
+        pop.style.left = (window.scrollX + rect.left + rect.width / 2 - 45) + "px";
+        pop.classList.remove("hidden");
+      }, 10);
+    });
+    pop.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    pop.addEventListener("click", function () {
+      highlightSelection();
+      pop.classList.add("hidden");
+    });
+    document.addEventListener("mousedown", function (e) {
+      if (!pop.contains(e.target)) pop.classList.add("hidden");
+    });
+  }
+  function highlightSelection() {
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var range = sel.getRangeAt(0);
+    if (range.collapsed) return;
+    var mark = document.createElement("span");
+    mark.className = "cd-hl";
+    try { range.surroundContents(mark); }
+    catch (e) { mark.appendChild(range.extractContents()); range.insertNode(mark); }
+    sel.removeAllRanges();
+  }
 
   // ---------------------------- checking -----------------------------
   // Cheksiz qayta urinish: to'g'ri javoblar qulflanadi (yashil), xato/bo'shlar
