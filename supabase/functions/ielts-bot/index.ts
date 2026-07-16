@@ -17,6 +17,7 @@
 
 import answers from "./answers.json" with { type: "json" };
 import * as CD from "./cd.ts";
+import { t, Lang, LANGS, isLang, RK_CD_ALL, RK_CHECK_ALL } from "./i18n.ts";
 import { unzipSync, strFromU8, zlibSync } from "https://esm.sh/fflate@0.8.2";
 import { getDocumentProxy, getResolvedPDFJS } from "https://esm.sh/unpdf@0.12.1";
 
@@ -178,65 +179,22 @@ function parseAnswers(text: string): Record<number, string> {
 const SECTION_NAMES: Record<string, string> = { listening: "Listening", reading: "Reading" };
 const SECTION_ICONS: Record<string, string> = { listening: "🎧", reading: "📖" };
 
-function partLabel(section: string, part: string): string {
-  if (part === "all") return "To'liq test";
+function partLabel(section: string, part: string, lang: Lang): string {
+  if (part === "all") return t(lang, "full_test");
   return section === "listening" ? `Part ${part}` : `Passage ${part}`;
 }
 
-const WELCOME = (name: string) =>
-  `👋 Assalomu alaykum, *${name}*!\n\n` +
-  "*DREAM ZONE* IELTS yordamchisiga xush kelibsiz 🎓\n\n" +
-  "Listening va Reading javoblaringizni bir zumda tekshirib beraman — " +
-  "boshlash uchun quyidagi tugmani bosing 👇";
-
-const WELCOME_HINT =
-  "\n\nℹ️ Bot haqida — /about\n📖 Qo'llanma — /guide";
-
-const ABOUT =
-  "🎓 *DREAM ZONE — IELTS yordamchisi*\n\n" +
-  "Men *DREAM ZONE* o'quv markazi o'quvchilari uchun yaratilganman 💙\n\n" +
-  "Cambridge IELTS Academic 10–21 kitoblaridagi Listening va Reading " +
-  "testlarini tekshiraman — jami 48 ta to'liq test.\n\n" +
-  "Eng muhimi: men *faqat to'g'ri* javoblaringizni ko'rsataman. Xato " +
-  "javoblarning to'g'ri variantini darrov ochib qo'ymayman — siz ular " +
-  "ustida o'zingiz ishlaysiz, tayyor bo'lganingizda esa o'zingiz ko'rasiz.\n\n" +
-  "📖 Qanday foydalanish — /guide";
-
-const GUIDE =
-  "📖 *Qanday foydalanaman?*\n\n" +
-  "1. Mini App'ni oching yoki «Matn orqali tekshirish»ni tanlang.\n" +
-  "2. Kitob, test va bo'limni tanlang.\n" +
-  "3. O'sha qismni mustaqil yeching.\n" +
-  "4. Javoblaringizni raqami bilan yuboring, masalan:\n" +
-  "`1. cat`\n`2. TRUE`\n`3. B`\n" +
-  "5. Men faqat to'g'rilarini belgilab beraman.\n" +
-  "6. Xatolar ustida ishlang va qayta yuboring.\n" +
-  "7. Tayyor bo'lsangiz — «🔑 Javoblarni ko'rish».\n\n" +
-  "Savolingiz bo'lsa, *DREAM ZONE* ustozlaringizga murojaat qiling 💙";
-
-const PART_NOT_AVAILABLE =
-  "⚠️ Afsuski, bu qism uchun javoblar hali bazaga kiritilmagan.\n" +
-  "Iltimos boshqa qismni tanlang yoki keyinroq urinib ko'ring.";
-
-const NO_ANSWERS_PARSED =
-  "🤔 Javoblarni o'qib bo'lmadi. Iltimos har bir javobni raqami bilan yuboring:\n" +
-  "`21. cat`\n`22. true`\n`23. B`";
-
-function sendAnswersPrompt(book: number, test: number, section: string, part: string): string {
+function sendAnswersPrompt(book: number, test: number, section: string, part: string, lang: Lang): string {
   const [lo, hi] = partRange(section, part);
   const nums = Object.keys(partAnswers(book, test, section, part)).map(Number).sort((a, b) => a - b);
   const first = nums.length ? nums[0] : lo;
   const last = nums.length ? nums[nums.length - 1] : hi;
+  // Namuna javoblari har doim inglizcha (IELTS mazmuni tarjima qilinmaydi)
   const example = section === "reading"
     ? `${first}. TRUE\n${first + 1}. paragraph\n${first + 2}. B`
     : `${first}. cat\n${first + 1}. 10 am\n${first + 2}. B`;
-  return (
-    `✍️ *${book}-kitob, Test ${test}, ${SECTION_NAMES[section]} — ${partLabel(section, part)}*\n` +
-    `Savollar: ${first}–${last} (${nums.length} ta)\n\n` +
-    "Javoblaringizni tartib raqami bilan yuboring. Masalan:\n" +
-    "`" + example + "`\n\n" +
-    "Har bir javobni alohida qatorda yozsangiz ham bo'ladi."
-  );
+  return t(lang, "answers_prompt", book, test, SECTION_NAMES[section], partLabel(section, part, lang),
+    first, last, nums.length, example);
 }
 
 // ------------------------------- klaviaturalar -------------------------------
@@ -249,11 +207,19 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out;
 }
 
-function launcherKb() {
+// Til tanlash — /start da va /language da (uch tilda birga ko'rsatiladi)
+const LANG_PICK = "🌐 Tilni tanlang / Выберите язык / Choose your language:";
+function langKb() {
+  return {
+    inline_keyboard: LANGS.map((l) => [{ text: t(l, "lang_native"), callback_data: `lang:${l}` }]),
+  };
+}
+
+function launcherKb(lang: Lang) {
   const rows: Btn[][] = [];
-  if (WEBAPP_URL) rows.push([{ text: "🚀 Mini App'ni ochish", web_app: { url: WEBAPP_URL } }]);
-  rows.push([{ text: "⌨️ Matn orqali tekshirish", callback_data: "nav:books" }]);
-  rows.push([{ text: "🆕 CD Test yaratish", callback_data: "cd:start" }]);
+  if (WEBAPP_URL) rows.push([{ text: t(lang, "btn_miniapp"), web_app: { url: WEBAPP_URL } }]);
+  rows.push([{ text: t(lang, "btn_text_check"), callback_data: "nav:books" }]);
+  rows.push([{ text: t(lang, "btn_cd_create"), callback_data: "cd:start" }]);
   return { inline_keyboard: rows };
 }
 
@@ -262,50 +228,50 @@ function booksKb() {
   return { inline_keyboard: chunk(btns, 4) };
 }
 
-function testsKb(book: number) {
-  const btns: Btn[] = TESTS.map((t) => ({ text: `Test ${t}`, callback_data: `t:${book}:${t}` }));
+function testsKb(book: number, lang: Lang) {
+  const btns: Btn[] = TESTS.map((tt) => ({ text: t(lang, "btn_test_n", tt), callback_data: `t:${book}:${tt}` }));
   const rows = chunk(btns, 2);
-  rows.push([{ text: "⬅️ Orqaga", callback_data: "nav:books" }]);
+  rows.push([{ text: t(lang, "btn_back"), callback_data: "nav:books" }]);
   return { inline_keyboard: rows };
 }
 
-function sectionsKb(book: number, test: number) {
+function sectionsKb(book: number, test: number, lang: Lang) {
   return {
     inline_keyboard: [
       [
         { text: "🎧 Listening", callback_data: `s:${book}:${test}:listening` },
         { text: "📖 Reading", callback_data: `s:${book}:${test}:reading` },
       ],
-      [{ text: "⬅️ Orqaga", callback_data: `nav:tests:${book}` }],
+      [{ text: t(lang, "btn_back"), callback_data: `nav:tests:${book}` }],
     ],
   };
 }
 
-function partsKb(book: number, test: number, section: string) {
+function partsKb(book: number, test: number, section: string, lang: Lang) {
   const labels: [string, string][] = section === "listening"
     ? [["Part 1", "1"], ["Part 2", "2"], ["Part 3", "3"], ["Part 4", "4"]]
     : [["Passage 1", "1"], ["Passage 2", "2"], ["Passage 3", "3"]];
   const btns: Btn[] = labels.map(([lbl, code]) =>
     ({ text: lbl, callback_data: `p:${book}:${test}:${section}:${code}` }));
   const rows = chunk(btns, 2);
-  rows.push([{ text: "📋 To'liq test (1–40)", callback_data: `p:${book}:${test}:${section}:all` }]);
-  rows.push([{ text: "⬅️ Orqaga", callback_data: `nav:secs:${book}:${test}` }]);
+  rows.push([{ text: t(lang, "btn_full_test"), callback_data: `p:${book}:${test}:${section}:all` }]);
+  rows.push([{ text: t(lang, "btn_back"), callback_data: `nav:secs:${book}:${test}` }]);
   return { inline_keyboard: rows };
 }
 
-function resultKb(book: number, test: number, section: string, part: string) {
+function resultKb(book: number, test: number, section: string, part: string, lang: Lang) {
   const ctx = `${book}:${test}:${section}:${part}`;
   return {
     inline_keyboard: [
-      [{ text: "🔁 Qaytadan urinish", callback_data: `retry:${ctx}` }],
-      [{ text: "🔑 Javoblarni ko'rish", callback_data: `reveal:${ctx}` }],
-      [{ text: "🏠 Bosh menyu", callback_data: "nav:books" }],
+      [{ text: t(lang, "btn_retry"), callback_data: `retry:${ctx}` }],
+      [{ text: t(lang, "btn_reveal"), callback_data: `reveal:${ctx}` }],
+      [{ text: t(lang, "btn_home"), callback_data: "nav:books" }],
     ],
   };
 }
 
-function afterRevealKb() {
-  return { inline_keyboard: [[{ text: "🏠 Bosh menyu", callback_data: "nav:books" }]] };
+function afterRevealKb(lang: Lang) {
+  return { inline_keyboard: [[{ text: t(lang, "btn_home"), callback_data: "nav:books" }]] };
 }
 
 // ------------------------------- Telegram API -------------------------------
@@ -405,6 +371,26 @@ async function upsertUser(u: any): Promise<void> {
   } catch (_) { /* ignore */ }
 }
 
+// Foydalanuvchi tanlagan interfeys tili (uz/ru/en). Tanlamagan bo'lsa — uz.
+async function getLang(tgId: number): Promise<Lang> {
+  try {
+    const c = await sb();
+    if (!c) return "uz";
+    const { data } = await c.from("ielts_ac_users").select("lang").eq("telegram_id", tgId).maybeSingle();
+    return isLang(data?.lang) ? data.lang : "uz";
+  } catch (_) { return "uz"; }
+}
+
+async function setLang(tgId: number, lang: Lang): Promise<void> {
+  try {
+    const c = await sb();
+    if (!c) return;
+    await c.from("ielts_ac_users").upsert({
+      telegram_id: tgId, lang, last_active_at: new Date().toISOString(),
+    }, { onConflict: "telegram_id" });
+  } catch (_) { /* ignore */ }
+}
+
 async function recordAttempt(tgId: number, book: number, test: number, section: string,
   part: string, correct: number, total: number, details: unknown): Promise<void> {
   try {
@@ -449,94 +435,79 @@ async function getCustomTest(id: string): Promise<any | null> {
   } catch (_) { return null; }
 }
 
-function customTestKb(id: string) {
+function customTestKb(id: string, lang: Lang) {
   var sep = WEBAPP_URL.indexOf("?") >= 0 ? "&" : "?";
-  return { inline_keyboard: [[{ text: "🚀 Testni boshlash", web_app: { url: WEBAPP_URL + sep + "ct=" + id } }]] };
+  return { inline_keyboard: [[{ text: t(lang, "btn_ct_start"), web_app: { url: WEBAPP_URL + sep + "ct=" + id } }]] };
 }
 
-async function handleOpenCustom(chatId: number, from: any, id: string) {
+async function handleOpenCustom(chatId: number, from: any, id: string, lang: Lang) {
   bg(upsertUser(from));
-  const t = await getCustomTest(id);
-  if (!t) { await sendMessage(chatId, "❌ Test topilmadi yoki o'chirilgan."); return; }
-  const total = Object.keys(t.answers || {}).length;
-  const st = ctStatus(t);
-  if (st === "closed") {
-    await sendMessage(chatId, `🔒 *${t.title}*\n\nBu test yakunlangan — hozir javob qabul qilinmaydi.`);
-    return;
-  }
-  if (st === "paused") {
-    await sendMessage(chatId, `⏸️ *${t.title}*\n\nBu test vaqtincha to'xtatilgan. Keyinroq urinib ko'ring.`);
-    return;
-  }
-  const who = t.owner_name ? `\nYaratuvchi: ${t.owner_name}` : "";
-  await sendMessage(chatId,
-    `📝 *${t.title}*\n\n${total} ta savol · DREAM ZONE${who}\n\n` +
-    "Javoblaringizni kiritib darrov tekshiring — faqat to'g'rilari ko'rsatiladi.\n\n" +
-    "Boshlash uchun quyidagi tugmani bosing 👇",
-    customTestKb(id));
+  const ct = await getCustomTest(id);
+  if (!ct) { await sendMessage(chatId, t(lang, "ct_not_found")); return; }
+  const total = Object.keys(ct.answers || {}).length;
+  const st = ctStatus(ct);
+  if (st === "closed") { await sendMessage(chatId, t(lang, "ct_closed", ct.title)); return; }
+  if (st === "paused") { await sendMessage(chatId, t(lang, "ct_paused", ct.title)); return; }
+  const who = ct.owner_name ? t(lang, "ct_owner", ct.owner_name) : "";
+  await sendMessage(chatId, t(lang, "ct_intro", ct.title, total, who), customTestKb(id, lang));
 }
 
-async function handleCommand(chatId: number, from: any, text: string) {
+async function handleCommand(chatId: number, from: any, text: string, lang: Lang) {
   const segs = text.split(/\s+/);
   const cmd = segs[0].replace(/@.*$/, "");
   const param = segs[1] || "";
   if (cmd === "/start" && param.indexOf("t_") === 0) {
-    return await handleOpenCustom(chatId, from, param.slice(2));
+    return await handleOpenCustom(chatId, from, param.slice(2), lang);
   }
   if (cmd === "/start") {
     bg(upsertUser(from));
     bg(setSession(from.id, { awaiting: false }));
-    const name = from.first_name || "do'stim";
-    // Doimiy pastki tugmalarni yoqamiz, so'ng inline menyuni ko'rsatamiz
-    await sendMessage(chatId, WELCOME(name), mainReplyKb());
-    await sendMessage(chatId, "👇 *Menyu*" + WELCOME_HINT, launcherKb());
+    // Doim: avval tilni so'raymiz. Tanlangach welcome + menyu ko'rsatiladi.
+    await sendMessage(chatId, LANG_PICK, langKb());
+  } else if (cmd === "/language" || cmd === "/lang") {
+    await sendMessage(chatId, LANG_PICK, langKb());
   } else if (cmd === "/about") {
-    await sendMessage(chatId, ABOUT);
+    await sendMessage(chatId, t(lang, "about"));
   } else if (cmd === "/guide" || cmd === "/help") {
-    await sendMessage(chatId, GUIDE);
+    await sendMessage(chatId, t(lang, "guide"));
   } else if (cmd === "/stats") {
-    await sendStats(chatId, from.id);
+    await sendStats(chatId, from.id, lang);
   } else if (cmd === "/qtemplate") {
-    await sendMessage(chatId, CD_QTEMPLATE);
+    await sendMessage(chatId, t(lang, "cd_qtemplate"));
   } else if (cmd === "/myid") {
-    await sendMessage(chatId, `🆔 Sizning Telegram ID: \`${from.id}\``);
+    await sendMessage(chatId, t(lang, "myid", from.id));
   } else if (cmd === "/admin") {
-    await sendAdminStats(chatId, from);
+    await sendAdminStats(chatId, from, lang);
   } else {
-    await sendMessage(chatId, "Boshlash uchun /start ni bosing.");
+    await sendMessage(chatId, t(lang, "start_prompt"));
   }
+}
+
+// Til tanlagandan keyin welcome + doimiy tugmalar + menyuni ko'rsatamiz
+async function showWelcome(chatId: number, from: any, lang: Lang) {
+  const name = from.first_name || "friend";
+  await sendMessage(chatId, t(lang, "welcome", name), mainReplyKb(lang));
+  await sendMessage(chatId, t(lang, "menu") + t(lang, "welcome_hint"), launcherKb(lang));
 }
 
 // Bot egasi uchun umumiy analitika (ADMIN_IDS env orqali himoyalangan)
-async function sendAdminStats(chatId: number, from: any) {
+async function sendAdminStats(chatId: number, from: any, lang: Lang) {
   if (!ADMIN_IDS.length || !ADMIN_IDS.includes(String(from.id))) {
-    await sendMessage(chatId, "⛔ Bu buyruq faqat bot egasi uchun.");
+    await sendMessage(chatId, t(lang, "admin_only"));
     return;
   }
   const c = await sb();
-  if (!c) { await sendMessage(chatId, "⚠️ Baza ulanmagan."); return; }
+  if (!c) { await sendMessage(chatId, t(lang, "db_not_connected")); return; }
   const { data, error } = await c.rpc("ielts_bot_admin_stats");
-  if (error || !data) { await sendMessage(chatId, "⚠️ Statistikani olishda xato."); return; }
+  if (error || !data) { await sendMessage(chatId, t(lang, "stats_error")); return; }
   const s = data as any;
-  const books = (s.top_books ?? []).map((b: any) => `${b.book}-kitob (${b.c})`).join(", ") || "—";
+  const books = (s.top_books ?? []).map((b: any) => `${t(lang, "book_label", b.book)} (${b.c})`).join(", ") || "—";
   const secs = (s.top_sections ?? []).map((x: any) =>
     `${SECTION_NAMES[x.section] ?? x.section} (${x.c})`).join(", ") || "—";
-  const msg =
-    "📊 *Bot analitikasi*\n\n" +
-    `👥 *Foydalanuvchilar:* ${s.users_total} ta\n` +
-    `   🆕 Yangi: bugun *${s.users_new_1d}*, 7 kun *${s.users_new_7d}*, 30 kun *${s.users_new_30d}*\n` +
-    `   🟢 Faol: 24 soat *${s.users_active_1d}*, 7 kun *${s.users_active_7d}*\n\n` +
-    `✅ *Javob tekshirish:* ${s.attempts_total} marta (bugun ${s.attempts_1d})\n` +
-    `   📈 O'rtacha natija: *${s.attempts_avg_pct}%*\n\n` +
-    `🆕 *CD test yaratildi:* ${s.cd_created_total} ta (bugun ${s.cd_created_1d})\n` +
-    `📝 *Custom testlar:* ${s.custom_tests} ta\n` +
-    `⏳ *Hozir yaratilyapti:* ${s.drafts_active} ta qoralama\n\n` +
-    `📚 *Top kitoblar:* ${books}\n` +
-    `🎧📖 *Top bo'limlar:* ${secs}`;
-  await sendMessage(chatId, msg);
+  await sendMessage(chatId, t(lang, "admin_stats", s, books, secs));
 }
 
-async function sendStats(chatId: number, tgId: number) {
+async function sendStats(chatId: number, tgId: number, lang: Lang) {
   const c = await sb();
   let rows: any[] = [];
   if (c) {
@@ -548,21 +519,21 @@ async function sendStats(chatId: number, tgId: number) {
     } catch (_) { rows = []; }
   }
   if (!rows.length) {
-    await sendMessage(chatId, "📈 Hali yechilgan testlar yo'q. Birinchi testni yechib ko'ring!");
+    await sendMessage(chatId, t(lang, "stats_none"));
     return;
   }
-  let msg = "📈 *Sizning statistikangiz:*\n\n";
+  let msg = t(lang, "stats_header");
   let pct = 0;
   for (const a of rows) {
     const sec = SECTION_NAMES[a.section] ?? a.section;
-    msg += `• ${a.book}-kitob T${a.test} ${sec} ${partLabel(a.section, a.part)}: ${a.correct}/${a.total}\n`;
+    msg += t(lang, "stats_row", a.book, a.test, sec, partLabel(a.section, a.part, lang), a.correct, a.total);
     if (a.total) pct += (a.correct / a.total) * 100;
   }
-  msg += `\n*Jami:* ${rows.length} ta urinish, o'rtacha ${Math.round(pct / rows.length)}% to'g'ri.`;
+  msg += t(lang, "stats_total", rows.length, Math.round(pct / rows.length));
   await sendMessage(chatId, msg);
 }
 
-async function handleCallback(cq: any) {
+async function handleCallback(cq: any, lang: Lang) {
   const data: string = cq.data ?? "";
   const chatId = cq.message?.chat?.id;
   const messageId = cq.message?.message_id;
@@ -573,8 +544,17 @@ async function handleCallback(cq: any) {
   const parts = data.split(":");
   const kind = parts[0];
 
+  // Til tanlash: tanlangach welcome + menyuni yangi til bilan ko'rsatamiz
+  if (kind === "lang") {
+    const chosen = isLang(parts[1]) ? parts[1] : "uz";
+    await setLang(from.id, chosen);
+    await editMessage(chatId, messageId, t(chosen, "lang_saved"));
+    await showWelcome(chatId, from, chosen);
+    return;
+  }
+
   if (kind === "cd") {
-    await handleCdCallback(cq, parts.slice(1));
+    await handleCdCallback(cq, parts.slice(1), lang);
     return;
   }
 
@@ -583,29 +563,29 @@ async function handleCallback(cq: any) {
     if (what === "menu") {
       bg(clearAwaiting(from.id));
       bg(clearDraft(from.id));
-      await editMessage(chatId, messageId, "🏠 *Bosh menyu*\n\nQuyidagilardan birini tanlang 👇", launcherKb());
+      await editMessage(chatId, messageId, t(lang, "menu_home"), launcherKb(lang));
     } else if (what === "books") {
       bg(clearAwaiting(from.id));
-      await editMessage(chatId, messageId, "📚 Cambridge IELTS Academic — kitobni tanlang:", booksKb());
+      await editMessage(chatId, messageId, t(lang, "choose_book"), booksKb());
     } else if (what === "tests") {
       const book = Number(parts[2]);
-      await editMessage(chatId, messageId, `📝 ${book}-kitob. Testni tanlang:`, testsKb(book));
+      await editMessage(chatId, messageId, t(lang, "choose_test", book), testsKb(book, lang));
     } else if (what === "secs") {
       const book = Number(parts[2]), test = Number(parts[3]);
-      await editMessage(chatId, messageId, `🎧📖 ${book}-kitob, Test ${test}. Bo'limni tanlang:`, sectionsKb(book, test));
+      await editMessage(chatId, messageId, t(lang, "choose_section", book, test), sectionsKb(book, test, lang));
     }
     return;
   }
 
   if (kind === "b") {
     const book = Number(parts[1]);
-    await editMessage(chatId, messageId, `📝 ${book}-kitob. Testni tanlang:`, testsKb(book));
+    await editMessage(chatId, messageId, t(lang, "choose_test", book), testsKb(book, lang));
     return;
   }
 
   if (kind === "t") {
     const book = Number(parts[1]), test = Number(parts[2]);
-    await editMessage(chatId, messageId, `🎧📖 ${book}-kitob, Test ${test}. Bo'limni tanlang:`, sectionsKb(book, test));
+    await editMessage(chatId, messageId, t(lang, "choose_section", book, test), sectionsKb(book, test, lang));
     return;
   }
 
@@ -614,26 +594,26 @@ async function handleCallback(cq: any) {
     const icon = SECTION_ICONS[section] ?? "";
     const name = SECTION_NAMES[section] ?? section;
     await editMessage(chatId, messageId,
-      `${icon} ${book}-kitob, Test ${test}, ${name}. Qismni tanlang:`, partsKb(book, test, section));
+      t(lang, "choose_part", icon, book, test, name), partsKb(book, test, section, lang));
     return;
   }
 
   if (kind === "p") {
     const book = Number(parts[1]), test = Number(parts[2]), section = parts[3], part = parts[4];
     if (!isPartAvailable(book, test, section, part)) {
-      await answerCallback(cq.id, "Bu qism uchun javoblar hali yo'q.", true);
-      await editMessage(chatId, messageId, PART_NOT_AVAILABLE, partsKb(book, test, section));
+      await answerCallback(cq.id, t(lang, "part_not_available"), true);
+      await editMessage(chatId, messageId, t(lang, "part_not_available"), partsKb(book, test, section, lang));
       return;
     }
     bg(setSession(from.id, { book, test, section, part, awaiting: true }));
-    await editMessage(chatId, messageId, sendAnswersPrompt(book, test, section, part));
+    await editMessage(chatId, messageId, sendAnswersPrompt(book, test, section, part, lang));
     return;
   }
 
   if (kind === "retry") {
     const book = Number(parts[1]), test = Number(parts[2]), section = parts[3], part = parts[4];
     bg(setSession(from.id, { book, test, section, part, awaiting: true }));
-    await editMessage(chatId, messageId, sendAnswersPrompt(book, test, section, part));
+    await editMessage(chatId, messageId, sendAnswersPrompt(book, test, section, part, lang));
     return;
   }
 
@@ -641,45 +621,44 @@ async function handleCallback(cq: any) {
     const book = Number(parts[1]), test = Number(parts[2]), section = parts[3], part = parts[4];
     bg(clearAwaiting(from.id));
     const keys = partAnswers(book, test, section, part);
-    const header = `🔑 *To'g'ri javoblar — ${book}-kitob, Test ${test}, ` +
-      `${SECTION_NAMES[section]} ${partLabel(section, part)}:*\n\n`;
+    const header = t(lang, "reveal_header", book, test, SECTION_NAMES[section], partLabel(section, part, lang));
     const lines = Object.keys(keys).map(Number).sort((a, b) => a - b)
       .map((q) => `${q}. ${keys[q]}`);
-    await editMessage(chatId, messageId, header + lines.join("\n"), afterRevealKb());
+    await editMessage(chatId, messageId, header + lines.join("\n"), afterRevealKb(lang));
     return;
   }
 }
 
-async function handleText(chatId: number, from: any, text: string) {
+async function handleText(chatId: number, from: any, text: string, lang: Lang) {
   // Doimiy pastki tugmalar (reply keyboard) — oqimning istalgan joyidan ishlaydi
-  if (text === RK_CD) {
+  if (RK_CD_ALL.has(text)) {
     await setDraft(from.id, "skill", newDraft());
-    await sendMessage(chatId, CD_INTRO, cdSkillKb());
+    await sendMessage(chatId, t(lang, "cd_intro"), cdSkillKb(lang));
     return;
   }
-  if (text === RK_CHECK) {
+  if (RK_CHECK_ALL.has(text)) {
     bg(clearAwaiting(from.id));
     await clearDraft(from.id);
-    await sendMessage(chatId, "📚 Cambridge IELTS Academic — kitobni tanlang:", booksKb());
+    await sendMessage(chatId, t(lang, "choose_book"), booksKb());
     return;
   }
 
   // CD test yaratish oqimi faol bo'lsa — o'sha yerga yo'naltiramiz
   const draft = await getDraft(from.id);
   if (draft && CD_STEPS.has(draft.step)) {
-    await cdHandleInput(chatId, from, draft.step, draft.data, text);
+    await cdHandleInput(chatId, from, draft.step, draft.data, text, [], lang);
     return;
   }
 
   const session = await getSession(from.id);
   if (!session || !session.awaiting || !session.book || !session.section || !session.part) {
-    await sendMessage(chatId, "Boshlash uchun /start ni bosing.");
+    await sendMessage(chatId, t(lang, "start_prompt"));
     return;
   }
   const { book, test, section, part } = session as Required<Session>;
   const userAnswers = parseAnswers(text);
   if (Object.keys(userAnswers).length === 0) {
-    await sendMessage(chatId, NO_ANSWERS_PARSED);
+    await sendMessage(chatId, t(lang, "no_answers_parsed"));
     return;
   }
 
@@ -693,17 +672,17 @@ async function handleText(chatId: number, from: any, text: string) {
   }
   const total = Object.keys(keys).length;
 
-  let msg = `📊 *Natija: ${correct.length}/${total} to'g'ri*\n\n`;
+  let msg = t(lang, "result_header", correct.length, total);
   if (correct.length === total && total > 0) {
-    msg += `🎉 Barakalla! Hammasi to'g'ri — ${total}/${total}!\n`;
+    msg += t(lang, "result_all_correct", total);
   } else {
-    if (correct.length) msg += `✅ To'g'ri javoblar: ${correct.join(", ")}\n`;
-    else msg += "Hozircha to'g'ri javob yo'q. Xafa bo'lmang, qayta urinib ko'ring! 💪\n";
-    if (unanswered.length) msg += `\nℹ️ Javob bermagan savollaringiz: ${unanswered.join(", ")}\n`;
-    msg += "\n🔁 Qolgan savollar ustida yana mustaqil ishlang. Tayyor bo'lsangiz, javoblarni qaytadan yuboring.";
+    if (correct.length) msg += t(lang, "result_correct_list", correct.join(", "));
+    else msg += t(lang, "result_none");
+    if (unanswered.length) msg += t(lang, "result_unanswered", unanswered.join(", "));
+    msg += t(lang, "result_retry_hint");
   }
 
-  await sendMessage(chatId, msg, resultKb(book, test, section, part));
+  await sendMessage(chatId, msg, resultKb(book, test, section, part, lang));
   bg(recordAttempt(from.id, book, test, section, part, correct.length, total,
     { correct, unanswered }));
 }
@@ -940,82 +919,49 @@ async function sendDocumentHtml(chatId: number, filename: string, html: string, 
 }
 
 // ---- klaviaturalar ----
-function cdSkillKb() {
+function cdSkillKb(lang: Lang) {
   return {
     inline_keyboard: [
       [{ text: "🟢 Reading", callback_data: "cd:skill:reading" }, { text: "🔴 Listening", callback_data: "cd:skill:listening" }],
       [{ text: "🔴 Speaking", callback_data: "cd:skill:speaking" }, { text: "🔴 Writing", callback_data: "cd:skill:writing" }],
-      [{ text: "🏠 Bosh menyu", callback_data: "cd:cancel" }],
+      [{ text: t(lang, "btn_home"), callback_data: "cd:cancel" }],
     ],
   };
 }
-function cdMoreKb() {
+function cdMoreKb(lang: Lang) {
   return { inline_keyboard: [
-    [{ text: "➕ Yana passage qo'shish", callback_data: "cd:more:add" }],
-    [{ text: "✅ CD test yaratish", callback_data: "cd:more:finish" }],
+    [{ text: t(lang, "btn_cd_add"), callback_data: "cd:more:add" }],
+    [{ text: t(lang, "btn_cd_finish"), callback_data: "cd:more:finish" }],
   ] };
 }
 // Test yaratilgandan keyin: yana yaratish / bosh menyu
-function cdDoneKb() {
+function cdDoneKb(lang: Lang) {
   return { inline_keyboard: [
-    [{ text: "➕ Yana CD test yaratish", callback_data: "cd:start" }],
-    [{ text: "🏠 Bosh menyu", callback_data: "nav:menu" }],
+    [{ text: t(lang, "btn_cd_more"), callback_data: "cd:start" }],
+    [{ text: t(lang, "btn_home"), callback_data: "nav:menu" }],
   ] };
 }
 // Doimiy pastki tugmalar (reply keyboard) — har doim qo'l ostida
-const RK_CD = "🆕 CD Test yaratish";
-const RK_CHECK = "📚 Test tekshirish";
-function mainReplyKb() {
+function mainReplyKb(lang: Lang) {
   return {
-    keyboard: [[{ text: RK_CD }], [{ text: RK_CHECK }]],
+    keyboard: [[{ text: t(lang, "rk_cd") }], [{ text: t(lang, "rk_check") }]],
     resize_keyboard: true,
     is_persistent: true,
   };
 }
 
-// ---- matnlar ----
-const CD_INTRO =
-  "🆕 *CD Test yaratish*\n\nQaysi bo'lim uchun test yaratmoqchisiz?\n\n" +
-  "🟢 *Reading* — tayyor\n🔴 Listening / Speaking / Writing — tez orada\n\nBo'limni tanlang 👇";
-const CD_COMING = "🔴 Bu bo'lim hozircha tayyor emas. Tez orada! Hozircha 🟢 Reading mavjud.";
-const cdAskPassage = (n: number) =>
-  `📖 *Reading — Passage ${n}*\n\nIltimos, testning *matn (passage)* qismini yuboring.\n\n` +
-  "Qabul qilinadi: 📄 PDF, DOCX yoki oddiy matn.\n" +
-  "Matnga savollar aralashib ketgan bo'lsa — bot ularni avtomatik ajratadi.\n" +
-  "_(Skanerlangan/rasm PDF emas — matnli PDF bo'lsin.)_";
-const cdAskQuestions = (title: string, paras: number, lettered: string, preview: string) =>
-  `✅ Passage qabul qilindi!\n📌 Sarlavha: *${title}*\n📄 Paragraflar: ${paras} ta${lettered}\n\n` +
-  `👀 *Namuna (boshi):*\n_${preview}_\n\n` +
-  "Matn biroz chalkash chiqsa — oxirida tayyor HTML'ni *o'zingiz tahrirlab* " +
-  "(bold, markaz, o'lcham) tuzatasiz.\n\n" +
-  "Endi shu passage'ning *savollarini* yuboring (matn yoki fayl).\n\n" +
-  "1️⃣ Toza Cambridge matni — bot turlarni o'zi taniydi.\n" +
-  "2️⃣ Aniq shablon (100% ishonchli) — /qtemplate ni yuboring.";
-const CD_NO_Q =
-  "🤔 Savollarni ajratib bo'lmadi. Iltimos aniq shablondan foydalaning — /qtemplate ni yuboring.";
-
-function cdWarnText(warnings: string[]): string {
+// Passage ogohlantirishlari (junk/short) — tanlangan tilda
+function cdWarnText(warnings: string[], lang: Lang): string {
   if (!warnings || !warnings.length) return "";
   const msgs: string[] = [];
-  if (warnings.includes("junk")) msgs.push("• URL/reklama yozuvlari topildi va olib tashlandi");
-  if (warnings.includes("short")) msgs.push("• Matn juda qisqa — to'liq passage yuborilganini tekshiring");
+  if (warnings.includes("junk")) msgs.push(t(lang, "cd_warn_junk"));
+  if (warnings.includes("short")) msgs.push(t(lang, "cd_warn_short"));
   if (!msgs.length) return "";
-  return "⚠️ *Diqqat:*\n" + msgs.join("\n") +
-    "\nNamunani ko'rib chiqing; kerak bo'lsa oxirida HTML'da tuzatasiz.\n\n";
+  return t(lang, "cd_warn_head", msgs.join("\n"));
 }
-const CD_QTEMPLATE =
-  "🧩 *Savol shabloni* — har blok `[tur] boshlanish-tugash` bilan.\nGap uchun `___` yozing (avtomatik raqamlanadi).\n\n" +
-  "```\n[note] 1-3\nComplete the notes. ONE WORD ONLY.\n- emperor wore ___ silk\n- payment of ___\n- used in ___ trade\n\n" +
-  "[tfng] 4-5\nTRUE FALSE NOT GIVEN\n4. Statement one.\n5. Statement two.\n\n" +
-  "[mcq] 6-6\nChoose the correct letter.\n6. Question stem?\nA option a\nB option b\nC option c\n\n" +
-  "[mcq_multi] 7-8\nChoose TWO letters. (javob: `7-8. B, D` — tartib muhim emas)\nA ...\nB ...\nC ...\nD ...\nE ...\n\n" +
-  "[headings] 9-10\nList of Headings:\ni Heading one\nii Heading two\niii Heading three\n9. Paragraph A\n10. Paragraph B\n\n" +
-  "[matching_info] 11-12 | A-F\nWhich paragraph contains...?\n11. info one\n12. info two\n\n" +
-  "[matching_features] 13-14 | A-C\nMatch each statement with a person.\nA Smith\nB Jones\nC Lee\n13. one\n14. two\n\n" +
-  "[summary]·[sentence]·[table]·[flowchart]·[shortanswer]·[diagram] — ham `___` bilan\n```";
 
 // ---- callback ----
-async function handleCdCallback(cq: any, sub: string[]) {
+async function handleCdCallback(cq: any, sub: string[], lang: Lang) {
   const chatId = cq.message?.chat?.id;
   const messageId = cq.message?.message_id;
   const from = cq.from;
@@ -1024,51 +970,52 @@ async function handleCdCallback(cq: any, sub: string[]) {
 
   if (op === "start") {
     await setDraft(from.id, "skill", newDraft());
-    await editMessage(chatId, messageId, CD_INTRO, cdSkillKb());
+    await editMessage(chatId, messageId, t(lang, "cd_intro"), cdSkillKb(lang));
     return;
   }
   if (op === "skill") {
-    if (sub[1] !== "reading") { await answerCallback(cq.id, CD_COMING, true); return; }
+    if (sub[1] !== "reading") { await answerCallback(cq.id, t(lang, "cd_coming"), true); return; }
     await setDraft(from.id, "passage", newDraft());
-    await editMessage(chatId, messageId, cdAskPassage(1));
+    await editMessage(chatId, messageId, t(lang, "cd_ask_passage", 1));
     return;
   }
   if (op === "cancel") {
     await clearDraft(from.id);
-    await editMessage(chatId, messageId, "📚 Cambridge IELTS Academic — kitobni tanlang:", booksKb());
+    await editMessage(chatId, messageId, t(lang, "choose_book"), booksKb());
     return;
   }
   const d = await getDraft(from.id);
-  if (!d) { await sendMessage(chatId, "Boshlash uchun /start ni bosing."); return; }
+  if (!d) { await sendMessage(chatId, t(lang, "start_prompt")); return; }
 
   if (op === "more") {
     if (sub[1] === "add") {
       await setDraft(from.id, "passage", d.data);
-      await editMessage(chatId, messageId, cdAskPassage(d.data.passages.length + 1));
+      await editMessage(chatId, messageId, t(lang, "cd_ask_passage", d.data.passages.length + 1));
     } else {
-      await cdFinish(chatId, from, d.data);
+      await cdFinish(chatId, from, d.data, lang);
     }
     return;
   }
 }
 
 // ---- xabar (matn/fayl) ----
-async function cdHandleInput(chatId: number, from: any, step: string, data: CdDraft, text: string, images: string[] = []) {
+async function cdHandleInput(chatId: number, from: any, step: string, data: CdDraft, text: string, images: string[] = [], lang: Lang = "uz") {
   if (step === "passage") {
     const [passagePart] = CD.splitPassageAndQuestions(text);
     const idx = data.passages.length + 1;
     const p = CD.parsePassage(passagePart || text, idx);
-    if (!p.paragraphs.length) { await sendMessage(chatId, "🤔 Matn bo'sh ko'rinadi. Passage matnini qayta yuboring."); return; }
+    if (!p.paragraphs.length) { await sendMessage(chatId, t(lang, "cd_passage_empty")); return; }
     data.curPassage = p;
     await setDraft(from.id, "questions", data);
-    const lettered = p.lettered ? " (A, B, C… belgilangan)" : "";
+    const lettered = p.lettered ? t(lang, "cd_lettered_note") : "";
     let preview = p.paragraphs.join(" ").slice(0, 180).trim();
-    preview = preview ? preview + "…" : "(matn topilmadi)";
-    await sendMessage(chatId, cdWarnText(p.warnings) + cdAskQuestions(p.title || "—", p.paragraphs.length, lettered, preview));
+    preview = preview ? preview + "…" : t(lang, "cd_preview_none");
+    await sendMessage(chatId, cdWarnText(p.warnings, lang) +
+      t(lang, "cd_ask_questions", p.title || "—", p.paragraphs.length, lettered, preview));
   } else if (step === "questions") {
     const p = data.curPassage!;
     const groups = CD.parseQuestions(text, p.paragraphs.length).filter((g) => CD.numbersOf(g).length);
-    if (!groups.length) { await sendMessage(chatId, CD_NO_Q); return; }
+    if (!groups.length) { await sendMessage(chatId, t(lang, "cd_no_q")); return; }
     data.curGroups = groups;
     // Diagram/flow-chart bo'lsa — PDF'dan ajratilgan rasmlarni passage'ga biriktiramiz
     const hasVisual = groups.some((g) => g.qtype === "diagram" || g.qtype === "flowchart");
@@ -1085,14 +1032,10 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
       if (k === "mcq" || k === "matching") return `${g.start}. B`;
       return `${g.start}. answer`;
     }).join("\n");
-    await sendMessage(chatId,
-      `🧩 *Savollar aniqlandi!*\n\n${lines}\nJami: *${new Set(nums).size}* ta (Q${first}–${last}).\n\n` +
-      "Endi *to'g'ri javoblarni* yuboring. Namuna:\n```\n" + ex + "\n```\n" +
-      "Muqobil javob: `24. vegetable / vegetation`.\n" +
-      "Ko'p tanlovli (Choose TWO/THREE): `12-13. C, D` — tartib muhim emas.");
+    await sendMessage(chatId, t(lang, "cd_q_detected", lines, new Set(nums).size, first, last, ex));
   } else if (step === "answers") {
     const key = parseCdAnswers(text);
-    if (!Object.keys(key).length) { await sendMessage(chatId, "🤔 Javoblarni o'qib bo'lmadi. Namuna: `1. white`  `2. TRUE`  `3. B`"); return; }
+    if (!Object.keys(key).length) { await sendMessage(chatId, t(lang, "cd_ans_unreadable")); return; }
     const p = data.curPassage!;
     const groups = data.curGroups!;
     const expected = groups.flatMap((g) => CD.numbersOf(g));
@@ -1102,15 +1045,13 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
     for (const n of expected) if (n in key) p.answers[n] = key[n];
     data.passages.push(p);
     data.curPassage = null; data.curGroups = null;
-    const warn = missing.length ? `\n⚠️ Javob berilmagan: ${missing.slice(0, 20).join(", ")}` : "";
+    const warn = missing.length ? t(lang, "cd_missing", missing.slice(0, 20).join(", ")) : "";
     if (data.passages.length >= 3) {
-      await sendMessage(chatId, `✅ Javoblar qabul qilindi (${Object.keys(p.answers).length} ta).${warn}\n\n(3 passage limiti — testni yaratamiz)`);
-      await cdFinish(chatId, from, data);
+      await sendMessage(chatId, t(lang, "cd_ans_ok_limit", Object.keys(p.answers).length, warn));
+      await cdFinish(chatId, from, data, lang);
     } else {
       await setDraft(from.id, "await_more", data);
-      await sendMessage(chatId,
-        `✅ Javoblar qabul qilindi (${Object.keys(p.answers).length} ta).${warn}\n\nBu passage tayyor. Yana passage qo'shasizmi yoki testni yaratamizmi?`,
-        cdMoreKb());
+      await sendMessage(chatId, t(lang, "cd_ans_ok_more", Object.keys(p.answers).length, warn), cdMoreKb(lang));
     }
   }
 }
@@ -1123,8 +1064,8 @@ function slugify(s: string): string {
   return base || "reading";
 }
 
-async function cdFinish(chatId: number, from: any, data: CdDraft) {
-  await sendMessage(chatId, "⏳ CD test tayyorlanmoqda…");
+async function cdFinish(chatId: number, from: any, data: CdDraft, lang: Lang) {
+  await sendMessage(chatId, t(lang, "cd_preparing"));
   data.settings.brand = "DREAM ZONE";
   // Sarlavha (yo'q bo'lsa passage boshidan) — fayl nomi uchun
   const rawTitle = (data.passages[0] && data.passages[0].title) || "";
@@ -1134,28 +1075,20 @@ async function cdFinish(chatId: number, from: any, data: CdDraft) {
   const html = CD.renderTest(test);
   const total = CD.totalQuestions(test);
   const fileName = "dream_zone_" + slugify(rawTitle || firstText) + ".html";
-  const caption =
-    `🎉 *Tayyor!* CD Reading testingiz quyida.\n\n📊 ${total} ta savol · ${data.passages.length} ta passage\n\n` +
-    "▶️ *Ishlashi:* o'quvchi javoblarni kiritib «Deliver» bosadi — to'g'rilari " +
-    "yashil bo'lib qulflanadi, xatolarini tuzatib *cheksiz* qayta tekshirishi " +
-    "mumkin. Xato javoblarning to'g'ri varianti «Javoblarni ko'rish»da ochiladi.\n\n" +
-    "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → *✏️* tugmasi → matn/savollarni " +
-    "tahrirlang → *💾 Saqlash* bilan toza faylni yuklab oling.\n\n" +
-    "So'ng o'quvchilarga tarqating. 💙";
+  const caption = t(lang, "cd_caption", total, data.passages.length);
   await sendDocumentHtml(chatId, fileName, html, caption);
   await clearDraft(from.id);
   bg(logEvent(from.id, "cd_created", { questions: total, passages: data.passages.length }));
-  await sendMessage(chatId,
-    "✅ Test tayyor! Yana bittasini yaratasizmi?", cdDoneKb());
+  await sendMessage(chatId, t(lang, "cd_done"), cdDoneKb(lang));
 }
 
-async function handleCdDocument(chatId: number, from: any, doc: any) {
+async function handleCdDocument(chatId: number, from: any, doc: any, lang: Lang) {
   const d = await getDraft(from.id);
   if (!d || !CD_STEPS.has(d.step)) {
-    await sendMessage(chatId, "📎 Faylni qabul qilish uchun avval «🆕 CD Test yaratish»ni boshlang (/start).");
+    await sendMessage(chatId, t(lang, "cd_doc_no_flow"));
     return;
   }
-  if (doc.file_size && doc.file_size > CD_MAX_FILE) { await sendMessage(chatId, "⚠️ Fayl juda katta (8 MB dan kichik bo'lsin)."); return; }
+  if (doc.file_size && doc.file_size > CD_MAX_FILE) { await sendMessage(chatId, t(lang, "cd_file_too_big")); return; }
   let text: string;
   let images: string[] = [];
   try {
@@ -1166,10 +1099,10 @@ async function handleCdDocument(chatId: number, from: any, doc: any) {
       try { images = await cdExtractImages(bytes, doc.file_name || ""); } catch (_) { images = []; }
     }
   } catch (e) {
-    await sendMessage(chatId, "⚠️ Faylni o'qib bo'lmadi: " + (e as Error).message);
+    await sendMessage(chatId, t(lang, "cd_file_unreadable", (e as Error).message));
     return;
   }
-  await cdHandleInput(chatId, from, d.step, d.data, text, images);
+  await cdHandleInput(chatId, from, d.step, d.data, text, images, lang);
 }
 
 // ======================= update'larni qayta ishlash =======================
@@ -1177,17 +1110,20 @@ async function handleCdDocument(chatId: number, from: any, doc: any) {
 async function handleUpdate(update: any) {
   try {
     if (update.callback_query) {
-      await handleCallback(update.callback_query);
+      const cq = update.callback_query;
+      const lang = await getLang(cq.from?.id);
+      await handleCallback(cq, lang);
       return;
     }
     const msg = update.message ?? update.edited_message;
     if (!msg || !msg.from) return;
     const chatId = msg.chat.id;
-    if (msg.document) { await handleCdDocument(chatId, msg.from, msg.document); return; }
+    const lang = await getLang(msg.from.id);
+    if (msg.document) { await handleCdDocument(chatId, msg.from, msg.document, lang); return; }
     const text = (msg.text ?? "").trim();
     if (!text) return;
-    if (text.startsWith("/")) await handleCommand(chatId, msg.from, text);
-    else await handleText(chatId, msg.from, text);
+    if (text.startsWith("/")) await handleCommand(chatId, msg.from, text, lang);
+    else await handleText(chatId, msg.from, text, lang);
   } catch (e) {
     console.error("handleUpdate xato:", e);
   }
@@ -1241,16 +1177,19 @@ Deno.serve(async (req) => {
       allowed_updates: ["message", "callback_query"],
       drop_pending_updates: true,
     });
-    // Telegram buyruqlar menyusi (qulay tugmalar).
-    await tg("setMyCommands", {
-      commands: [
-        { command: "start", description: "Boshlash" },
-        { command: "about", description: "Bot haqida" },
-        { command: "guide", description: "Qo'llanma" },
-        { command: "stats", description: "Mening natijalarim" },
-        { command: "qtemplate", description: "CD test savol shabloni" },
-      ],
-    });
+    // Telegram buyruqlar menyusi — har til uchun alohida (language_code scope).
+    const cmdList = (l: Lang) => [
+      { command: "start", description: t(l, "cmd_start") },
+      { command: "language", description: t(l, "cmd_language") },
+      { command: "about", description: t(l, "cmd_about") },
+      { command: "guide", description: t(l, "cmd_guide") },
+      { command: "stats", description: t(l, "cmd_stats") },
+      { command: "qtemplate", description: t(l, "cmd_qtemplate") },
+    ];
+    // Standart (uz) + ru/en scope'lari
+    await tg("setMyCommands", { commands: cmdList("uz") });
+    await tg("setMyCommands", { commands: cmdList("ru"), language_code: "ru" });
+    await tg("setMyCommands", { commands: cmdList("en"), language_code: "en" });
     // Pastdagi doimiy "Menyu" tugmasi Mini App'ni ochsin.
     let menu: any = { ok: false, description: "WEBAPP_URL yo'q" };
     if (WEBAPP_URL) {
