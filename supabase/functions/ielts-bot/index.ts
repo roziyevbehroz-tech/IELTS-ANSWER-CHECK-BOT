@@ -632,7 +632,7 @@ async function handleText(chatId: number, from: any, text: string) {
 // ======================= CD Test yaratish (Reading) =======================
 
 const CD_MAX_FILE = 8 * 1024 * 1024;
-const CD_STEPS = new Set(["passage", "questions", "answers", "expl"]);
+const CD_STEPS = new Set(["passage", "questions", "answers"]);
 
 interface CdDraft {
   skill: string;
@@ -640,12 +640,11 @@ interface CdDraft {
   curPassage: CD.Passage | null;
   curGroups: CD.QuestionGroup[] | null;
   settings: CD.Settings;
-  explanations: Record<number, string>;
 }
 
 function newDraft(): CdDraft {
   return { skill: "reading", passages: [], curPassage: null, curGroups: null,
-    settings: CD.newSettings(), explanations: {} };
+    settings: CD.newSettings() };
 }
 
 // Ko'p tanlovli (Choose TWO/THREE) javoblar: "12-13. C, D" -> {12:"C",13:"D"}.
@@ -787,18 +786,6 @@ function cdSkillKb() {
     ],
   };
 }
-function cdRevealKb() {
-  return { inline_keyboard: [
-    [{ text: "⚡ Darrov ko'rinsin", callback_data: "cd:reveal:instant" }],
-    [{ text: "🔒 Bosib ko'rsin (bot kabi)", callback_data: "cd:reveal:end" }],
-  ] };
-}
-function cdExplKb() {
-  return { inline_keyboard: [[
-    { text: "➕ Ha, izoh qo'shaman", callback_data: "cd:expl:yes" },
-    { text: "⏭ Yo'q, kerak emas", callback_data: "cd:expl:no" },
-  ]] };
-}
 function cdMoreKb() {
   return { inline_keyboard: [
     [{ text: "➕ Yana passage qo'shish", callback_data: "cd:more:add" }],
@@ -836,14 +823,6 @@ function cdWarnText(warnings: string[]): string {
   return "⚠️ *Diqqat:*\n" + msgs.join("\n") +
     "\nNamunani ko'rib chiqing; kerak bo'lsa oxirida HTML'da tuzatasiz.\n\n";
 }
-const CD_ASK_REVEAL =
-  "⚙️ *Sozlama 1/2 — javoblar qachon ko'rinsin?*\n\n" +
-  "⚡ *Darrov* — «Deliver» bosilganda to'g'ri javoblar darrov ko'rinadi.\n" +
-  "🔒 *Bosib ko'rsin* — avval faqat ball, to'g'ri javoblar «Javoblarni ko'rish» bosilganda ochiladi (bot uslubi).";
-const CD_ASK_EXPL =
-  "⚙️ *Sozlama 2/2 — izoh qo'shasizmi?*\n\nHar bir savol uchun qisqa izoh qo'shishingiz mumkin.";
-const CD_ASK_EXPL_TEXT =
-  "✍️ Izohlarni yuboring. Namuna:\n```\n1. matnda 'white silk' deb aytilgan\n5. bu haqda ma'lumot yo'q\n```";
 const CD_QTEMPLATE =
   "🧩 *Savol shabloni* — har blok `[tur] boshlanish-tugash` bilan.\nGap uchun `___` yozing (avtomatik raqamlanadi).\n\n" +
   "```\n[note] 1-3\nComplete the notes. ONE WORD ONLY.\n- emperor wore ___ silk\n- payment of ___\n- used in ___ trade\n\n" +
@@ -887,25 +866,6 @@ async function handleCdCallback(cq: any, sub: string[]) {
       await setDraft(from.id, "passage", d.data);
       await editMessage(chatId, messageId, cdAskPassage(d.data.passages.length + 1));
     } else {
-      await setDraft(from.id, "await_reveal", d.data);
-      await editMessage(chatId, messageId, CD_ASK_REVEAL, cdRevealKb());
-    }
-    return;
-  }
-  if (op === "reveal") {
-    d.data.settings.revealMode = sub[1] === "instant" ? "instant" : "end";
-    await setDraft(from.id, "await_expl", d.data);
-    await editMessage(chatId, messageId, CD_ASK_EXPL, cdExplKb());
-    return;
-  }
-  if (op === "expl") {
-    if (sub[1] === "yes") {
-      d.data.settings.explanations = true;
-      await setDraft(from.id, "expl", d.data);
-      await editMessage(chatId, messageId, CD_ASK_EXPL_TEXT);
-    } else {
-      d.data.settings.explanations = false;
-      await setDraft(from.id, "await_expl", d.data);
       await cdFinish(chatId, from, d.data);
     }
     return;
@@ -961,20 +921,14 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
     data.curPassage = null; data.curGroups = null;
     const warn = missing.length ? `\n⚠️ Javob berilmagan: ${missing.slice(0, 20).join(", ")}` : "";
     if (data.passages.length >= 3) {
-      await setDraft(from.id, "await_reveal", data);
       await sendMessage(chatId, `✅ Javoblar qabul qilindi (${Object.keys(p.answers).length} ta).${warn}\n\n(3 passage limiti — testni yaratamiz)`);
-      await sendMessage(chatId, CD_ASK_REVEAL, cdRevealKb());
+      await cdFinish(chatId, from, data);
     } else {
       await setDraft(from.id, "await_more", data);
       await sendMessage(chatId,
         `✅ Javoblar qabul qilindi (${Object.keys(p.answers).length} ta).${warn}\n\nBu passage tayyor. Yana passage qo'shasizmi yoki testni yaratamizmi?`,
         cdMoreKb());
     }
-  } else if (step === "expl") {
-    const expl = parseAnswers(text);
-    data.explanations = {};
-    for (const [k, v] of Object.entries(expl)) data.explanations[Number(k)] = v;
-    await cdFinish(chatId, from, data);
   }
 }
 
@@ -982,15 +936,16 @@ async function cdFinish(chatId: number, from: any, data: CdDraft) {
   await sendMessage(chatId, "⏳ CD test tayyorlanmoqda…");
   data.settings.brand = "DREAM ZONE";
   const title = (data.passages[0] && data.passages[0].title) || "IELTS Reading Practice";
-  const test: CD.ReadingTest = { title, passages: data.passages, settings: data.settings, explanations: data.explanations };
+  const test: CD.ReadingTest = { title, passages: data.passages, settings: data.settings };
   const html = CD.renderTest(test);
   const total = CD.totalQuestions(test);
-  const revealLbl = data.settings.revealMode === "instant" ? "⚡ darrov" : "🔒 bosib ko'rish";
-  const explLbl = data.settings.explanations ? "bor" : "yo'q";
   const caption =
-    `🎉 *Tayyor!* CD Reading testingiz.\n\n📊 ${total} ta savol · ${data.passages.length} ta passage · ${revealLbl} · izoh: ${explLbl}\n\n` +
+    `🎉 *Tayyor!* CD Reading testingiz quyida.\n\n📊 ${total} ta savol · ${data.passages.length} ta passage\n\n` +
+    "▶️ *Ishlashi:* o'quvchi javoblarni kiritib «Deliver» bosadi — to'g'rilari " +
+    "yashil bo'lib qulflanadi, xatolarini tuzatib *cheksiz* qayta tekshirishi " +
+    "mumkin. Xato javoblarning to'g'ri varianti «Javoblarni ko'rish»da ochiladi.\n\n" +
     "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → *✏️* tugmasi → matn/savollarni " +
-    "tahrirlang (bold, markaz, o'lcham) → *💾 Saqlash* bilan toza faylni yuklab oling.\n\n" +
+    "tahrirlang → *💾 Saqlash* bilan toza faylni yuklab oling.\n\n" +
     "So'ng o'quvchilarga tarqating. 💙";
   await sendDocumentHtml(chatId, "dream_zone_reading.html", html, caption);
   await clearDraft(from.id);

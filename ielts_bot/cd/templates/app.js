@@ -1,18 +1,19 @@
 /* CD Reading test — generic engine (ma'lumotga asoslangan).
  * window.CD_DATA renderer tomonidan to'ldiriladi:
  *   { answers:{q:ans|[..]}, groups:[{kind,start,end}], parts:[[s,e]..],
- *     settings:{revealMode,explanations,duration}, explanations:{q:txt} }
+ *     settings:{duration} }
+ * Mantiq: «Deliver» -> to'g'ri javoblar qulflanadi (yashil), xatolar tahrirlanadi.
+ * Cheksiz qayta urinish. Xato javoblarning to'g'ri varianti «ko'rish»da ochiladi.
  */
 (function () {
   "use strict";
-  var D = window.CD_DATA || { answers: {}, groups: [], parts: [], settings: {}, explanations: {} };
+  var D = window.CD_DATA || { answers: {}, groups: [], parts: [], settings: {} };
   var S = D.settings || {};
-  var revealMode = S.revealMode || "end";           // "instant" | "end"
   var totalQuestions = Object.keys(D.answers).length;
   var partCount = (D.parts || []).length || 1;
   var currentPart = 1;
   var timeLeft = (S.duration || 60) * 60;
-  var timerId = null, submitted = false;
+  var timerId = null;
 
   document.addEventListener("DOMContentLoaded", init);
 
@@ -40,7 +41,7 @@
     if (t) t.addEventListener("click", toggle);
     if (r) r.addEventListener("click", function () { timeLeft = (S.duration || 60) * 60; render(); if (!timerId) toggle(); });
     function tick() { timerId = setInterval(function () {
-      if (timeLeft > 0) { timeLeft--; render(); } else { clearInterval(timerId); timerId = null; if (!submitted) onDeliver(); }
+      if (timeLeft > 0) { timeLeft--; render(); } else { clearInterval(timerId); timerId = null; onDeliver(); }
     }, 1000); }
     function toggle() {
       if (timerId) { clearInterval(timerId); timerId = null; setIcon(true); }
@@ -109,9 +110,18 @@
   function toggle(id, show) { var e = document.getElementById(id); if (e) e.classList.toggle("hidden", !show); }
 
   // ---------------------------- checking -----------------------------
+  // Cheksiz qayta urinish: to'g'ri javoblar qulflanadi (yashil), xato/bo'shlar
+  // tahrirlanadigan qoladi. Foydalanuvchi oynani yopib, xatolarni qayta kiritib
+  // yana «Deliver» bosishi mumkin — cheksiz. To'g'ri javoblar HAR DOIM darrov
+  // belgilanadi; xatolarning to'g'ri varianti «Javoblarni ko'rish»da ochiladi.
+  var revealed = false;
+  var locked = {};
+
   function norm(s) {
+    // Punktuatsiyani BO'SHLIQQA aylantiramiz (defis/sana shakllari mos kelsin:
+    // "1-May" == "1 May", "(the) book" -> yoyilgan variantlar bilan).
     return (s || "").toString().toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+      .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
   }
   function textCorrect(user, key) {
     var u = norm(user);
@@ -132,31 +142,27 @@
   }
 
   function onDeliver() {
-    if (submitted) return;
-    submitted = true;
     if (timerId) { clearInterval(timerId); timerId = null; }
     document.body.classList.add("results-mode");
-    lockInputs();
+    // Eski xato belgilarini tozalaymiz (to'g'ri/qulflangan belgilar qoladi)
+    document.querySelectorAll(".incorrect").forEach(function (e) { e.classList.remove("incorrect"); });
+    document.querySelectorAll(".correct-answer-display").forEach(function (e) { e.remove(); });
 
-    var score = 0;
-    var rows = [];
-    var multiDone = {};
-
+    var score = 0, rows = [], multiDone = {};
     var nums = Object.keys(D.answers).map(Number).sort(function (a, b) { return a - b; });
     nums.forEach(function (q) {
       var g = groupOf(q);
       var kind = g ? g.kind : "gap";
       var key = D.answers[q];
-      var res;
       if (kind === "mcq_multi") {
         if (multiDone[g.start]) return;
         multiDone[g.start] = true;
-        res = checkMulti(g);        // {score, rows:[...]}
-        score += res.score;
-        rows = rows.concat(res.rows);
+        var mres = checkMulti(g);
+        score += mres.score;
+        rows = rows.concat(mres.rows);
         return;
       }
-      res = checkSingle(q, kind, key);
+      var res = checkSingle(q, kind, key);
       if (res.correct) score++;
       rows.push(res.row);
     });
@@ -165,71 +171,73 @@
   }
 
   function checkSingle(q, kind, key) {
-    var user = "", correct = false, mark, host;
+    var user = "", correct = false, mark;
     if (kind === "tfng" || kind === "ynng" || kind === "mcq") {
       var checked = document.querySelector('input[name="q' + q + '"]:checked');
       user = checked ? checked.value : "";
       correct = letterCorrect(user, key);
-      // MCQ variant labelini belgilash
       var group = document.querySelector('[data-qgroup="q' + q + '"]');
       if (group) {
         group.querySelectorAll("label").forEach(function (lb) {
           var inp = lb.querySelector("input");
           if (!inp) return;
           if (inp.value === user && !correct) lb.classList.add("incorrect");
-          if (letterCorrect(inp.value, key) && shouldReveal()) lb.classList.add("correct");
+          if (correct && inp.value === user) lb.classList.add("correct");
+          if (letterCorrect(inp.value, key) && revealed) lb.classList.add("correct");
         });
+        // to'g'ri bo'lsa — shu savol radiolarini qulflaymiz
+        if (correct) group.querySelectorAll("input").forEach(function (i) { i.disabled = true; });
       }
     } else if (kind === "matching") {
       var sel = document.getElementById("q" + q);
       user = sel ? sel.value : "";
       correct = letterCorrect(user, key);
-      mark = sel && sel.closest(".matching-form-row") || sel;
+      mark = (sel && sel.closest(".matching-form-row")) || sel;
       if (mark) mark.classList.add(correct ? "correct" : "incorrect");
+      if (sel) sel.disabled = correct;             // to'g'ri -> qulf, xato -> ochiq
     } else { // gap
       var inp2 = document.getElementById("q" + q);
       user = inp2 ? inp2.value.trim() : "";
       correct = textCorrect(user, key);
       if (inp2) {
         inp2.classList.add(correct ? "correct" : "incorrect");
-        if (!correct && shouldReveal()) showInline(inp2, key);
+        inp2.disabled = correct;                   // to'g'ri -> qulf, xato -> ochiq
+        if (!correct && revealed) showInline(inp2, key);
       }
     }
+    if (correct) locked[q] = true;
     return { correct: correct, row: rowData(q, user, key, correct) };
   }
 
   function checkMulti(g) {
-    var name = "qm" + g.start;
-    var boxes = document.querySelectorAll('input[name="' + name + '"]');
+    var boxes = document.querySelectorAll('input[name="qm' + g.start + '"]');
     var chosen = [];
     boxes.forEach(function (b) { if (b.checked) chosen.push(b.value.toUpperCase()); });
     var expected = [];
     for (var q = g.start; q <= g.end; q++) expected.push(String(D.answers[q]).toUpperCase());
-    var exp = expected.slice();
-    var got = 0;
+    var exp = expected.slice(), got = 0;
     chosen.forEach(function (c) {
       var idx = exp.indexOf(c);
       if (idx !== -1) { got++; exp.splice(idx, 1); }
     });
+    var allCorrect = (got === expected.length && chosen.length === expected.length);
     boxes.forEach(function (b) {
       var lb = b.closest(".multi-choice-option");
-      if (!lb) return;
       var val = b.value.toUpperCase();
-      if (b.checked && expected.indexOf(val) !== -1) lb.classList.add("correct");
-      else if (b.checked) lb.classList.add("incorrect");
-      else if (expected.indexOf(val) !== -1 && shouldReveal()) lb.classList.add("correct");
+      if (lb) {
+        if (b.checked && expected.indexOf(val) !== -1) lb.classList.add("correct");
+        else if (b.checked) lb.classList.add("incorrect");
+        else if (expected.indexOf(val) !== -1 && revealed) lb.classList.add("correct");
+      }
+      if (allCorrect) b.disabled = true;           // to'liq to'g'ri -> qulf
     });
-    var rows = [];
-    var label = expected.join(", ");
+    var rows = [], label = expected.join(", ");
     var chosenLabel = chosen.length ? chosen.join(", ") : "Not Answered";
     for (var i = 0; i < expected.length; i++) {
       rows.push(rowData(g.start + i, i === 0 ? chosenLabel : "", label, i < got));
     }
     return { score: got, rows: rows };
   }
-
-  function shouldReveal() { return revealMode === "instant" || revealedManually; }
-  var revealedManually = false;
 
   function rowData(q, user, key, correct) {
     return { q: q, user: user || "Not Answered", key: Array.isArray(key) ? key.join(" / ") : key, correct: correct };
@@ -244,22 +252,25 @@
     inputEl.parentNode.insertBefore(span, inputEl.nextSibling);
   }
 
-  function lockInputs() {
-    document.querySelectorAll("input, select, textarea").forEach(function (i) { i.disabled = true; });
-    var db = document.getElementById("deliver-button");
-    if (db) { db.disabled = true; db.style.cursor = "not-allowed"; }
-  }
-
   // ---------------------------- results ------------------------------
-  var lastScore = 0, lastRows = [];
+  var lastRows = [];
   function showResults(score, rows) {
-    lastScore = score; lastRows = rows;
+    lastRows = rows;
     document.getElementById("results-score").textContent = score;
     var band = document.getElementById("results-band");
     if (band) band.textContent = bandScore(score, totalQuestions);
+    var wrong = rows.filter(function (r) { return !r.correct; }).length;
+    var hint = document.getElementById("results-hint");
+    if (hint) {
+      hint.innerHTML = wrong === 0
+        ? "🎉 Barakalla! Hammasi to'g'ri."
+        : "✅ To'g'ri javoblar qulflandi. <b>Yopish</b> tugmasini bosib, "
+          + "qolgan <b>" + wrong + " ta</b> xato javobni tuzatib, yana <b>Deliver</b> bosing. "
+          + "Yoki to'g'ri javoblarni ko'rish uchun quyidagi tugmani bosing.";
+    }
     renderRows();
     var rv = document.getElementById("reveal-button");
-    if (rv) rv.style.display = (revealMode === "instant") ? "none" : "";
+    if (rv) rv.style.display = (revealed || wrong === 0) ? "none" : "";
     document.getElementById("results-modal").classList.remove("hidden");
   }
 
@@ -269,26 +280,23 @@
     lastRows.forEach(function (r) {
       var div = document.createElement("div");
       div.className = "result-row " + (r.correct ? "correct" : "incorrect");
-      var show = shouldReveal();
-      var keyHtml = show ? "<span class='correct-answer-highlight'>" + esc(r.key) + "</span>"
-                         : "<span class='muted'>•••</span>";
-      var expl = "";
-      if (S.explanations && show && D.explanations && D.explanations[r.q]) {
-        expl = "<div class='result-expl'>💡 " + esc(D.explanations[r.q]) + "</div>";
-      }
+      // To'g'ri javob: darrov ko'rinadi. Xato: «ko'rish» bosilmaguncha yashirin.
+      var keyHtml = (r.correct || revealed)
+        ? "<span class='correct-answer-highlight'>" + esc(r.key) + "</span>"
+        : "<span class='muted'>•••</span>";
       div.innerHTML =
         "<div class='q-num'>" + r.q + "</div>" +
         "<div class='user-ans'>" + (r.correct ? "✅ " : "❌ ") + esc(r.user) + "</div>" +
-        "<div class='correct-ans'>" + keyHtml + expl + "</div>";
+        "<div class='correct-ans'>" + keyHtml + "</div>";
       box.appendChild(div);
     });
   }
 
   function revealAll() {
-    revealedManually = true;
-    // inline javoblarni ochamiz
+    revealed = true;
     Object.keys(D.answers).map(Number).forEach(function (q) {
       var g = groupOf(q), kind = g ? g.kind : "gap", key = D.answers[q];
+      if (locked[q]) return;
       if (kind === "gap") {
         var inp = document.getElementById("q" + q);
         if (inp && inp.classList.contains("incorrect")) showInline(inp, key);

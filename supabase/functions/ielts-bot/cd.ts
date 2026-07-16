@@ -17,12 +17,11 @@ export interface Passage {
   groups: QuestionGroup[]; answers: Record<number, string>; warnings: string[];
 }
 export interface Settings {
-  revealMode: string; explanations: boolean; durationMin: number;
+  durationMin: number;
   brand: string; telegramUrl: string;
 }
 export interface ReadingTest {
   title: string; passages: Passage[]; settings: Settings;
-  explanations: Record<number, string>;
 }
 
 const TYPE_TO_KIND: Record<string, string> = {
@@ -59,7 +58,7 @@ export function totalQuestions(t: ReadingTest): number {
   return n;
 }
 export function newSettings(): Settings {
-  return { revealMode: "end", explanations: false, durationMin: 60, brand: "DREAM ZONE", telegramUrl: "" };
+  return { durationMin: 60, brand: "DREAM ZONE", telegramUrl: "" };
 }
 
 // ============================ passage ============================
@@ -732,11 +731,8 @@ function buildData(test: ReadingTest) {
     }
   }
   const parts = test.passages.map((p) => [qStart(p), qEnd(p)]);
-  const expl: Record<string, string> = {};
-  for (const [k, v] of Object.entries(test.explanations)) expl[k] = v;
   return {
     answers, groups, parts,
-    settings: { revealMode: test.settings.revealMode === "instant" ? "instant" : "end", explanations: test.settings.explanations, duration: test.settings.durationMin },
-    explanations: expl,
+    settings: { duration: test.settings.durationMin },
   };
 }

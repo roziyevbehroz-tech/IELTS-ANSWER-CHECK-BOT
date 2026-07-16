@@ -124,8 +124,6 @@ class Passage:
 class Settings:
     """Test sozlamalari."""
 
-    reveal_mode: str = "end"         # "instant" | "end"  (javob qachon ko'rinadi)
-    explanations: bool = False       # izohlar qo'shiladimi
     duration_min: int = 60           # taymer (daqiqa)
     brand: str = "DREAM ZONE"
     telegram_url: str = ""
@@ -138,8 +136,6 @@ class ReadingTest:
     title: str = "IELTS Reading Practice"
     passages: List[Passage] = field(default_factory=list)
     settings: Settings = field(default_factory=Settings)
-    # Har bir savol uchun izoh (ixtiyoriy): {qnum: "izoh matni"}
-    explanations: Dict[int, str] = field(default_factory=dict)
 
     @property
     def total_questions(self) -> int:

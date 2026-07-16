@@ -341,12 +341,7 @@ def _build_data(test: ReadingTest) -> Dict:
         "answers": answers,
         "groups": groups,
         "parts": parts,
-        "settings": {
-            "revealMode": "instant" if test.settings.reveal_mode == "instant" else "end",
-            "explanations": test.settings.explanations,
-            "duration": test.settings.duration_min,
-        },
-        "explanations": {str(k): v for k, v in test.explanations.items()},
+        "settings": {"duration": test.settings.duration_min},
     }
 
 
