@@ -141,6 +141,98 @@
             cursor: pointer; z-index: 6; display: inline-flex; align-items: center;
             justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
         .cd-img-del:hover { background: #b0102f; }
+
+        /* ========================= DARK MODE ========================= */
+        #cd-theme-toggle { background: none; border: none; cursor: pointer; font-size: 18px;
+            line-height: 1; padding: 4px 6px; border-radius: 8px; }
+        #cd-theme-toggle:hover { background: rgba(0,0,0,.06); }
+
+        body.cd-dark { background: #0d0d0f; color: #e6e6e6; }
+        body.cd-dark::after { color: #ffffff; opacity: 0.05; }   /* watermark */
+        body.cd-dark #cd-theme-toggle:hover { background: rgba(255,255,255,.12); }
+
+        body.cd-dark .header { background: #151518; border-bottom-color: #2a2a2e; }
+        body.cd-dark .timer-display { color: #e6e6e6; }
+        body.cd-dark .timer-controls svg { fill: #cfcfcf; }
+        body.cd-dark .brand-sub { color: #9aa0a6; }
+        body.cd-dark .telegram-link { color: #e6e6e6; border-color: #4a4a52; }
+
+        body.cd-dark .main-container,
+        body.cd-dark .passage-panel,
+        body.cd-dark .questions-panel { background: #0d0d0f; color: #e6e6e6; }
+        body.cd-dark .questions-panel { border-left-color: #2a2a2e; }
+        body.cd-dark .reading-passage h4,
+        body.cd-dark .reading-passage p,
+        body.cd-dark .reading-passage strong { color: #f0f0f0; }
+
+        body.cd-dark #passage-header-container { background: #0d0d0f; }
+        body.cd-dark .part-header { background: #1a1a1f; color: #d8d8d8; border-bottom-color: #2a2a2e; }
+        body.cd-dark .part-header strong { color: #fff; }
+
+        /* Kirish maydonlari */
+        body.cd-dark .answer-input,
+        body.cd-dark input[type="text"],
+        body.cd-dark select,
+        body.cd-dark .gap-input { background: #1c1c22 !important; color: #f0f0f0 !important; border-color: #3a3a42 !important; }
+        body.cd-dark input[type="text"]::placeholder,
+        body.cd-dark .gap-input::placeholder { color: #7a7a82; }
+        /* To'g'ri (yashil) qulflangan javob — quyuq yashil */
+        body.cd-dark .answer-input.correct,
+        body.cd-dark input.correct,
+        body.cd-dark select.correct { background: #123524 !important; color: #7ee2a8 !important; border-color: #1aa260 !important; }
+
+        /* Statement / MCQ / matching */
+        body.cd-dark .tf-question-text,
+        body.cd-dark .multi-choice-question .question-prompt p,
+        body.cd-dark .matching-form-label,
+        body.cd-dark .question-prompt,
+        body.cd-dark .tf-option,
+        body.cd-dark .multi-choice-option label,
+        body.cd-dark .notes-content,
+        body.cd-dark .diagram-lbl { color: #f0f0f0; }
+        body.cd-dark .tf-question-text,
+        body.cd-dark .multi-choice-question .question-prompt p,
+        body.cd-dark .matching-form-label { color: #ffffff; }
+        body.cd-dark .multi-choice-option { border-color: #33333a; background: #151518; }
+        body.cd-dark .heading-bank,
+        body.cd-dark .cd-table th { background: #17171b; border-color: #2a2a2e; color: #e6e6e6; }
+        body.cd-dark .cd-table td { border-color: #2a2a2e; }
+        body.cd-dark .diagram-lbl { background: #1c1c22; border-color: #3a3a42; color: #f0f0f0; }
+        body.cd-dark .diagram-drop { background: #151518; color: #9aa0a6; border-color: #3a3a42; }
+        body.cd-dark .diagram-img { border-color: #2a2a2e; }
+
+        /* Flow-chart */
+        body.cd-dark .fc-box { background: #17171b; border-color: #4a4a52; color: #f0f0f0; }
+        body.cd-dark .fc-arrow { color: #cfcfcf; }
+
+        /* Pastki navigatsiya */
+        body.cd-dark .bottom-nav { background: #151518; border-top-color: #2a2a2e; }
+        body.cd-dark .bn-part { border-right-color: #26262b; }
+        body.cd-dark .bn-part.active { background: #1e1e24; }
+        body.cd-dark .bn-label { color: #d8d8d8; }
+        body.cd-dark .bn-count { color: #9aa0a6; }
+        body.cd-dark .bn-q { background: #1c1c22; color: #d8d8d8; border-color: #3a3a42; }
+        body.cd-dark .bn-q:hover { background: #26262d; }
+        body.cd-dark .bn-q.answered { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+        /* Natija oynasi (modal) */
+        body.cd-dark .modal-content { background: #17171b; color: #e6e6e6; }
+        body.cd-dark .modal-content h2 { color: #fff; }
+        body.cd-dark .results-hint { background: #1e1e24; color: #d8d8d8; }
+        body.cd-dark .result-row { border-bottom-color: #2a2a2e; }
+        body.cd-dark .result-row.correct { background: #12241a; }
+        body.cd-dark .result-row.incorrect { background: #2a1720; }
+        body.cd-dark .result-row .q-num { background: #1c1c22; color: #eee; border-color: #3a3a42; }
+        body.cd-dark .result-row .user-ans { background: #1c1c22; color: #ddd; border-color: #33333a; }
+        body.cd-dark .result-row .correct-ans { background: #12241a; color: #7ee2a8; border-color: #1aa260; }
+        body.cd-dark .row-eye { background: #1c1c22; border-color: #3a3a42; }
+
+        /* Ixchamliklar */
+        body.cd-dark .part-header .ph-sep { color: #6b6b73; }
+        body.cd-dark .q-tries { color: #6b6b73; }
+        body.cd-dark .q-check { background: #1c1c22; border-color: #3a3a42; }
+        body.cd-dark .cd-hl { background: #7c6f1e; color: #fff; }
+        body.cd-dark .resizer { background-color: #2a2a2e; border-color: #3a3a42; }
     </style>
 </head>
 <body>
@@ -161,6 +253,7 @@
                 <button id="timer-reset-btn" title="Reset">
                     <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
                 </button>
+                <button id="cd-theme-toggle" title="Tungi/kunduzgi rejim" aria-label="theme">🌙</button>
             </div>
         </div>
         {{TELEGRAM_LINK}}
