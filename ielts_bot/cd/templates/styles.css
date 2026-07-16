@@ -152,7 +152,7 @@
 
         /* Page watermark */
         body::after {
-            content: "@MINDLESS_WRITER";
+            content: "DREAM ZONE";
             position: fixed;
             left: 50%;
             top: 50%;

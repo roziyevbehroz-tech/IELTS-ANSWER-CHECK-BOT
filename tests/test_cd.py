@@ -339,10 +339,22 @@ def test_render_headings_roman_options_arabic_key():
 
 def test_render_settings_has_duration_only():
     html = render.render_test(_build_test()).replace(" ", "")
-    # Yagona sozlama — taymer davomiyligi; reveal/izoh sozlamalari olib tashlangan
-    assert '"duration":60' in html
+    # Vaqt passage soniga qarab: bitta passage -> 20 daqiqa
+    assert '"duration":20' in html
     assert "revealMode" not in html
     assert "explanations" not in html
+
+
+def test_render_duration_scales_with_passages():
+    # 1→20, 2→40, 3→60 daqiqa
+    p = passage_mod.parse_passage("T\n\nBody one about things here.\n")
+    p.groups = q_mod.parse_questions("[note] 1-1\n- eats ___\n")
+    p.answers = {1: "x"}
+    p2 = passage_mod.parse_passage("T2\n\nBody two about matters here.\n")
+    p2.groups = q_mod.parse_questions("[note] 2-2\n- sees ___\n")
+    p2.answers = {2: "y"}
+    html = render.render_test(ReadingTest(passages=[p, p2])).replace(" ", "")
+    assert '"duration":40' in html
 
 
 if __name__ == "__main__":

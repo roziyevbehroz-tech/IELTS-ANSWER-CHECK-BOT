@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 from typing import Dict
 
 from telegram import Update
@@ -398,8 +399,12 @@ async def _finish(update, context) -> None:
         settings=settings,
     )
     html = render.render_test(test)
+    # Fayl nomi sarlavhadan (yo'q bo'lsa passage boshidagi matndan)
+    raw = cd["passages"][0].title or (
+        cd["passages"][0].paragraphs[0] if cd["passages"][0].paragraphs else "")
+    slug = re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")[:40] or "reading"
     buf = io.BytesIO(html.encode("utf-8"))
-    buf.name = "dream_zone_reading.html"
+    buf.name = f"dream_zone_{slug}.html"
 
     caption = DONE.format(
         total=test.total_questions, passages=len(test.passages))

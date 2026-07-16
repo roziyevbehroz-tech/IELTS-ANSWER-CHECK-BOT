@@ -40,7 +40,7 @@ _HEADER_NOISE = re.compile(
 
 # IELTS "ishchi yozuvlari" (rabochiy matn) — asl passage emas, olib tashlanadi
 _BOILERPLATE = re.compile(
-    r"^\s*("
+    r"^\s*\d{0,3}\s*("                          # oldida bet raqami bo'lishi mumkin: "1READING PASSAGE 2"
     r"reading\s+passage\b"                     # READING PASSAGE 2 (+ davomi)
     r"|part\s+\d+\s*$"
     r"|section\s+\d+\s*$"
@@ -56,7 +56,7 @@ _BOILERPLATE = re.compile(
     re.IGNORECASE,
 )
 # Harf-oralig'i (letter-spacing) uchun: "R E A D I N G  P A S S A G E  2" -> "readingpassage2"
-_BOILERPLATE_DESPACED = re.compile(r"^(readingpassage|passage|part|section)\d+$")
+_BOILERPLATE_DESPACED = re.compile(r"^\d{0,3}(readingpassage|passage|part|section)\d+$")
 # Bet raqami: yolg'iz son ("3", "- 3 -", "• 3")
 _PAGENUM = re.compile(r"^\s*[-–—•·|]*\s*\d{1,3}\s*[-–—•·|]*\s*$")
 # URL / telegram / reklama yozuvlari
