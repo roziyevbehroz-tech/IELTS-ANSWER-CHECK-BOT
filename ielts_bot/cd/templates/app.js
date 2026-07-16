@@ -246,28 +246,27 @@
 
   // ---------------------------- highlight ----------------------------
   function setupHighlight() {
-    var panel = document.getElementById("passage-panel");
+    // Passage VA savollar paneli — ikkalasida ham highlight ishlaydi
+    var root = document.querySelector(".panels-container") || document.getElementById("main-container");
     var pop = document.getElementById("hl-popup");
-    if (!panel || !pop) return;
-    // Mavjud highlightni bosib olib tashlash
-    panel.addEventListener("click", function (e) {
+    if (!root || !pop) return;
+    // Mavjud highlight ustiga bosib olib tashlash
+    root.addEventListener("click", function (e) {
       var m = e.target.closest ? e.target.closest(".cd-hl") : null;
-      if (m && !document.body.classList.contains("cd-editing")) {
-        var par = m.parentNode;
-        while (m.firstChild) par.insertBefore(m.firstChild, m);
-        par.removeChild(m); par.normalize();
-      }
+      if (m && !document.body.classList.contains("cd-editing")) unwrapMark(m);
     });
-    panel.addEventListener("mouseup", function () {
+    root.addEventListener("mouseup", function () {
       if (document.body.classList.contains("cd-editing")) return;
       setTimeout(function () {
         var sel = window.getSelection();
         if (!sel || sel.isCollapsed || !sel.toString().trim()) { pop.classList.add("hidden"); return; }
         var range = sel.getRangeAt(0);
-        if (!panel.contains(range.commonAncestorContainer)) { pop.classList.add("hidden"); return; }
+        if (!root.contains(range.commonAncestorContainer)) { pop.classList.add("hidden"); return; }
+        // Tanlov highlight ustida bo'lsa — tugma "olib tashlash" rejimida
+        pop.textContent = marksInRange(range).length ? "🚫 Olib tashlash" : "🖍 Highlight";
         var rect = range.getBoundingClientRect();
         pop.style.top = (window.scrollY + rect.top - 42) + "px";
-        pop.style.left = (window.scrollX + rect.left + rect.width / 2 - 45) + "px";
+        pop.style.left = (window.scrollX + rect.left + rect.width / 2 - 55) + "px";
         pop.classList.remove("hidden");
       }, 10);
     });
@@ -280,11 +279,40 @@
       if (!pop.contains(e.target)) pop.classList.add("hidden");
     });
   }
+  function unwrapMark(m) {
+    var par = m.parentNode;
+    while (m.firstChild) par.insertBefore(m.firstChild, m);
+    par.removeChild(m);
+    if (par.normalize) par.normalize();
+  }
+  function marksInRange(range) {
+    var out = [];
+    // Tanlov to'liq highlight ichida bo'lsa — o'sha markni topamiz
+    var anc = range.commonAncestorContainer;
+    var node = anc.nodeType === 1 ? anc : anc.parentNode;
+    var up = node && node.closest ? node.closest(".cd-hl") : null;
+    if (up) out.push(up);
+    // Tanlov ichidagi (ustidagi) highlightlar
+    var rootEl = anc.nodeType === 1 ? anc : anc.parentNode;
+    if (rootEl && rootEl.querySelectorAll) {
+      rootEl.querySelectorAll(".cd-hl").forEach(function (m) {
+        try { if (range.intersectsNode(m) && out.indexOf(m) === -1) out.push(m); } catch (e) {}
+      });
+    }
+    return out;
+  }
   function highlightSelection() {
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     var range = sel.getRangeAt(0);
     if (range.collapsed) return;
+    // Toggle: tanlov highlight ustida bo'lsa — olib tashlaymiz
+    var existing = marksInRange(range);
+    if (existing.length) {
+      existing.forEach(unwrapMark);
+      sel.removeAllRanges();
+      return;
+    }
     var mark = document.createElement("span");
     mark.className = "cd-hl";
     try { range.surroundContents(mark); }
