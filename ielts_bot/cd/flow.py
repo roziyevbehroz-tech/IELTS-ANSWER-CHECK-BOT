@@ -408,6 +408,10 @@ async def _finish(update, context) -> None:
         document=buf, filename="dream_zone_reading.html",
         caption=caption, parse_mode=ParseMode.MARKDOWN)
     _reset(context)
+    # Test tayyor bo'lgach — yana yaratish tugmalarini qayta ko'rsatamiz
+    await msg_obj.reply_text(
+        "✅ Test tayyor! Yana bittasini yaratasizmi?",
+        reply_markup=keyboards.cd_done_keyboard())
 
 
 async def cmd_qtemplate(update, context) -> None:
