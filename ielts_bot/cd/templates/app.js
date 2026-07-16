@@ -664,8 +664,8 @@
   // ------------------------------ editor ------------------------------
   // Yaratuvchi HTML'ni to'g'ridan-to'g'ri tahrirlaydi: passage/savol matnlari,
   // bold/kursiv/markaz/o'lcham. So'ng «Saqlash» — toza yakuniy faylni yuklaydi.
-  var EDIT_SEL = ".reading-passage, .question-prompt, .notes-content, .summary-text, " +
-    ".tf-question-text, .matching-form-label, .heading-bank, .part-header";
+  // Passage VA butun savol bloklari tahrirlanadi (form elementlari atomik qoladi)
+  var EDIT_SEL = ".reading-passage, .question, .part-header, .flowchart, .diagram-block";
 
   function setupEditor() {
     var toggle = document.getElementById("cd-edit-toggle");
@@ -700,6 +700,7 @@
         if (el.closest(".cd-toolbar") || el.id === "cd-edit-toggle") return;
         el.setAttribute("contenteditable", "false");
       });
+      addImageDeleters();
       toolbar.classList.remove("hidden");
       toggle.textContent = "✅";
     }
@@ -710,8 +711,43 @@
         if (el.closest(".cd-toolbar")) return;
         el.setAttribute("contenteditable", "false");
       });
+      removeImageDeleters();
       toolbar.classList.add("hidden");
       toggle.textContent = "✏️";
+    }
+    // Tahrirlash rejimida rasmlarga ✖ (o'chirish) tugmasini qo'shamiz —
+    // ortiqcha logo/rasmlarni olib tashlash uchun. Header brend logosi tegilmaydi.
+    function addImageDeleters() {
+      var mc = document.getElementById("main-container");
+      if (!mc) return;
+      mc.querySelectorAll("img").forEach(function (img) {
+        if (img.classList.contains("brand-logo")) return;
+        if (img.parentNode && img.parentNode.classList && img.parentNode.classList.contains("cd-img-wrap")) return;
+        var wrap = document.createElement("span");
+        wrap.className = "cd-img-wrap";
+        wrap.setAttribute("contenteditable", "false");
+        img.parentNode.insertBefore(wrap, img);
+        wrap.appendChild(img);
+        img.classList.add("cd-deletable");
+        var del = document.createElement("button");
+        del.type = "button"; del.className = "cd-img-del"; del.textContent = "✖";
+        del.title = "Rasmni o'chirish";
+        del.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        del.addEventListener("click", function (e) {
+          e.preventDefault(); e.stopPropagation();
+          if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        });
+        wrap.appendChild(del);
+      });
+    }
+    function removeImageDeleters() {
+      document.querySelectorAll(".cd-img-wrap").forEach(function (wrap) {
+        var del = wrap.querySelector(".cd-img-del");
+        if (del) wrap.removeChild(del);
+        var img = wrap.querySelector("img");
+        if (img) { img.classList.remove("cd-deletable"); wrap.parentNode.insertBefore(img, wrap); }
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      });
     }
     function changeSize(dir) {
       var sel = window.getSelection();
