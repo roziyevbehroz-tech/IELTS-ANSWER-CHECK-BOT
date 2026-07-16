@@ -104,6 +104,17 @@
             justify-content: center; font-weight: 700; color: #111827; border: 1px solid #d1d5db;
             border-radius: 6px; background: #fff; }
         .diagram-row .answer-input { flex: 1; }
+
+        /* --- Yakka (joyida) tekshirish tugmasi + urinishlar soni --- */
+        .q-check-wrap { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; vertical-align: middle; }
+        .q-check { width: 24px; height: 24px; border: 1px solid #cbd5e1; background: #fff; color: #16a34a;
+            border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+            display: inline-flex; align-items: center; justify-content: center; transition: background .15s, transform .1s; }
+        .q-check:hover { background: #ecfdf5; }
+        .q-check:active { transform: scale(0.9); }
+        .q-check.q-ok { color: #fff; background: #16a34a; border-color: #16a34a; }
+        .q-tries { font-size: 11px; color: #b6bcc7; min-width: 10px; text-align: center; user-select: none; }
+        .q-tries.solved { color: #86c9a4; font-weight: 600; }
     </style>
 </head>
 <body>
