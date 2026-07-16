@@ -346,6 +346,56 @@ def test_render_answer_alternatives_expanded():
     assert "vegetable" in html and "vegetation" in html
 
 
+def test_mcq_choose_correct_answer_dot_options():
+    # "Choose the correct answer, A, B, C or D" + "A." variantlar — mcq bo'lishi kerak
+    src = (
+        "Questions 7-9\n"
+        "Choose the correct answer, A, B, C or D and write in your answer sheet.\n"
+        "7. The problem with the ballpoint pens was that\n"
+        "A. they cost a great deal.\nB. the technology did not exist.\n"
+        "C. they could not write on paper.\nD. they were affected by weather.\n"
+        "8. The design of the first pen\n"
+        "A. was similar to previous pens.\nB. was based on capillary action.\n"
+        "C. worked with heavy inks.\nD. worked when slanted.\n"
+        "9. Milton Reynolds copied it because\n"
+        "A. the patent was out of date.\nB. it was legal.\n"
+        "C. they had no patent for North America.\nD. permission was given.")
+    groups = q_mod.parse_questions(src)
+    assert len(groups) == 1
+    g = groups[0]
+    assert g.kind == "mcq"
+    assert len(g.items) == 3
+    assert all(len(it.options) == 4 for it in g.items)
+
+
+def test_matching_features_glued_options_and_items():
+    # PDF variant/elementlarni yopishtirgan (coolerB, natureH, Corpe Nove2)
+    src = (
+        "Questions 1-6\n"
+        "Look at the following list of companies (1-6) and the list of new "
+        "materials below. Match each company with the correct material. "
+        "Write the correct letter A-H next to the companies 1-6.\n"
+        "New materials\n"
+        "A material that can make you warmer or coolerB clothing with perfume "
+        "addedC material that rarely needs washingD clothes that can change "
+        "with heatE material made from banana stalksF material that is "
+        "environmentally-friendlyG fibres similar to those in natureH clothes "
+        "that can light up in the dark\n"
+        "1. Corpe Nove2 Nexia Biotechnologies3 Nano-Tex4 Schoeller Textil5 "
+        "Quest International6 Cargill Dow")
+    groups = q_mod.parse_questions(src)
+    assert len(groups) == 1
+    g = groups[0]
+    assert g.qtype == "matching_features"
+    assert len(g.items) == 6
+    assert [it.text for it in g.items][0] == "Corpe Nove"
+    assert [it.text for it in g.items][-1] == "Cargill Dow"
+    assert len(g.options) == 8
+    assert g.options[0] == ("A", "material that can make you warmer or cooler")
+    assert g.options[1][0] == "B"
+    assert g.options[7] == ("H", "clothes that can light up in the dark")
+
+
 def test_render_headings_roman_options_arabic_key():
     # Matching headings: variantlar rim raqamlarida (i, ii…) render qilinadi,
     # ammo kalit oddiy raqamlarda (1, 2…) kiritilishi mumkin. HTML ikkalasini
