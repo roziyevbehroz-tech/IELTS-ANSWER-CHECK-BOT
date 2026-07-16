@@ -346,6 +346,28 @@ def test_render_answer_alternatives_expanded():
     assert "vegetable" in html and "vegetation" in html
 
 
+def test_classify_belonging_to_is_matching():
+    # "Classify ... as belonging to A/B/C" — matching bo'lishi kerak (mcq emas),
+    # A)/B)/C) variant qatorlari bo'lsa ham guruh tashlab yuborilmasin.
+    src = (
+        "Questions 6-12.\n"
+        "Classify the following characteristics as belonging to\n"
+        "A) academic intelligence tests\nB) emotional intelligence tests\n"
+        "C) practical intelligence tests\n"
+        "Write the correct letter A, B or C, next to Questions 6-12 below.\n"
+        "6. measures skills which improve with age\n"
+        "7. assesses social skills\n8. deals with real-life difficulties\n"
+        "9. the oldest of the three tests\n10. high scorers learn from actions\n"
+        "11. stay calm in difficult situations\n12. more than one possible answer")
+    groups = q_mod.parse_questions(src)
+    assert len(groups) == 1
+    g = groups[0]
+    assert g.kind == "matching"
+    assert g.qtype == "matching_features"
+    assert len(g.items) == 7
+    assert [o[0] for o in g.options] == ["A", "B", "C"]
+
+
 def test_flowchart_detected_and_rendered_as_boxes():
     src = (
         "Questions 8-10\n"

@@ -603,8 +603,8 @@ function detectQtype(chunk: string, low: string): string {
   // Matching Paragraph Information
   if (/which (section|paragraph)/.test(low)
       || /in which paragraph|paragraph contains|paragraph mentions|paragraph refers/.test(low)) return "matching_info";
-  // Matching Features
-  if (/match each|match the following|list of (people|researchers|names|companies|scientists|places|dates|options|statements|inventions|theories)|correct ending|from the (box|list) below|look at the following list|match(ing)? .* (with|to) .* (person|people|option|feature|category|group|company|researcher)/.test(low))
+  // Matching Features / Classification
+  if (/match each|match the following|classify (the|each|these|those|them)|classify the following|belong(s|ing)?\s+to|list of (people|researchers|names|companies|scientists|places|dates|options|statements|inventions|theories)|correct ending|from the (box|list) below|look at the following list|match(ing)? .* (with|to) .* (person|people|option|feature|category|group|company|researcher)/.test(low))
     return "matching_features";
   // Multiple choice II (TWO/THREE)
   if (/choose\s+(two|three|four|2|3|4)\b/.test(low)) return "mcq_multi";
