@@ -42,28 +42,19 @@ def cd_skill_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def cd_reveal_keyboard() -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton("⚡ Darrov ko'rinsin", callback_data="cd:reveal:instant")],
-        [InlineKeyboardButton("🔒 Bosib ko'rsin (bot kabi)", callback_data="cd:reveal:end")],
-    ]
-    return InlineKeyboardMarkup(rows)
-
-
-def cd_explanations_keyboard() -> InlineKeyboardMarkup:
-    rows = [
-        [
-            InlineKeyboardButton("➕ Ha, izoh qo'shaman", callback_data="cd:expl:yes"),
-            InlineKeyboardButton("⏭ Yo'q, kerak emas", callback_data="cd:expl:no"),
-        ],
-    ]
-    return InlineKeyboardMarkup(rows)
-
-
 def cd_more_keyboard() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton("➕ Yana passage qo'shish", callback_data="cd:more:add")],
         [InlineKeyboardButton("✅ CD test yaratish", callback_data="cd:more:finish")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+def cd_done_keyboard() -> InlineKeyboardMarkup:
+    """Test yaratilgandan keyin: yana yaratish / bosh menyu."""
+    rows = [
+        [InlineKeyboardButton("➕ Yana CD test yaratish", callback_data="cd:start")],
+        [InlineKeyboardButton(texts.BTN_MENU, callback_data="cd:cancel")],
     ]
     return InlineKeyboardMarkup(rows)
 

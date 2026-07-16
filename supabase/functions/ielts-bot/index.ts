@@ -460,7 +460,9 @@ async function handleCommand(chatId: number, from: any, text: string) {
     bg(upsertUser(from));
     bg(setSession(from.id, { awaiting: false }));
     const name = from.first_name || "do'stim";
-    await sendMessage(chatId, WELCOME(name) + WELCOME_HINT, launcherKb());
+    // Doimiy pastki tugmalarni yoqamiz, so'ng inline menyuni ko'rsatamiz
+    await sendMessage(chatId, WELCOME(name), mainReplyKb());
+    await sendMessage(chatId, "👇 *Menyu*" + WELCOME_HINT, launcherKb());
   } else if (cmd === "/about") {
     await sendMessage(chatId, ABOUT);
   } else if (cmd === "/guide" || cmd === "/help") {
@@ -518,7 +520,11 @@ async function handleCallback(cq: any) {
 
   if (kind === "nav") {
     const what = parts[1];
-    if (what === "books") {
+    if (what === "menu") {
+      bg(clearAwaiting(from.id));
+      bg(clearDraft(from.id));
+      await editMessage(chatId, messageId, "🏠 *Bosh menyu*\n\nQuyidagilardan birini tanlang 👇", launcherKb());
+    } else if (what === "books") {
       bg(clearAwaiting(from.id));
       await editMessage(chatId, messageId, "📚 Cambridge IELTS Academic — kitobni tanlang:", booksKb());
     } else if (what === "tests") {
@@ -585,6 +591,19 @@ async function handleCallback(cq: any) {
 }
 
 async function handleText(chatId: number, from: any, text: string) {
+  // Doimiy pastki tugmalar (reply keyboard) — oqimning istalgan joyidan ishlaydi
+  if (text === RK_CD) {
+    await setDraft(from.id, "skill", newDraft());
+    await sendMessage(chatId, CD_INTRO, cdSkillKb());
+    return;
+  }
+  if (text === RK_CHECK) {
+    bg(clearAwaiting(from.id));
+    await clearDraft(from.id);
+    await sendMessage(chatId, "📚 Cambridge IELTS Academic — kitobni tanlang:", booksKb());
+    return;
+  }
+
   // CD test yaratish oqimi faol bo'lsa — o'sha yerga yo'naltiramiz
   const draft = await getDraft(from.id);
   if (draft && CD_STEPS.has(draft.step)) {
@@ -792,6 +811,23 @@ function cdMoreKb() {
     [{ text: "✅ CD test yaratish", callback_data: "cd:more:finish" }],
   ] };
 }
+// Test yaratilgandan keyin: yana yaratish / bosh menyu
+function cdDoneKb() {
+  return { inline_keyboard: [
+    [{ text: "➕ Yana CD test yaratish", callback_data: "cd:start" }],
+    [{ text: "🏠 Bosh menyu", callback_data: "nav:menu" }],
+  ] };
+}
+// Doimiy pastki tugmalar (reply keyboard) — har doim qo'l ostida
+const RK_CD = "🆕 CD Test yaratish";
+const RK_CHECK = "📚 Test tekshirish";
+function mainReplyKb() {
+  return {
+    keyboard: [[{ text: RK_CD }], [{ text: RK_CHECK }]],
+    resize_keyboard: true,
+    is_persistent: true,
+  };
+}
 
 // ---- matnlar ----
 const CD_INTRO =
@@ -949,6 +985,8 @@ async function cdFinish(chatId: number, from: any, data: CdDraft) {
     "So'ng o'quvchilarga tarqating. 💙";
   await sendDocumentHtml(chatId, "dream_zone_reading.html", html, caption);
   await clearDraft(from.id);
+  await sendMessage(chatId,
+    "✅ Test tayyor! Yana bittasini yaratasizmi?", cdDoneKb());
 }
 
 async function handleCdDocument(chatId: number, from: any, doc: any) {
