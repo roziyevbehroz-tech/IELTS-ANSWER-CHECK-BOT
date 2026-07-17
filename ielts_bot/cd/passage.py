@@ -61,6 +61,42 @@ _BOILERPLATE_DESPACED = re.compile(r"^\d{0,3}(readingpassage|passage|part|sectio
 _PAGENUM = re.compile(r"^\s*[-–—•·|]*\s*\d{1,3}\s*[-–—•·|]*\s*$")
 # URL / telegram / reklama yozuvlari
 _URLISH = re.compile(r"(https?://|www\.\w|t\.me/|@[A-Za-z0-9_]{3,})", re.IGNORECASE)
+# Izohli lug'at (footnote): qator boshida */**/*** + izoh. Reading passage'ning
+# muhim qismi — junk emas, alohida saqlanadi va HTML pastida ko'rsatiladi.
+_GLOSSARY_RE = re.compile(r"^\s*\*{1,3}\s*\S")
+
+
+def _extract_glossary(text: str) -> Tuple[str, List[str]]:
+    """Passage oxiridagi */** izohli lug'atni ajratib oladi.
+
+    Birinchi */** bilan boshlangan qatordan oxirigacha — lug'at deb olinadi
+    (matn ichida qator boshida * bo'lishi amalda uchramaydi). Davomi (yulduzchasiz)
+    qatorlar oldingi izohga qo'shiladi. (matn_lug'atsiz, izohlar) qaytaradi.
+    """
+    lines = text.split("\n")
+    start = None
+    for i, ln in enumerate(lines):
+        if _GLOSSARY_RE.match(ln):
+            start = i
+            break
+    if start is None:
+        return text, []
+    body_lines = lines[:start]
+    # Lug'atdan oldingi ajratuvchi chiziq (____/----) va bo'sh qatorlarni tashlaymiz
+    while body_lines and (not body_lines[-1].strip()
+                          or re.fullmatch(r"[_\-–—=.·•*\s]{3,}", body_lines[-1].strip())):
+        body_lines.pop()
+    body = "\n".join(body_lines).rstrip()
+    entries: List[str] = []
+    for ln in lines[start:]:
+        s = ln.strip()
+        if not s:
+            continue
+        if _GLOSSARY_RE.match(s):
+            entries.append(s)
+        elif entries:
+            entries[-1] += " " + s
+    return body, entries
 
 
 def _is_boilerplate_line(s: str) -> bool:
@@ -161,6 +197,9 @@ def parse_passage(text: str, index: int = 1) -> Passage:
     m = _PART_NO_RE.search(re.sub(r"[\s.:|·•–—-]+", " ", raw))
     part_no = int(m.group(1)) if m else 0
     text, warnings = strip_boilerplate(raw)
+    # Izohli lug'atni (footnote */**) ajratib olamiz — passage tanasidan chiqarib,
+    # alohida saqlaymiz (HTML pastida ko'rsatiladi).
+    text, glossary = _extract_glossary(text)
     lines = [ln for ln in text.split("\n")]
 
     # 1) Boshdagi shovqin sarlavhalarni tashlab yuboramiz
@@ -196,6 +235,7 @@ def parse_passage(text: str, index: int = 1) -> Passage:
         paragraphs=paragraphs,
         lettered=lettered,
         warnings=warnings,
+        glossary=glossary,
     )
 
 

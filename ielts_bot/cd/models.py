@@ -108,6 +108,7 @@ class Passage:
     answers: Dict[int, str] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)  # tozalashda topilgan muammolar
     images: List[str] = field(default_factory=list)    # diagram rasmlari (data URI)
+    glossary: List[str] = field(default_factory=list)  # */** izohli lug'at (footnote)
 
     @property
     def q_start(self) -> int:

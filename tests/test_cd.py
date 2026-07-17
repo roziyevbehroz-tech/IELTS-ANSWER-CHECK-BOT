@@ -35,6 +35,40 @@ def test_passage_title_and_paragraphs():
     assert len(p.paragraphs) == 2
 
 
+def test_passage_glossary_footnotes():
+    # */** izohli lug'at passage tanasidan ajratiladi, in-text yulduzchalar qoladi
+    text = (
+        "The Davies Sisters\n\n"
+        "The sisters chose to use their inheritance for philanthropic* purposes "
+        "and built a large collection over many years of dedicated effort.\n\n"
+        "They preferred Old Master** paintings but made few early attempts to "
+        "secure such works, buying safer pieces instead for their collection.\n\n"
+        "________\n"
+        "* philanthropic: seeking to promote the welfare of others\n"
+        "** Old Master: a highly respected artist who worked before about 1800\n"
+        "16"
+    )
+    p = passage_mod.parse_passage(text)
+    assert len(p.glossary) == 2
+    assert p.glossary[0].startswith("* philanthropic:")
+    assert p.glossary[1].startswith("** Old Master:")
+    # ajratuvchi chiziq va bet raqami passage tanasiga tushmagan
+    assert all("___" not in para for para in p.paragraphs)
+    assert not any(para.strip() == "16" for para in p.paragraphs)
+    # in-text yulduzchalar (philanthropic*, Old Master**) saqlangan
+    assert "philanthropic*" in " ".join(p.paragraphs)
+    # HTML'da lug'at bloki chiqadi
+    from ielts_bot.cd import render as render_mod
+    from ielts_bot.cd.models import QuestionGroup, Item
+    p.groups = [QuestionGroup(qtype="tfng", start=1, end=1,
+                              items=[Item(number=1, text="A statement.")])]
+    p.answers = {1: "TRUE"}
+    html = render_mod.render_test(
+        ReadingTest(title="T", passages=[p], settings=Settings(brand="DZ")))
+    assert "passage-glossary" in html
+    assert "philanthropic:" in html
+
+
 def test_passage_lettered():
     text = ("Mammoths\n\nA  First paragraph about mammoths here.\n\n"
             "B  Second paragraph about ice age here.\n\n"
