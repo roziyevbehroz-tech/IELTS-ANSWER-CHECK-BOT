@@ -146,6 +146,12 @@
         #cd-theme-toggle { background: none; border: none; cursor: pointer; font-size: 18px;
             line-height: 1; padding: 4px 6px; border-radius: 8px; }
         #cd-theme-toggle:hover { background: rgba(0,0,0,.06); }
+        #cd-lang-toggle { background: none; border: 1px solid #d1d5db; cursor: pointer;
+            font-size: 12px; font-weight: 700; color: #374151; line-height: 1;
+            padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+        #cd-lang-toggle:hover { background: rgba(0,0,0,.06); }
+        body.cd-dark #cd-lang-toggle { color: #d8d8d8; border-color: #4a4a52; }
+        body.cd-dark #cd-lang-toggle:hover { background: rgba(255,255,255,.12); }
 
         body.cd-dark { background: #0d0d0f; color: #e6e6e6; }
         body.cd-dark::after { color: #ffffff; opacity: 0.05; }   /* watermark */
@@ -247,37 +253,38 @@
         <div class="timer-container">
             <span class="timer-display">60:00</span>
             <div class="timer-controls">
-                <button id="timer-toggle-btn" title="Pause/Resume">
+                <button id="timer-toggle-btn" data-i18n-title="timer_toggle" title="Pause/Resume">
                     <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>
                 </button>
-                <button id="timer-reset-btn" title="Reset">
+                <button id="timer-reset-btn" data-i18n-title="timer_reset" title="Reset">
                     <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
                 </button>
-                <button id="cd-theme-toggle" title="Tungi/kunduzgi rejim" aria-label="theme">🌙</button>
+                <button id="cd-lang-toggle" title="Til / Язык / Language" aria-label="language">🌐 UZ</button>
+                <button id="cd-theme-toggle" data-i18n-title="theme_toggle" title="Tungi/kunduzgi rejim" aria-label="theme">🌙</button>
             </div>
         </div>
         {{TELEGRAM_LINK}}
     </div>
 
-    <button id="cd-edit-toggle" title="Tahrirlash rejimi" aria-label="Tahrirlash">✏️</button>
+    <button id="cd-edit-toggle" data-i18n-title="edit_mode" data-i18n-aria="edit_mode" title="Tahrirlash rejimi" aria-label="Tahrirlash">✏️</button>
     <div id="cd-toolbar" class="cd-toolbar hidden">
-        <button data-cmd="bold" title="Qalin"><b>B</b></button>
-        <button data-cmd="italic" title="Kursiv"><i>I</i></button>
-        <button data-cmd="underline" title="Tagchiziq"><u>U</u></button>
+        <button data-cmd="bold" data-i18n-title="fmt_bold" title="Qalin"><b>B</b></button>
+        <button data-cmd="italic" data-i18n-title="fmt_italic" title="Kursiv"><i>I</i></button>
+        <button data-cmd="underline" data-i18n-title="fmt_underline" title="Tagchiziq"><u>U</u></button>
         <span class="sep"></span>
-        <button data-cmd="justifyLeft" title="Chapga">⬅</button>
-        <button data-cmd="justifyCenter" title="Markaz">▣</button>
-        <button data-cmd="justifyRight" title="O'ngga">➡</button>
+        <button data-cmd="justifyLeft" data-i18n-title="align_left" title="Chapga">⬅</button>
+        <button data-cmd="justifyCenter" data-i18n-title="align_center" title="Markaz">▣</button>
+        <button data-cmd="justifyRight" data-i18n-title="align_right" title="O'ngga">➡</button>
         <span class="sep"></span>
-        <button data-size="up" title="Kattalashtirish">A+</button>
-        <button data-size="down" title="Kichiklashtirish">A−</button>
+        <button data-size="up" data-i18n-title="size_up" title="Kattalashtirish">A+</button>
+        <button data-size="down" data-i18n-title="size_down" title="Kichiklashtirish">A−</button>
         <span class="sep"></span>
-        <button id="cd-save" class="primary" title="Yakuniy faylni saqlash">💾 Saqlash</button>
-        <button id="cd-exit" class="exit" title="Chiqish">✖</button>
-        <span class="cd-hint">Matn/savollarni tahrirlang · rasmlarni ✖ bilan o'chiring</span>
+        <button id="cd-save" class="primary" data-i18n-title="save_title" data-i18n="btn_save" title="Yakuniy faylni saqlash">💾 Saqlash</button>
+        <button id="cd-exit" class="exit" data-i18n-title="exit_title" title="Chiqish">✖</button>
+        <span class="cd-hint" data-i18n="edit_hint">Matn/savollarni tahrirlang · rasmlarni ✖ bilan o'chiring</span>
     </div>
 
-    <div id="hl-popup" class="hl-popup hidden">🖍 Highlight</div>
+    <div id="hl-popup" class="hl-popup hidden" data-i18n="hl_add">🖍 Highlight</div>
     <div id="cd-toast" class="cd-toast"></div>
 
     <div class="main-container" id="main-container">
@@ -296,31 +303,31 @@
     </div>
 
     <div class="nav-arrows">
-        <button class="nav-arrow prev" id="prevBtn" aria-label="Previous part">
+        <button class="nav-arrow prev" id="prevBtn" data-i18n-aria="prev_part" aria-label="Previous part">
             <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" fill="#fff"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
         </button>
-        <button class="nav-arrow next" id="nextBtn" aria-label="Next part">
+        <button class="nav-arrow next" id="nextBtn" data-i18n-aria="next_part" aria-label="Next part">
             <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" fill="#fff"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         </button>
     </div>
 
     <div id="bottom-nav" class="bottom-nav">
         <div id="bn-parts" class="bn-parts"></div>
-        <button id="deliver-button" aria-label="Submit answers" class="bn-deliver">Deliver ✓</button>
+        <button id="deliver-button" data-i18n-aria="deliver" aria-label="Submit answers" class="bn-deliver" data-i18n="deliver">Deliver ✓</button>
     </div>
 
     <div id="results-modal" class="modal-overlay hidden">
         <div class="modal-content">
-            <h2>🎓 {{BRAND}} — Natija</h2>
+            <h2>🎓 {{BRAND}} — <span data-i18n="results">Natija</span></h2>
             <div class="results-summary">
-                <p>Score: <strong><span id="results-score"></span> / {{TOTAL}}</strong></p>
-                <p>IELTS Band: <strong><span id="results-band"></span></strong></p>
+                <p><span data-i18n="score">Score:</span> <strong><span id="results-score"></span> / {{TOTAL}}</strong></p>
+                <p><span data-i18n="band">IELTS Band:</span> <strong><span id="results-band"></span></strong></p>
             </div>
             <div id="results-hint" class="results-hint"></div>
             <div id="results-details" class="results-details-container"></div>
             <div class="modal-actions">
-                <button id="reveal-button">👁 Javoblarni ko'rish</button>
-                <button id="modal-close">✏️ Yopish va tuzatish</button>
+                <button id="reveal-button" data-i18n="reveal">👁 Javoblarni ko'rish</button>
+                <button id="modal-close" data-i18n="close_fix">✏️ Yopish va tuzatish</button>
             </div>
         </div>
     </div>

@@ -15,9 +15,129 @@
   var timeLeft = (S.duration || 60) * 60;
   var timerId = null;
 
+  // ------------------------------ i18n ------------------------------
+  // Interfeys tarjimalari (uz/ru/en). Test MAZMUNI (passage/savol/javob/variant)
+  // tarjima qilinmaydi — inglizcha qoladi. Standart til: CD_DATA.settings.lang
+  // (bot generatsiya paytida qo'yadi), foydalanuvchi 🌐 bilan almashtiradi.
+  var I18N = {
+    uz: {
+      part_n: function (l) { return "Part " + l; },
+      read_text: function (r) { return r ? "Matnni o'qing va " + r + " savollarga javob bering." : "Matnni o'qing."; },
+      timer_toggle: "Pauza/Davom", timer_reset: "Qayta boshlash", theme_toggle: "Tungi/kunduzgi rejim",
+      edit_mode: "Tahrirlash rejimi", fmt_bold: "Qalin", fmt_italic: "Kursiv", fmt_underline: "Tagchiziq",
+      align_left: "Chapga", align_center: "Markaz", align_right: "O'ngga",
+      size_up: "Kattalashtirish", size_down: "Kichiklashtirish",
+      save_title: "Yakuniy faylni saqlash", exit_title: "Chiqish", btn_save: "💾 Saqlash",
+      edit_hint: "Matn/savollarni tahrirlang · rasmlarni ✖ bilan o'chiring",
+      hl_add: "🖍 Highlight", hl_remove: "🚫 Olib tashlash",
+      prev_part: "Oldingi savol", next_part: "Keyingi savol", deliver: "Topshirish ✓",
+      results: "Natija", score: "Ball:", band: "IELTS Band:",
+      reveal: "👁 Javoblarni ko'rish", close_fix: "✏️ Yopish va tuzatish",
+      toast_need: "✍️ Iltimos, avval javob kiriting.",
+      toast_ok: "🎉 Barakalla! To'g'ri javob.",
+      toast_wrong: "❌ Javobingiz xato. Boshqa javob bilan yana urinib ko'ring.",
+      check_one: "Shu javobni tekshirish", not_answered: "Not Answered",
+      row_eye: "Javobni ko'rish/yashirish",
+      res_all_correct: "🎉 Barakalla! Hammasi to'g'ri.",
+      res_hint: function (w) { return "✅ To'g'ri javoblar qulflandi. «Yopish»ni bosib, qolgan <b>" + w + " ta</b> xato javobni tuzatib, yana topshiring. Yoki to'g'ri javoblarni ko'rish uchun quyidagi tugmani bosing."; },
+      save_error: "Saqlashda xato. Iltimos faylni tashqi brauzerda (Chrome/Safari) oching.",
+      img_del: "Rasmni o'chirish",
+    },
+    ru: {
+      part_n: function (l) { return "Часть " + l; },
+      read_text: function (r) { return r ? "Прочитайте текст и ответьте на вопросы " + r + "." : "Прочитайте текст."; },
+      timer_toggle: "Пауза/Продолжить", timer_reset: "Сбросить", theme_toggle: "Ночной/дневной режим",
+      edit_mode: "Режим редактирования", fmt_bold: "Жирный", fmt_italic: "Курсив", fmt_underline: "Подчёркнутый",
+      align_left: "По левому краю", align_center: "По центру", align_right: "По правому краю",
+      size_up: "Увеличить", size_down: "Уменьшить",
+      save_title: "Сохранить готовый файл", exit_title: "Выход", btn_save: "💾 Сохранить",
+      edit_hint: "Редактируйте текст/вопросы · удаляйте картинки через ✖",
+      hl_add: "🖍 Выделить", hl_remove: "🚫 Убрать",
+      prev_part: "Предыдущий вопрос", next_part: "Следующий вопрос", deliver: "Отправить ✓",
+      results: "Результат", score: "Балл:", band: "IELTS Band:",
+      reveal: "👁 Показать ответы", close_fix: "✏️ Закрыть и исправить",
+      toast_need: "✍️ Пожалуйста, сначала введите ответ.",
+      toast_ok: "🎉 Отлично! Правильный ответ.",
+      toast_wrong: "❌ Ответ неверный. Попробуйте другой вариант.",
+      check_one: "Проверить этот ответ", not_answered: "Not Answered",
+      row_eye: "Показать/скрыть ответ",
+      res_all_correct: "🎉 Отлично! Всё верно.",
+      res_hint: function (w) { return "✅ Правильные ответы зафиксированы. Нажмите «Закрыть», исправьте оставшиеся <b>" + w + "</b> неверных ответа и отправьте снова. Или нажмите кнопку ниже, чтобы увидеть правильные ответы."; },
+      save_error: "Ошибка сохранения. Пожалуйста, откройте файл во внешнем браузере (Chrome/Safari).",
+      img_del: "Удалить картинку",
+    },
+    en: {
+      part_n: function (l) { return "Part " + l; },
+      read_text: function (r) { return r ? "Read the text and answer questions " + r + "." : "Read the text."; },
+      timer_toggle: "Pause/Resume", timer_reset: "Reset", theme_toggle: "Dark/light mode",
+      edit_mode: "Edit mode", fmt_bold: "Bold", fmt_italic: "Italic", fmt_underline: "Underline",
+      align_left: "Align left", align_center: "Center", align_right: "Align right",
+      size_up: "Increase size", size_down: "Decrease size",
+      save_title: "Save the final file", exit_title: "Exit", btn_save: "💾 Save",
+      edit_hint: "Edit the text/questions · delete images with ✖",
+      hl_add: "🖍 Highlight", hl_remove: "🚫 Remove",
+      prev_part: "Previous question", next_part: "Next question", deliver: "Submit ✓",
+      results: "Result", score: "Score:", band: "IELTS Band:",
+      reveal: "👁 Show answers", close_fix: "✏️ Close and fix",
+      toast_need: "✍️ Please enter an answer first.",
+      toast_ok: "🎉 Well done! Correct answer.",
+      toast_wrong: "❌ Your answer is wrong. Try a different one.",
+      check_one: "Check this answer", not_answered: "Not Answered",
+      row_eye: "Show/hide answer",
+      res_all_correct: "🎉 Well done! All correct.",
+      res_hint: function (w) { return "✅ Correct answers are locked. Press «Close», fix the remaining <b>" + w + "</b> wrong answers and submit again. Or press the button below to see the correct answers."; },
+      save_error: "Save failed. Please open the file in an external browser (Chrome/Safari).",
+      img_del: "Delete image",
+    },
+  };
+  var CD_LANGS = ["uz", "ru", "en"];
+  function isLang(l) { return CD_LANGS.indexOf(l) !== -1; }
+  var LANG = (function () {
+    var l = null;
+    try { l = localStorage.getItem("cd-lang"); } catch (e) {}
+    if (!isLang(l)) l = (S.lang || "").toString().toLowerCase();
+    if (!isLang(l)) l = "uz";
+    return l;
+  })();
+  function T(key) {
+    var d = I18N[LANG] || I18N.uz;
+    var v = d[key];
+    if (v === undefined) v = I18N.uz[key];
+    if (typeof v === "function") return v.apply(null, Array.prototype.slice.call(arguments, 1));
+    return v == null ? key : v;
+  }
+  function applyI18n() {
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      var arg = el.getAttribute("data-i18narg");
+      el.textContent = arg != null ? T(el.getAttribute("data-i18n"), arg) : T(el.getAttribute("data-i18n"));
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
+      el.setAttribute("title", T(el.getAttribute("data-i18n-title")));
+    });
+    document.querySelectorAll("[data-i18n-aria]").forEach(function (el) {
+      el.setAttribute("aria-label", T(el.getAttribute("data-i18n-aria")));
+    });
+  }
+  function setupLangToggle() {
+    var b = document.getElementById("cd-lang-toggle");
+    if (!b) return;
+    b.textContent = "🌐 " + LANG.toUpperCase();
+    b.addEventListener("click", function () {
+      LANG = CD_LANGS[(CD_LANGS.indexOf(LANG) + 1) % CD_LANGS.length];
+      try { localStorage.setItem("cd-lang", LANG); } catch (e) {}
+      b.textContent = "🌐 " + LANG.toUpperCase();
+      applyI18n();
+      buildBottomNav();
+      var modal = document.getElementById("results-modal");
+      if (modal && !modal.classList.contains("hidden")) setResultsHint();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
+    applyI18n();
+    setupLangToggle();
     setupTimer();
     setupResizer();
     setupParts();
@@ -206,7 +326,7 @@
       sec.setAttribute("data-part", i);
       var lbl = document.createElement("button");
       lbl.className = "bn-label";
-      lbl.textContent = "Part " + ((D.partNos && D.partNos[i - 1]) || i);
+      lbl.textContent = T("part_n", (D.partNos && D.partNos[i - 1]) || i);
       (function (pi) { lbl.addEventListener("click", function () { switchToPart(pi); }); })(i);
       sec.appendChild(lbl);
       if (i === currentPart && r[0]) {
@@ -310,7 +430,7 @@
         var range = sel.getRangeAt(0);
         if (!root.contains(range.commonAncestorContainer)) { pop.classList.add("hidden"); return; }
         // Tanlov highlight ustida bo'lsa — tugma "olib tashlash" rejimida
-        pop.textContent = marksInRange(range).length ? "🚫 Olib tashlash" : "🖍 Highlight";
+        pop.textContent = marksInRange(range).length ? T("hl_remove") : T("hl_add");
         var rect = range.getBoundingClientRect();
         pop.style.top = (window.scrollY + rect.top - 42) + "px";
         pop.style.left = (window.scrollX + rect.left + rect.width / 2 - 55) + "px";
@@ -518,7 +638,7 @@
     });
     if (allCorrect) for (var ql = g.start; ql <= g.end; ql++) locked[ql] = true;
     var rows = [], label = expected.join(", ");
-    var chosenLabel = chosen.length ? chosen.join(", ") : "Not Answered";
+    var chosenLabel = chosen.length ? chosen.join(", ") : T("not_answered");
     for (var i = 0; i < expected.length; i++) {
       rows.push(rowData(g.start + i, i === 0 ? chosenLabel : "", label, i < got));
     }
@@ -526,7 +646,7 @@
   }
 
   function rowData(q, user, key, correct) {
-    return { q: q, user: user || "Not Answered", key: Array.isArray(key) ? key.join(" / ") : key, correct: correct };
+    return { q: q, user: user || T("not_answered"), key: Array.isArray(key) ? key.join(" / ") : key, correct: correct };
   }
 
   // -------------------- yakka (joyida) tekshirish --------------------
@@ -552,7 +672,7 @@
       wrap.className = "q-check-wrap";
       wrap.innerHTML =
         '<button type="button" class="q-check" data-q="' + q + '" ' +
-        'title="Shu javobni tekshirish" aria-label="check">↻</button>' +
+        'title="' + esc(T("check_one")) + '" aria-label="check">↻</button>' +
         '<span class="q-tries" data-q="' + q + '"></span>';
       if (a.mode === "after") {
         if (a.el.parentNode) a.el.parentNode.insertBefore(wrap, a.el.nextSibling);
@@ -586,9 +706,7 @@
     var t = document.getElementById("cd-toast");
     if (!t) return;
     var kind = ok === null ? "info" : ok ? "ok" : "err";
-    t.textContent = ok === null ? "✍️ Iltimos, avval javob kiriting."
-      : ok ? "🎉 Barakalla! To'g'ri javob."
-      : "❌ Javobingiz xato. Boshqa javob bilan yana urinib ko'ring.";
+    t.textContent = ok === null ? T("toast_need") : ok ? T("toast_ok") : T("toast_wrong");
     t.className = "cd-toast show " + kind;
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.className = "cd-toast " + kind; }, 3000);
@@ -623,18 +741,19 @@
     var band = document.getElementById("results-band");
     if (band) band.textContent = bandScore(score, totalQuestions);
     var wrong = rows.filter(function (r) { return !r.correct; }).length;
-    var hint = document.getElementById("results-hint");
-    if (hint) {
-      hint.innerHTML = wrong === 0
-        ? "🎉 Barakalla! Hammasi to'g'ri."
-        : "✅ To'g'ri javoblar qulflandi. <b>Yopish</b> tugmasini bosib, "
-          + "qolgan <b>" + wrong + " ta</b> xato javobni tuzatib, yana <b>Deliver</b> bosing. "
-          + "Yoki to'g'ri javoblarni ko'rish uchun quyidagi tugmani bosing.";
-    }
+    setResultsHint();
     renderRows();
     var rv = document.getElementById("reveal-button");
     if (rv) rv.style.display = (revealed || wrong === 0) ? "none" : "";
     document.getElementById("results-modal").classList.remove("hidden");
+  }
+
+  // Natija oynasidagi izohni joriy tilda o'rnatadi (til almashtirilganda ham)
+  function setResultsHint() {
+    var hint = document.getElementById("results-hint");
+    if (!hint) return;
+    var wrong = lastRows.filter(function (r) { return !r.correct; }).length;
+    hint.innerHTML = wrong === 0 ? T("res_all_correct") : T("res_hint", wrong);
   }
 
   function renderRows() {
@@ -653,7 +772,7 @@
       var eye = "";
       if (!r.correct && !revealed) {
         eye = "<button type='button' class='row-eye' data-q='" + r.q +
-              "' title='Javobni koʻrish/yashirish' aria-label='toggle'>" +
+              "' title='" + esc(T("row_eye")) + "' aria-label='toggle'>" +
               (rowSeen[r.q] ? "🙈" : "👁") + "</button>";
       }
       div.innerHTML =
@@ -771,7 +890,7 @@
         img.classList.add("cd-deletable");
         var del = document.createElement("button");
         del.type = "button"; del.className = "cd-img-del"; del.textContent = "✖";
-        del.title = "Rasmni o'chirish";
+        del.title = T("img_del");
         del.addEventListener("mousedown", function (e) { e.preventDefault(); });
         del.addEventListener("click", function (e) {
           e.preventDefault(); e.stopPropagation();
@@ -818,7 +937,7 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
       } catch (e) {
-        alert("Saqlashda xato. Iltimos faylni tashqi brauzerda (Chrome/Safari) oching.");
+        alert(T("save_error"));
       }
     }
   }

@@ -21,6 +21,7 @@ export interface Passage {
 export interface Settings {
   durationMin: number;
   brand: string; telegramUrl: string;
+  lang?: string;   // interfeys tili (uz/ru/en) — standart uz
 }
 export interface ReadingTest {
   title: string; passages: Passage[]; settings: Settings;
@@ -60,7 +61,7 @@ export function totalQuestions(t: ReadingTest): number {
   return n;
 }
 export function newSettings(): Settings {
-  return { durationMin: 60, brand: "DREAM ZONE", telegramUrl: "" };
+  return { durationMin: 60, brand: "DREAM ZONE", telegramUrl: "", lang: "uz" };
 }
 
 // ============================ passage ============================
@@ -703,7 +704,8 @@ function renderPartHeader(p: Passage, idx: number, hidden: boolean): string {
   const rng = qStart(p) ? `${qStart(p)}-${qEnd(p)}` : "";
   const tail = rng ? `Read the text and answer questions ${rng}.` : "Read the text.";
   const partLabel = p.partNo || idx;   // matndan aniqlangan raqam, bo'lmasa pozitsion
-  return `<div id="part-header-${idx}" class="${cls}"><p><strong>Part ${partLabel}</strong></p><span class="ph-sep">·</span><p>${tail}</p></div>`;
+  // data-i18n: interfeys tili (uz/ru/en) app.js tomonidan qo'llanadi
+  return `<div id="part-header-${idx}" class="${cls}"><p><strong data-i18n="part_n" data-i18narg="${partLabel}">Part ${partLabel}</strong></p><span class="ph-sep">·</span><p data-i18n="read_text" data-i18narg="${rng}">${tail}</p></div>`;
 }
 function renderQuestionSet(p: Passage, idx: number, hidden: boolean): string {
   const cls = "question-set" + (hidden ? " hidden" : "");
@@ -888,6 +890,6 @@ function buildData(test: ReadingTest) {
   const duration = 20 * Math.max(1, test.passages.length);
   return {
     answers, groups, parts, partNos,
-    settings: { duration },
+    settings: { duration, lang: test.settings.lang || "uz" },
   };
 }
