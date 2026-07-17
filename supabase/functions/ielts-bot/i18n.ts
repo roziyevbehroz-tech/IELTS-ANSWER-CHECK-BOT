@@ -135,6 +135,16 @@ const uz: Dict = {
   cd_ans_ok_more: (count: number, warn: string) =>
     `✅ Javoblar qabul qilindi (${count} ta).${warn}\n\nBu passage tayyor. Yana passage qo'shasizmi yoki testni yaratamizmi?`,
   cd_missing: (list: string) => `\n⚠️ Javob berilmagan: ${list}`,
+  cd_fmt_intro: "📋 *Javoblarni shu shaklda yuboring:*",
+  cd_fmt_tfng: "TRUE / FALSE / NOT GIVEN (yoki T/F/NG)",
+  cd_fmt_ynng: "YES / NO / NOT GIVEN",
+  cd_fmt_mcq: "bitta harf A–E (masalan `B`)",
+  cd_fmt_mcq_multi: "har savolga bitta harf (masalan `14-16. A, B, C` yoki `14,15,16 A B C`)",
+  cd_fmt_matching: "harf A–H yoki raqam i, ii… (masalan `C`)",
+  cd_fmt_gap: "so'z yoki ibora (masalan `sunlight`; muqobil: `sun/sunlight`)",
+  cd_key_mismatch: (body: string) => `\n\n⚠️ *Ba'zi javoblar savol turiga mos kelmadi* — tekshiring:\n${body}`,
+  cd_key_extra: (list: string) => `\n⚠️ Bu raqamlar bu passage savollariga kirmaydi: ${list}`,
+  cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
   cd_preparing: "⏳ CD test tayyorlanmoqda…",
   cd_caption: (total: number, passages: number) =>
     `🎉 *Tayyor!* CD Reading testingiz quyida.\n\n📊 ${total} ta savol · ${passages} ta passage\n\n` +
@@ -306,6 +316,16 @@ const ru: Dict = {
   cd_ans_ok_more: (count: number, warn: string) =>
     `✅ Ответы приняты (${count} шт.).${warn}\n\nЭтот passage готов. Добавите ещё passage или создаём тест?`,
   cd_missing: (list: string) => `\n⚠️ Без ответа: ${list}`,
+  cd_fmt_intro: "📋 *Отправляйте ответы в таком виде:*",
+  cd_fmt_tfng: "TRUE / FALSE / NOT GIVEN (или T/F/NG)",
+  cd_fmt_ynng: "YES / NO / NOT GIVEN",
+  cd_fmt_mcq: "одна буква A–E (например `B`)",
+  cd_fmt_mcq_multi: "по одной букве на вопрос (например `14-16. A, B, C` или `14,15,16 A B C`)",
+  cd_fmt_matching: "буква A–H или номер i, ii… (например `C`)",
+  cd_fmt_gap: "слово или фраза (например `sunlight`; вариант: `sun/sunlight`)",
+  cd_key_mismatch: (body: string) => `\n\n⚠️ *Некоторые ответы не соответствуют типу вопроса* — проверьте:\n${body}`,
+  cd_key_extra: (list: string) => `\n⚠️ Эти номера не относятся к вопросам этого passage: ${list}`,
+  cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
   cd_preparing: "⏳ CD-тест готовится…",
   cd_caption: (total: number, passages: number) =>
     `🎉 *Готово!* Ваш CD Reading-тест ниже.\n\n📊 ${total} вопросов · ${passages} passage\n\n` +
@@ -476,6 +496,16 @@ const en: Dict = {
   cd_ans_ok_more: (count: number, warn: string) =>
     `✅ Answers received (${count}).${warn}\n\nThis passage is ready. Add another passage or create the test?`,
   cd_missing: (list: string) => `\n⚠️ Unanswered: ${list}`,
+  cd_fmt_intro: "📋 *Send the answers in this format:*",
+  cd_fmt_tfng: "TRUE / FALSE / NOT GIVEN (or T/F/NG)",
+  cd_fmt_ynng: "YES / NO / NOT GIVEN",
+  cd_fmt_mcq: "one letter A–E (e.g. `B`)",
+  cd_fmt_mcq_multi: "one letter per question (e.g. `14-16. A, B, C` or `14,15,16 A B C`)",
+  cd_fmt_matching: "a letter A–H or a numeral i, ii… (e.g. `C`)",
+  cd_fmt_gap: "a word or phrase (e.g. `sunlight`; alternative: `sun/sunlight`)",
+  cd_key_mismatch: (body: string) => `\n\n⚠️ *Some answers don't match the question type* — please check:\n${body}`,
+  cd_key_extra: (list: string) => `\n⚠️ These numbers don't belong to this passage's questions: ${list}`,
+  cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
   cd_preparing: "⏳ Preparing the CD test…",
   cd_caption: (total: number, passages: number) =>
     `🎉 *Done!* Your CD Reading test is below.\n\n📊 ${total} questions · ${passages} passage(s)\n\n` +

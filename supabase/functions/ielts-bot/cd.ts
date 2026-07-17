@@ -49,6 +49,99 @@ export function numbersOf(g: QuestionGroup): number[] {
   for (let n = g.start; n <= g.end; n++) out.push(n);
   return out;
 }
+
+// ===================== javob kaliti: moslashuvchan tahlil =====================
+// O'qituvchi javob kalitini turli shaklda yuborishi mumkin:
+//   "14. A"  ·  "14-16. A,B,C"  ·  "14-15-16, A B C"  ·  "14,15,16: A/B/C"
+//   "21. sunlight"  ·  "22 vegetable oil"  ·  "23) TRUE"
+// Maqsad: iloji boricha ko'p shaklni tushunish (userni qiynamaslik).
+
+const _LINE_ONE = /^\s*(\d{1,3})\s*[.\)\-:–—]?\s*(.+?)\s*$/;
+// Guruhli qator: bir nechta raqam + bir nechta yakka harf (mcq_multi/matching)
+const _GROUP_LINE = /^\s*(\d{1,3}(?:\s*[-–—,&\/ ]\s*\d{1,3})+)\s*[.\):,]?\s*([A-Za-z](?:\s*[,&\/ ]\s*[A-Za-z])*)\s*$/;
+
+function _parseGroupLine(line: string): { nums: number[]; letters: string[] } | null {
+  const m = line.match(_GROUP_LINE);
+  if (!m) return null;
+  const numTokens = m[1].split(/[-–—,&\/\s]+/).filter(Boolean).map(Number);
+  const letters = (m[2].toUpperCase().match(/[A-Z]/g)) || [];
+  if (letters.length < 1 || numTokens.length < 2) return null;
+  let nums = numTokens.slice();
+  const dashOnlyRange = numTokens.length === 2 && /[-–—]/.test(m[1]) && !/[,&\/]/.test(m[1]);
+  // "14-16" (dash, 2 uch) -> harflar soniga qarab 14,15,16 ga yoyamiz
+  if (dashOnlyRange) {
+    const [a, b] = numTokens;
+    if (b >= a && (b - a + 1) === letters.length) {
+      nums = []; for (let q = a; q <= b; q++) nums.push(q);
+    }
+  }
+  if (nums.length !== letters.length) {
+    // oxirgi imkoniyat: 2 uchli diapazonni yoyib ko'ramiz
+    if (numTokens.length === 2) {
+      const [a, b] = numTokens;
+      if (b >= a) { nums = []; for (let q = a; q <= b; q++) nums.push(q); }
+    }
+    if (nums.length !== letters.length) return null;
+  }
+  return { nums, letters };
+}
+
+export function parseAnswerKey(text: string): Record<number, string> {
+  const out: Record<number, string> = {};
+  const rest: string[] = [];
+  for (const raw of (text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const g = _parseGroupLine(line);
+    if (g) { for (let i = 0; i < g.nums.length; i++) out[g.nums[i]] = g.letters[i]; continue; }
+    rest.push(line);
+  }
+  // Qolgan qatorlar: "N. javob" (bitta) yoki bir qatorda ketma-ket "N. javob N. javob"
+  for (const line of rest) {
+    const m = line.match(_LINE_ONE);
+    if (m) { if (!(Number(m[1]) in out)) out[Number(m[1])] = m[2].trim(); continue; }
+  }
+  // Umuman qator topilmasa — bitta qatordagi inline "1. a 2. b" ni ham sinaymiz
+  if (!Object.keys(out).length) {
+    const INLINE = /(\d{1,3})\s*[.\)\-:–—]\s*([^\d][^\n]*?)(?=\s+\d{1,3}\s*[.\)\-:–—]|$)/g;
+    let m: RegExpExecArray | null;
+    while ((m = INLINE.exec(text || "")) !== null) out[Number(m[1])] = m[2].trim();
+  }
+  return out;
+}
+
+// Savol turiga qarab javob "shakli" mos keladimi (juda strict emas — asosiy shakl)
+export function keyKindValid(kind: string, ans: string): boolean {
+  const s = (ans ?? "").toString().trim();
+  if (!s) return false;
+  if (kind === "tfng") return /^(true|false|not\s*given|t|f|ng|n\.?\s*g\.?)$/i.test(s);
+  if (kind === "ynng") return /^(yes|no|not\s*given|y|n|ng|n\.?\s*g\.?)$/i.test(s);
+  if (kind === "mcq" || kind === "mcq_multi") return /^[a-j]$/i.test(s);
+  if (kind === "matching") return /^([a-j]|[ivx]{1,4}|\d{1,2})$/i.test(s);
+  return true; // gap (note/summary/sentence/table/flowchart/shortanswer/diagram) — har qanday so'z
+}
+
+// Kalitni guruhlar (savol turlari) bo'yicha tekshiradi: qaysi turda javob shakli
+// mos emas, qaysi raqamlar passagega umuman kirmaydi, qaysilari yetishmaydi.
+export function validateAnswerKey(
+  key: Record<number, string>,
+  groups: QuestionGroup[],
+): { badByKind: Record<string, number[]>; extra: number[]; missing: number[] } {
+  const badByKind: Record<string, number[]> = {};
+  const missing: number[] = [];
+  const expected = new Set<number>();
+  for (const g of groups) {
+    const kind = kindOf(g);
+    for (const n of numbersOf(g)) {
+      expected.add(n);
+      const ans = key[n];
+      if (ans === undefined || !String(ans).trim()) { missing.push(n); continue; }
+      if (!keyKindValid(kind, String(ans))) (badByKind[kind] ||= []).push(n);
+    }
+  }
+  const extra = Object.keys(key).map(Number).filter((n) => !expected.has(n));
+  return { badByKind, extra, missing };
+}
 function qStart(p: Passage): number {
   return p.groups.length ? Math.min(...p.groups.map((g) => g.start)) : 0;
 }

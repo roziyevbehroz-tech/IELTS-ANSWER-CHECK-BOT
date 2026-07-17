@@ -713,33 +713,32 @@ function newDraft(): CdDraft {
     settings: CD.newSettings() };
 }
 
-// Ko'p tanlovli (Choose TWO/THREE) javoblar: "12-13. C, D" -> {12:"C",13:"D"}.
-// Tekshirgich to'plam sifatida solishtiradi (tartib muhim emas).
-const CD_RANGE_LETTERS = /^\s*(\d{1,3})\s*[-–—&,\/]\s*(\d{1,3})\s*[.\):]?\s*([A-Za-z](?:\s*[,\/&]?\s*[A-Za-z])*)\s*$/;
-function parseCdAnswers(text: string): Record<number, string> {
-  const out: Record<number, string> = {};
-  const rest: string[] = [];
-  for (const raw of (text || "").split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line) continue;
-    const m = line.match(CD_RANGE_LETTERS);
-    if (m) {
-      const s = Number(m[1]), e = Number(m[2]);
-      const letters = (m[3].toUpperCase().match(/[A-Z]/g)) || [];
-      if (e >= s && (e - s + 1) >= 2 && (e - s + 1) <= 11 && letters.length) {
-        let i = 0;
-        for (let q = s; q <= e; q++) out[q] = letters[i++] ?? letters[letters.length - 1];
-        continue;
-      }
-    }
-    rest.push(raw);
+// Ketma-ket raqamlarni ixcham ko'rinishga keltiradi: [14,15,16,20] -> "14-16, 20"
+function compactNums(nums: number[]): string {
+  const a = Array.from(new Set(nums)).sort((x, y) => x - y);
+  const parts: string[] = [];
+  let i = 0;
+  while (i < a.length) {
+    let j = i;
+    while (j + 1 < a.length && a[j + 1] === a[j] + 1) j++;
+    parts.push(j > i ? `${a[i]}-${a[j]}` : `${a[i]}`);
+    i = j + 1;
   }
-  const base = parseAnswers(rest.join("\n"));
-  for (const k of Object.keys(base)) {
-    const n = Number(k);
-    if (!(n in out)) out[n] = base[n];
-  }
-  return out;
+  return parts.join(", ");
+}
+
+// Savol turlari uchun "qanday shaklda yuborish" qo'llanmasi (tanlangan tilda)
+function cdFormatGuide(groups: CD.QuestionGroup[], lang: Lang): string {
+  const kinds = Array.from(new Set(groups.map((g) => CD.kindOf(g))));
+  const lines = kinds.map((k) => "• " + t(lang, "cd_fmt_" + k));
+  return t(lang, "cd_fmt_intro") + "\n" + lines.join("\n");
+}
+
+// Turiga mos kelmagan javoblar bo'yicha ogohlantirish (raqam + to'g'ri shakl)
+function cdMismatchMsg(badByKind: Record<string, number[]>, lang: Lang): string {
+  const lines = Object.keys(badByKind).map((k) =>
+    t(lang, "cd_fmt_line", compactNums(badByKind[k]), t(lang, "cd_fmt_" + k)));
+  return t(lang, "cd_key_mismatch", lines.join("\n"));
 }
 
 async function getDraft(tgId: number): Promise<{ step: string; data: CdDraft } | null> {
@@ -1042,18 +1041,25 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
     }).join("\n");
     await sendMessage(chatId, t(lang, "cd_q_detected", lines, new Set(nums).size, first, last, ex));
   } else if (step === "answers") {
-    const key = parseCdAnswers(text);
-    if (!Object.keys(key).length) { await sendMessage(chatId, t(lang, "cd_ans_unreadable")); return; }
-    const p = data.curPassage!;
+    const key = CD.parseAnswerKey(text);
     const groups = data.curGroups!;
+    // Umuman o'qib bo'lmasa — savol turlariga qarab qanday yuborishni ko'rsatamiz
+    if (!Object.keys(key).length) {
+      await sendMessage(chatId, t(lang, "cd_ans_unreadable") + "\n\n" + cdFormatGuide(groups, lang));
+      return;
+    }
+    const p = data.curPassage!;
     const expected = groups.flatMap((g) => CD.numbersOf(g));
-    const missing = expected.filter((n) => !(n in key));
+    // Javob kalitini savol turlariga qarab tekshiramiz (moslashuvchan, bloklamaydi)
+    const v = CD.validateAnswerKey(key, groups);
     p.groups = groups;
     p.answers = {};
     for (const n of expected) if (n in key) p.answers[n] = key[n];
     data.passages.push(p);
     data.curPassage = null; data.curGroups = null;
-    const warn = missing.length ? t(lang, "cd_missing", missing.slice(0, 20).join(", ")) : "";
+    let warn = v.missing.length ? t(lang, "cd_missing", v.missing.slice(0, 20).join(", ")) : "";
+    if (v.extra.length) warn += t(lang, "cd_key_extra", compactNums(v.extra.slice(0, 30)));
+    if (Object.keys(v.badByKind).length) warn += cdMismatchMsg(v.badByKind, lang);
     if (data.passages.length >= 3) {
       await sendMessage(chatId, t(lang, "cd_ans_ok_limit", Object.keys(p.answers).length, warn));
       await cdFinish(chatId, from, data, lang);
