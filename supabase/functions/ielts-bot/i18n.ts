@@ -22,33 +22,29 @@ const uz: Dict = {
   lang_native: "O'zbekcha",
   lang_saved: "✅ Til o'zbekchaga o'rnatildi.",
   welcome: (name: string) =>
-    `👋 Assalomu alaykum, *${name}*!\n\n` +
-    "*DREAM ZONE* IELTS yordamchisiga xush kelibsiz 🎓\n\n" +
-    "Listening va Reading javoblaringizni bir zumda tekshirib beraman — " +
-    "boshlash uchun quyidagi tugmani bosing 👇",
-  welcome_hint: "\n\nℹ️ Bot haqida — /about\n📖 Qo'llanma — /guide",
+    `👋 Assalomu alaykum, *${name}*.\n\n` +
+    "*DREAM ZONE — IELTS Assistant*.\n" +
+    "Listening va Reading javoblarini tekshiradi hamda CD Reading testlar yaratadi.\n\n" +
+    "Boshlash uchun quyidagi tugmani tanlang 👇",
+  welcome_hint: "\n\nℹ️ Bot haqida — /about   📖 Qo'llanma — /guide",
   menu: "👇 *Menyu*",
-  menu_home: "🏠 *Bosh menyu*\n\nQuyidagilardan birini tanlang 👇",
+  menu_home: "🏠 *Bosh menyu*",
   about:
-    "🎓 *DREAM ZONE — IELTS yordamchisi*\n\n" +
-    "Men *DREAM ZONE* o'quv markazi o'quvchilari uchun yaratilganman 💙\n\n" +
-    "Cambridge IELTS Academic 10–21 kitoblaridagi Listening va Reading " +
-    "testlarini tekshiraman — jami 48 ta to'liq test.\n\n" +
-    "Eng muhimi: men *faqat to'g'ri* javoblaringizni ko'rsataman. Xato " +
-    "javoblarning to'g'ri variantini darrov ochib qo'ymayman — siz ular " +
-    "ustida o'zingiz ishlaysiz, tayyor bo'lganingizda esa o'zingiz ko'rasiz.\n\n" +
-    "📖 Qanday foydalanish — /guide",
+    "🎓 *DREAM ZONE — IELTS Assistant*\n\n" +
+    "Cambridge IELTS Academic 10–21 (Listening va Reading — jami 48 ta test) " +
+    "javoblarini tekshiradi va o'qituvchilar uchun CD Reading testlar yaratadi.\n\n" +
+    "Javob tekshirishda faqat to'g'ri javoblar belgilanadi; noto'g'rilarining " +
+    "to'g'ri varianti siz so'raganingizda ko'rsatiladi.\n\n" +
+    "📖 Qo'llanma — /guide",
   guide:
-    "📖 *Qanday foydalanaman?*\n\n" +
-    "1. Mini App'ni oching yoki «Matn orqali tekshirish»ni tanlang.\n" +
+    "📖 *Qo'llanma*\n\n" +
+    "1. Mini App yoki «Matn orqali tekshirish»ni tanlang.\n" +
     "2. Kitob, test va bo'limni tanlang.\n" +
-    "3. O'sha qismni mustaqil yeching.\n" +
-    "4. Javoblaringizni raqami bilan yuboring, masalan:\n" +
-    "`1. cat`\n`2. TRUE`\n`3. B`\n" +
-    "5. Men faqat to'g'rilarini belgilab beraman.\n" +
-    "6. Xatolar ustida ishlang va qayta yuboring.\n" +
-    "7. Tayyor bo'lsangiz — «🔑 Javoblarni ko'rish».\n\n" +
-    "Savolingiz bo'lsa, *DREAM ZONE* ustozlaringizga murojaat qiling 💙",
+    "3. Qismni mustaqil yeching.\n" +
+    "4. Javoblarni raqami bilan yuboring:\n`1. cat`   `2. TRUE`   `3. B`\n" +
+    "5. Faqat to'g'ri javoblar belgilanadi; xatolarni tuzatib qayta yuboring.\n" +
+    "6. To'g'ri javoblarni ko'rish — «🔑 Javoblarni ko'rish».\n\n" +
+    "CD Reading test yaratish — «🆕 CD Test yaratish».",
   part_not_available:
     "⚠️ Afsuski, bu qism uchun javoblar hali bazaga kiritilmagan.\n" +
     "Iltimos boshqa qismni tanlang yoki keyinroq urinib ko'ring.",
@@ -146,14 +142,12 @@ const uz: Dict = {
   cd_key_extra: (list: string) => `\n⚠️ Bu raqamlar bu passage savollariga kirmaydi: ${list}`,
   cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
   cd_preparing: "⏳ CD test tayyorlanmoqda…",
-  cd_caption: (total: number, passages: number) =>
-    `🎉 *Tayyor!* CD Reading testingiz quyida.\n\n📊 ${total} ta savol · ${passages} ta passage\n\n` +
-    "▶️ *Ishlashi:* o'quvchi javoblarni kiritib «Deliver» bosadi — to'g'rilari " +
-    "yashil bo'lib qulflanadi, xatolarini tuzatib *cheksiz* qayta tekshirishi " +
-    "mumkin. Xato javoblarning to'g'ri varianti «Javoblarni ko'rish»da ochiladi.\n\n" +
-    "✏️ *Tuzatish kerakmi?* Faylni brauzerda oching → *✏️* tugmasi → matn/savollarni " +
-    "tahrirlang → *💾 Saqlash* bilan toza faylni yuklab oling.\n\n" +
-    "So'ng o'quvchilarga tarqating. 💙",
+  cd_caption: (total: number, passages: number, botLink: string) =>
+    `✅ *CD Reading test tayyor* — ${total} ta savol, ${passages} ta passage.\n\n` +
+    "O'quvchi javoblarni kiritib «Topshirish»ni bosadi: to'g'rilari qulflanadi, " +
+    "qolganlarini qayta ishlash mumkin, to'g'ri javoblar «Javoblarni ko'rish»da ochiladi.\n" +
+    "Tahrirlash: faylni brauzerda oching → ✏️ → 💾 Saqlash.\n\n" +
+    `🤖 ${botLink}`,
   cd_done: "✅ Test tayyor! Yana bittasini yaratasizmi?",
   cd_doc_no_flow: "📎 Faylni qabul qilish uchun avval «🆕 CD Test yaratish»ni boshlang (/start).",
   cd_file_too_big: "⚠️ Fayl juda katta (8 MB dan kichik bo'lsin).",
@@ -204,33 +198,29 @@ const ru: Dict = {
   lang_native: "Русский",
   lang_saved: "✅ Язык переключён на русский.",
   welcome: (name: string) =>
-    `👋 Здравствуйте, *${name}*!\n\n` +
-    "Добро пожаловать в IELTS-помощник *DREAM ZONE* 🎓\n\n" +
-    "Моментально проверю ваши ответы Listening и Reading — " +
-    "нажмите кнопку ниже, чтобы начать 👇",
-  welcome_hint: "\n\nℹ️ О боте — /about\n📖 Руководство — /guide",
+    `👋 Здравствуйте, *${name}*.\n\n` +
+    "*DREAM ZONE — IELTS Assistant*.\n" +
+    "Проверяет ответы Listening и Reading и создаёт CD Reading-тесты.\n\n" +
+    "Чтобы начать, выберите кнопку ниже 👇",
+  welcome_hint: "\n\nℹ️ О боте — /about   📖 Руководство — /guide",
   menu: "👇 *Меню*",
-  menu_home: "🏠 *Главное меню*\n\nВыберите один из вариантов 👇",
+  menu_home: "🏠 *Главное меню*",
   about:
-    "🎓 *DREAM ZONE — IELTS-помощник*\n\n" +
-    "Я создан для учеников учебного центра *DREAM ZONE* 💙\n\n" +
-    "Проверяю тесты Listening и Reading из книг Cambridge IELTS Academic 10–21 — " +
-    "всего 48 полных тестов.\n\n" +
-    "Главное: я показываю *только правильные* ответы. Правильные варианты " +
-    "неверных ответов сразу не открываю — вы работаете над ними сами, " +
-    "а когда будете готовы — увидите их.\n\n" +
-    "📖 Как пользоваться — /guide",
+    "🎓 *DREAM ZONE — IELTS Assistant*\n\n" +
+    "Проверяет ответы Cambridge IELTS Academic 10–21 (Listening и Reading — " +
+    "всего 48 тестов) и создаёт CD Reading-тесты для преподавателей.\n\n" +
+    "При проверке отмечаются только правильные ответы; правильные варианты " +
+    "неверных показываются по вашему запросу.\n\n" +
+    "📖 Руководство — /guide",
   guide:
-    "📖 *Как пользоваться?*\n\n" +
-    "1. Откройте Mini App или выберите «Проверка по тексту».\n" +
+    "📖 *Руководство*\n\n" +
+    "1. Откройте Mini App или «Проверка по тексту».\n" +
     "2. Выберите книгу, тест и раздел.\n" +
-    "3. Решите эту часть самостоятельно.\n" +
-    "4. Отправьте ответы с номерами, например:\n" +
-    "`1. cat`\n`2. TRUE`\n`3. B`\n" +
-    "5. Я отмечу только правильные.\n" +
-    "6. Поработайте над ошибками и отправьте снова.\n" +
-    "7. Когда будете готовы — «🔑 Показать ответы».\n\n" +
-    "Если есть вопросы — обратитесь к преподавателям *DREAM ZONE* 💙",
+    "3. Решите часть самостоятельно.\n" +
+    "4. Отправьте ответы с номерами:\n`1. cat`   `2. TRUE`   `3. B`\n" +
+    "5. Отмечаются только правильные; исправьте ошибки и отправьте снова.\n" +
+    "6. Показать правильные ответы — «🔑 Показать ответы».\n\n" +
+    "Создать CD Reading-тест — «🆕 Создать CD-тест».",
   part_not_available:
     "⚠️ К сожалению, ответы для этой части ещё не добавлены в базу.\n" +
     "Пожалуйста, выберите другую часть или попробуйте позже.",
@@ -327,14 +317,12 @@ const ru: Dict = {
   cd_key_extra: (list: string) => `\n⚠️ Эти номера не относятся к вопросам этого passage: ${list}`,
   cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
   cd_preparing: "⏳ CD-тест готовится…",
-  cd_caption: (total: number, passages: number) =>
-    `🎉 *Готово!* Ваш CD Reading-тест ниже.\n\n📊 ${total} вопросов · ${passages} passage\n\n` +
-    "▶️ *Как работает:* ученик вводит ответы и нажимает «Deliver» — верные " +
-    "становятся зелёными и блокируются, ошибки можно исправлять и проверять " +
-    "*бесконечно*. Правильные варианты неверных ответов открываются в «Показать ответы».\n\n" +
-    "✏️ *Нужно исправить?* Откройте файл в браузере → кнопка *✏️* → отредактируйте " +
-    "текст/вопросы → *💾 Сохранить* и скачайте чистый файл.\n\n" +
-    "Затем раздайте ученикам. 💙",
+  cd_caption: (total: number, passages: number, botLink: string) =>
+    `✅ *CD Reading-тест готов* — ${total} вопросов, ${passages} passage.\n\n` +
+    "Ученик вводит ответы и нажимает «Отправить»: верные фиксируются, остальные " +
+    "можно доработать, правильные ответы открываются в «Показать ответы».\n" +
+    "Редактирование: откройте файл в браузере → ✏️ → 💾 Сохранить.\n\n" +
+    `🤖 ${botLink}`,
   cd_done: "✅ Тест готов! Создать ещё один?",
   cd_doc_no_flow: "📎 Чтобы принять файл, сначала начните «🆕 Создание CD-теста» (/start).",
   cd_file_too_big: "⚠️ Файл слишком большой (не более 8 МБ).",
@@ -384,33 +372,29 @@ const en: Dict = {
   lang_native: "English",
   lang_saved: "✅ Language set to English.",
   welcome: (name: string) =>
-    `👋 Hello, *${name}*!\n\n` +
-    "Welcome to the *DREAM ZONE* IELTS assistant 🎓\n\n" +
-    "I'll instantly check your Listening and Reading answers — " +
-    "tap the button below to start 👇",
-  welcome_hint: "\n\nℹ️ About — /about\n📖 Guide — /guide",
+    `👋 Hello, *${name}*.\n\n` +
+    "*DREAM ZONE — IELTS Assistant*.\n" +
+    "Checks Listening and Reading answers and builds CD Reading tests.\n\n" +
+    "Choose a button below to begin 👇",
+  welcome_hint: "\n\nℹ️ About — /about   📖 Guide — /guide",
   menu: "👇 *Menu*",
-  menu_home: "🏠 *Main menu*\n\nChoose one of the options 👇",
+  menu_home: "🏠 *Main menu*",
   about:
-    "🎓 *DREAM ZONE — IELTS assistant*\n\n" +
-    "I was built for the students of *DREAM ZONE* learning centre 💙\n\n" +
-    "I check the Listening and Reading tests from Cambridge IELTS Academic 10–21 — " +
-    "48 full tests in total.\n\n" +
-    "Most importantly: I show *only your correct* answers. I don't reveal the " +
-    "correct options for wrong answers right away — you work on them yourself, " +
-    "and see them when you're ready.\n\n" +
-    "📖 How to use — /guide",
+    "🎓 *DREAM ZONE — IELTS Assistant*\n\n" +
+    "Checks answers for Cambridge IELTS Academic 10–21 (Listening and Reading — " +
+    "48 tests in total) and builds CD Reading tests for teachers.\n\n" +
+    "When checking, only correct answers are marked; the correct options for wrong " +
+    "answers are shown on request.\n\n" +
+    "📖 Guide — /guide",
   guide:
-    "📖 *How do I use it?*\n\n" +
-    "1. Open the Mini App or choose «Check by text».\n" +
-    "2. Pick a book, test and section.\n" +
-    "3. Solve that part on your own.\n" +
-    "4. Send your answers with their numbers, e.g.:\n" +
-    "`1. cat`\n`2. TRUE`\n`3. B`\n" +
-    "5. I'll mark only the correct ones.\n" +
-    "6. Work on the mistakes and send again.\n" +
-    "7. When ready — «🔑 Show answers».\n\n" +
-    "If you have questions, ask your *DREAM ZONE* teachers 💙",
+    "📖 *Guide*\n\n" +
+    "1. Open the Mini App or «Check by text».\n" +
+    "2. Choose a book, test and section.\n" +
+    "3. Solve the part on your own.\n" +
+    "4. Send answers with their numbers:\n`1. cat`   `2. TRUE`   `3. B`\n" +
+    "5. Only correct answers are marked; fix mistakes and send again.\n" +
+    "6. Reveal correct answers — «🔑 Show answers».\n\n" +
+    "Build a CD Reading test — «🆕 Create CD test».",
   part_not_available:
     "⚠️ Unfortunately, answers for this part haven't been added to the database yet.\n" +
     "Please choose another part or try again later.",
@@ -507,14 +491,12 @@ const en: Dict = {
   cd_key_extra: (list: string) => `\n⚠️ These numbers don't belong to this passage's questions: ${list}`,
   cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
   cd_preparing: "⏳ Preparing the CD test…",
-  cd_caption: (total: number, passages: number) =>
-    `🎉 *Done!* Your CD Reading test is below.\n\n📊 ${total} questions · ${passages} passage(s)\n\n` +
-    "▶️ *How it works:* the student enters answers and taps «Deliver» — correct " +
-    "ones turn green and lock, mistakes can be fixed and re-checked *unlimited* " +
-    "times. The correct options for wrong answers open in «Show answers».\n\n" +
-    "✏️ *Need to fix it?* Open the file in a browser → the *✏️* button → edit the " +
-    "text/questions → *💾 Save* to download the clean file.\n\n" +
-    "Then share it with your students. 💙",
+  cd_caption: (total: number, passages: number, botLink: string) =>
+    `✅ *Your CD Reading test is ready* — ${total} questions, ${passages} passage(s).\n\n` +
+    "Students enter answers and tap «Submit»: correct ones lock, the rest can be " +
+    "reworked, and correct answers appear under «Show answers».\n" +
+    "To edit: open the file in a browser → ✏️ → 💾 Save.\n\n" +
+    `🤖 ${botLink}`,
   cd_done: "✅ Test ready! Create another one?",
   cd_doc_no_flow: "📎 To accept a file, first start «🆕 Create a CD test» (/start).",
   cd_file_too_big: "⚠️ The file is too large (must be under 8 MB).",

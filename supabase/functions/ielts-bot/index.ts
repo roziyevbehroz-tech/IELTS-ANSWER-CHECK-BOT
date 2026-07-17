@@ -29,6 +29,9 @@ const BOT_TOKEN = Deno.env.get("BOT_TOKEN") ?? "";
 const ADMIN_IDS = (Deno.env.get("ADMIN_IDS") ?? "").split(/[,\s]+/).filter(Boolean);
 const WEBAPP_URL = (Deno.env.get("WEBAPP_URL") ??
   "https://roziyevbehroz-tech.github.io/IELTS-ANSWER-CHECK-BOT/").trim();
+// Bot havolasi (CD test caption va h.k. uchun). BOT_USERNAME env bilan o'zgartiriladi.
+const BOT_USERNAME = (Deno.env.get("BOT_USERNAME") ?? "IELTS_Answer_checkerbot").replace(/^@/, "").trim();
+const BOT_LINK = "https://t.me/" + BOT_USERNAME;
 const TG_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 const BOOKS = Array.from({ length: 12 }, (_, i) => 10 + i); // 10..21
@@ -1090,7 +1093,7 @@ async function cdFinish(chatId: number, from: any, data: CdDraft, lang: Lang) {
   const html = CD.renderTest(test);
   const total = CD.totalQuestions(test);
   const fileName = "dream_zone_" + slugify(rawTitle || firstText) + ".html";
-  const caption = t(lang, "cd_caption", total, data.passages.length);
+  const caption = t(lang, "cd_caption", total, data.passages.length, BOT_LINK);
   await sendDocumentHtml(chatId, fileName, html, caption);
   await clearDraft(from.id);
   bg(logEvent(from.id, "cd_created", { questions: total, passages: data.passages.length }));
