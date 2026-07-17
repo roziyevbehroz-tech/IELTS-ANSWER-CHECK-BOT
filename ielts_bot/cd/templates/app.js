@@ -373,7 +373,16 @@
     currentQuestion = q;
     var el = qEl(q);
     if (el) {
-      var wrap = (el.closest && (el.closest(".statement") || el.closest(".matching-form-row") || el.closest(".question"))) || el;
+      // Faqat AYNAN shu savol blokini belgilaymiz (butun MCQ/TFNG guruhini emas):
+      // avval yakka savol o'ramlari (mcq/tfng/matching/diagram/qator), keyin guruh.
+      var wrap = (el.closest && (
+        el.closest(".multi-choice-question") ||
+        el.closest(".tf-question") ||
+        el.closest(".matching-form-row") ||
+        el.closest(".diagram-row") ||
+        el.closest(".statement") ||
+        el.closest("li") || el.closest("td") || el.closest("p") ||
+        el.closest(".question"))) || el;
       document.querySelectorAll(".q-active").forEach(function (x) { x.classList.remove("q-active"); });
       if (wrap.classList) wrap.classList.add("q-active");
       if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
