@@ -273,6 +273,34 @@
     try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(type || "light"); } catch (e) {}
   }
 
+  // Kursorni maydon oxiriga qo'yib fokus beradi + ekranga surib keladi
+  function focusEnd(elm) {
+    if (!elm) return;
+    try { elm.focus(); } catch (e) {}
+    try { var v = elm.value; elm.value = ""; elm.value = v; } catch (e) {}
+    try { elm.setSelectionRange(elm.value.length, elm.value.length); } catch (e) {}
+    try { if (elm.scrollIntoView) elm.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
+  }
+
+  // Javob maydonlari orasida klaviatura bilan yurish: ↓/Enter -> keyingi,
+  // ↑ -> oldingi. (←/→ matn ichida ishlashda davom etadi.)
+  function wireKeyNav(order) {
+    order.forEach(function (inp, i) {
+      if (!inp) return;
+      inp.addEventListener("keydown", function (e) {
+        var k = e.key;
+        if (k === "ArrowDown" || k === "Enter") {
+          e.preventDefault();
+          var nx = order[i + 1];
+          if (nx) focusEnd(nx); else inp.blur();
+        } else if (k === "ArrowUp") {
+          e.preventDefault();
+          focusEnd(order[i - 1]);
+        }
+      });
+    });
+  }
+
   function answeredFor(book, test, section) {
     return CAT.answered[book + "-" + test + "-" + section] || [];
   }
@@ -433,6 +461,7 @@
 
     var listWrap = el("div", "q-list");
     var inputs = {};
+    var order = [];      // klaviatura navigatsiyasi uchun tartibli ro'yxat
     var attempts = {};   // har savol necha marta yakka tekshirilgani
     var rowsA = {};
     qs.forEach(function (q) {
@@ -445,6 +474,7 @@
       inp.placeholder = T("ph_answer");
       if (prefill && prefill[q] != null) inp.value = prefill[q];
       inputs[q] = inp;
+      order.push(inp);
       qr.appendChild(inp);
       // Yakka (joyida) tekshirish: xira urinishlar soni + ↻ tugma
       var tries = el("span", "q-tries");
@@ -458,6 +488,7 @@
       listWrap.appendChild(qr);
     });
     wrap.appendChild(listWrap);
+    wireKeyNav(order);
     show(wrap);
 
     function collect() {
@@ -708,6 +739,7 @@
     var list = el("div", "q-list ans-list");
     var rows = {};
     var inputs = {};
+    var order = [];
     qs.forEach(function (q, i) {
       var st = statusOf(q, res);
       var row = el("div", "ans-row st-" + st);
@@ -730,6 +762,7 @@
         if (ua != null) input.value = ua;
         body.appendChild(input);
         inputs[q] = input;
+        order.push(input);
       }
       var corr = el("div", "ans-correct");
       body.appendChild(corr);
@@ -760,6 +793,7 @@
       list.appendChild(row);
       rows[q] = { row: row, status: status, st: st, reveal: revealThis };
     });
+    wireKeyNav(order);
     wrap.appendChild(list);
 
     // ----- Tugmalar -----
@@ -892,6 +926,7 @@
 
     var listWrap = el("div", "q-list");
     var inputs = {};
+    var order = [];
     qs.forEach(function (q) {
       var qr = el("div", "q-row");
       qr.appendChild(el("div", "q-num", String(q)));
@@ -899,9 +934,10 @@
       inp.setAttribute("autocomplete", "off"); inp.setAttribute("autocapitalize", "off");
       inp.placeholder = T("ph_answer");
       if (prefill && prefill[q] != null) inp.value = prefill[q];
-      inputs[q] = inp; qr.appendChild(inp); listWrap.appendChild(qr);
+      inputs[q] = inp; order.push(inp); qr.appendChild(inp); listWrap.appendChild(qr);
     });
     wrap.appendChild(listWrap);
+    wireKeyNav(order);
     show(wrap);
 
     setupMain(T("btn_check"), function () {
