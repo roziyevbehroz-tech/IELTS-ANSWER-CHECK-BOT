@@ -115,10 +115,12 @@ def _render_part_header(p: Passage, idx: int, hidden: bool) -> str:
     rng = f"{p.q_start}-{p.q_end}" if p.q_start else ""
     tail = f"Read the text and answer questions {rng}." if rng else "Read the text."
     part_label = p.part_no or idx      # matndan aniqlangan raqam, bo'lmasa pozitsion
+    # data-i18n: interfeys tili (uz/ru/en) app.js tomonidan qo'llanadi
     return (
         f'<div id="part-header-{idx}" class="{cls}">'
-        f'<p><strong>Part {part_label}</strong></p>'
-        f'<span class="ph-sep">·</span><p>{tail}</p></div>'
+        f'<p><strong data-i18n="part_n" data-i18narg="{part_label}">Part {part_label}</strong></p>'
+        f'<span class="ph-sep">·</span>'
+        f'<p data-i18n="read_text" data-i18narg="{rng}">{tail}</p></div>'
     )
 
 
@@ -399,7 +401,7 @@ def _build_data(test: ReadingTest) -> Dict:
         "groups": groups,
         "parts": parts,
         "partNos": part_nos,
-        "settings": {"duration": duration},
+        "settings": {"duration": duration, "lang": test.settings.lang or "uz"},
     }
 
 

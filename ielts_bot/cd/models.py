@@ -129,6 +129,7 @@ class Settings:
     duration_min: int = 60           # taymer (daqiqa)
     brand: str = "DREAM ZONE"
     telegram_url: str = ""
+    lang: str = "uz"                 # interfeys tili (uz/ru/en) — standart uz
 
 
 @dataclass

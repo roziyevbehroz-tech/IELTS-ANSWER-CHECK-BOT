@@ -1075,6 +1075,7 @@ function slugify(s: string): string {
 async function cdFinish(chatId: number, from: any, data: CdDraft, lang: Lang) {
   await sendMessage(chatId, t(lang, "cd_preparing"));
   data.settings.brand = "DREAM ZONE";
+  data.settings.lang = lang;   // CD HTML interfeysi shu tilda bo'ladi
   // Sarlavha (yo'q bo'lsa passage boshidan) — fayl nomi uchun
   const rawTitle = (data.passages[0] && data.passages[0].title) || "";
   const firstText = (data.passages[0] && data.passages[0].paragraphs && data.passages[0].paragraphs[0]) || "";
