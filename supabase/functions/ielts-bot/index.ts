@@ -215,9 +215,18 @@ function langKb() {
   };
 }
 
+// Mini App manziliga qo'shimcha parametr (masalan lang) qo'shadi
+function webappUrl(params: Record<string, string>): string {
+  let u = WEBAPP_URL;
+  for (const [k, v] of Object.entries(params)) {
+    u += (u.indexOf("?") >= 0 ? "&" : "?") + k + "=" + encodeURIComponent(v);
+  }
+  return u;
+}
+
 function launcherKb(lang: Lang) {
   const rows: Btn[][] = [];
-  if (WEBAPP_URL) rows.push([{ text: t(lang, "btn_miniapp"), web_app: { url: WEBAPP_URL } }]);
+  if (WEBAPP_URL) rows.push([{ text: t(lang, "btn_miniapp"), web_app: { url: webappUrl({ lang }) } }]);
   rows.push([{ text: t(lang, "btn_text_check"), callback_data: "nav:books" }]);
   rows.push([{ text: t(lang, "btn_cd_create"), callback_data: "cd:start" }]);
   return { inline_keyboard: rows };
@@ -436,8 +445,7 @@ async function getCustomTest(id: string): Promise<any | null> {
 }
 
 function customTestKb(id: string, lang: Lang) {
-  var sep = WEBAPP_URL.indexOf("?") >= 0 ? "&" : "?";
-  return { inline_keyboard: [[{ text: t(lang, "btn_ct_start"), web_app: { url: WEBAPP_URL + sep + "ct=" + id } }]] };
+  return { inline_keyboard: [[{ text: t(lang, "btn_ct_start"), web_app: { url: webappUrl({ ct: id, lang }) } }]] };
 }
 
 async function handleOpenCustom(chatId: number, from: any, id: string, lang: Lang) {

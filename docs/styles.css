@@ -69,7 +69,22 @@ body::before {
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-mark { font-weight: 800; font-size: 18px; letter-spacing: .5px; }
 .brand-sub { font-size: 12px; opacity: 0.92; font-weight: 500; }
-.crumb { margin-top: 6px; font-size: 13px; opacity: 0.92; min-height: 16px; }
+.crumb { margin-top: 6px; font-size: 13px; opacity: 0.92; min-height: 16px; padding-right: 62px; }
+
+/* Til almashtirish (globus) — topbar o'ng yuqori burchagida */
+.lang-switch {
+  position: absolute;
+  top: 12px; right: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px; font-weight: 800; letter-spacing: .3px;
+  cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.lang-switch:active { background: rgba(255, 255, 255, 0.30); }
 
 /* ----- Screen ----- */
 .screen { flex: 1; padding: 18px 16px 28px; }
