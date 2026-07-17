@@ -106,8 +106,21 @@ def _render_passage(p: Passage, idx: int, hidden: bool) -> str:
         if p.lettered:
             letter = f'<strong>{chr(ord("A") + i)}</strong>&nbsp;&nbsp;'
         parts.append(f"<p>{letter}{html.escape(para)}</p>")
+    # Izohli lug'at (*/** footnote) — passage oxirida ajratuvchi chiziq bilan
+    glossary = getattr(p, "glossary", None) or []
+    if glossary:
+        items = "".join(_gloss_item(g) for g in glossary)
+        parts.append(f'<div class="passage-glossary">{items}</div>')
     parts.append("</div>")
     return "\n".join(parts)
+
+
+def _gloss_item(g: str) -> str:
+    """"* philanthropic: ..." -> yulduzchani ajratib, izohni ko'rsatadi."""
+    m = re.match(r"^\s*(\*{1,3})\s*(.*)$", g)
+    mark, rest = (m.group(1), m.group(2)) if m else ("*", g)
+    return (f'<p class="gloss-item"><span class="gloss-mark">{mark}</span>'
+            f'{html.escape(rest)}</p>')
 
 
 def _render_part_header(p: Passage, idx: int, hidden: bool) -> str:

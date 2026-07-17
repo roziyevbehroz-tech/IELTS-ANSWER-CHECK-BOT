@@ -17,6 +17,7 @@ export interface Passage {
   groups: QuestionGroup[]; answers: Record<number, string>; warnings: string[];
   images?: string[];   // diagram rasmlari (data URI)
   partNo?: number;     // matndan aniqlangan "READING PASSAGE N"
+  glossary?: string[]; // */** izohli lug'at (footnote)
 }
 export interface Settings {
   durationMin: number;
@@ -227,13 +228,40 @@ export function splitPassageAndQuestions(text: string): [string, string] {
   return [lines.slice(0, cut).join("\n").trim(), lines.slice(cut).join("\n").trim()];
 }
 
+// Izohli lug'at (footnote): qator boshida */**/*** + izoh — passage muhim qismi
+const GLOSSARY_RE = /^\s*\*{1,3}\s*\S/;
+function extractGlossary(text: string): [string, string[]] {
+  const lines = text.split("\n");
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) { if (GLOSSARY_RE.test(lines[i])) { start = i; break; } }
+  if (start < 0) return [text, []];
+  const bodyLines = lines.slice(0, start);
+  // Lug'atdan oldingi ajratuvchi chiziq (____/----) va bo'sh qatorlarni tashlaymiz
+  while (bodyLines.length) {
+    const last = bodyLines[bodyLines.length - 1].trim();
+    if (last === "" || /^[_\-–—=.·•*\s]{3,}$/.test(last)) bodyLines.pop();
+    else break;
+  }
+  const body = bodyLines.join("\n").replace(/\s+$/, "");
+  const entries: string[] = [];
+  for (const ln of lines.slice(start)) {
+    const s = ln.trim();
+    if (!s) continue;
+    if (GLOSSARY_RE.test(s)) entries.push(s);
+    else if (entries.length) entries[entries.length - 1] += " " + s;
+  }
+  return [body, entries];
+}
+
 export function parsePassage(text: string, index = 1): Passage {
   const raw = text.trim();
   // "READING PASSAGE 2" / "...based on Reading Passage 2" -> part raqami
   const pm = raw.replace(/[\s.:|·•–—-]+/g, " ").match(/reading\s+passage\s+(\d+)/i);
   const partNo = pm ? Number(pm[1]) : 0;
   const [clean, warnings] = stripBoilerplate(raw);
-  text = clean;
+  // Izohli lug'atni (footnote */**) ajratib olamiz — alohida saqlaymiz
+  const [afterGloss, glossary] = extractGlossary(clean);
+  text = afterGloss;
   let lines = text.split("\n");
   while (lines.length && (!lines[0].trim() || HEADER_NOISE.test(lines[0]))) lines.shift();
 
@@ -251,7 +279,7 @@ export function parsePassage(text: string, index = 1): Passage {
   const body = lines.join("\n").trim();
   const [paragraphs, lettered] = splitParagraphs(body);
   if (paragraphs.join("").length < 150 && !warnings.includes("short")) warnings.push("short");
-  return { title, subtitle, paragraphs, lettered, groups: [], answers: {}, warnings, partNo };
+  return { title, subtitle, paragraphs, lettered, groups: [], answers: {}, warnings, partNo, glossary };
 }
 
 function looksLikeTitle(line: string): boolean {
@@ -789,8 +817,20 @@ function renderPassage(p: Passage, idx: number, hidden: boolean): string {
     const letter = p.lettered ? `<strong>${String.fromCharCode(65 + i)}</strong>&nbsp;&nbsp;` : "";
     parts.push(`<p>${letter}${esc(para)}</p>`);
   });
+  // Izohli lug'at (*/** footnote) — passage oxirida ajratuvchi chiziq bilan
+  const glossary = p.glossary || [];
+  if (glossary.length) {
+    const items = glossary.map(glossItem).join("");
+    parts.push(`<div class="passage-glossary">${items}</div>`);
+  }
   parts.push("</div>");
   return parts.join("\n");
+}
+function glossItem(g: string): string {
+  const m = g.match(/^\s*(\*{1,3})\s*(.*)$/);
+  const mark = m ? m[1] : "*";
+  const rest = m ? m[2] : g;
+  return `<p class="gloss-item"><span class="gloss-mark">${mark}</span>${esc(rest)}</p>`;
 }
 function renderPartHeader(p: Passage, idx: number, hidden: boolean): string {
   const cls = "part-header" + (hidden ? " hidden" : "");
