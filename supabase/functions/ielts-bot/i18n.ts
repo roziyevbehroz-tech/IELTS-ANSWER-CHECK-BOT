@@ -147,7 +147,7 @@ const uz: Dict = {
     "O'quvchi javoblarni kiritib «Topshirish»ni bosadi: to'g'rilari qulflanadi, " +
     "qolganlarini qayta ishlash mumkin, to'g'ri javoblar «Javoblarni ko'rish»da ochiladi.\n" +
     "Tahrirlash: faylni brauzerda oching → ✏️ → 💾 Saqlash.\n\n" +
-    `🤖 ${botLink}`,
+    `🤖 [Botni ochish](${botLink})`,
   cd_done: "✅ Test tayyor! Yana bittasini yaratasizmi?",
   cd_doc_no_flow: "📎 Faylni qabul qilish uchun avval «🆕 CD Test yaratish»ni boshlang (/start).",
   cd_file_too_big: "⚠️ Fayl juda katta (8 MB dan kichik bo'lsin).",
@@ -322,7 +322,7 @@ const ru: Dict = {
     "Ученик вводит ответы и нажимает «Отправить»: верные фиксируются, остальные " +
     "можно доработать, правильные ответы открываются в «Показать ответы».\n" +
     "Редактирование: откройте файл в браузере → ✏️ → 💾 Сохранить.\n\n" +
-    `🤖 ${botLink}`,
+    `🤖 [Открыть бота](${botLink})`,
   cd_done: "✅ Тест готов! Создать ещё один?",
   cd_doc_no_flow: "📎 Чтобы принять файл, сначала начните «🆕 Создание CD-теста» (/start).",
   cd_file_too_big: "⚠️ Файл слишком большой (не более 8 МБ).",
@@ -496,7 +496,7 @@ const en: Dict = {
     "Students enter answers and tap «Submit»: correct ones lock, the rest can be " +
     "reworked, and correct answers appear under «Show answers».\n" +
     "To edit: open the file in a browser → ✏️ → 💾 Save.\n\n" +
-    `🤖 ${botLink}`,
+    `🤖 [Open the bot](${botLink})`,
   cd_done: "✅ Test ready! Create another one?",
   cd_doc_no_flow: "📎 To accept a file, first start «🆕 Create a CD test» (/start).",
   cd_file_too_big: "⚠️ The file is too large (must be under 8 MB).",
