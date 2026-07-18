@@ -701,19 +701,27 @@ async function handleText(chatId: number, from: any, text: string, lang: Lang) {
 // ======================= CD Test yaratish (Reading) =======================
 
 const CD_MAX_FILE = 8 * 1024 * 1024;
-const CD_STEPS = new Set(["passage", "questions", "answers"]);
+// intake — universal material qabul qilish; review — topilganini tasdiqlash;
+// answers — javob kalitini so'rash
+const CD_STEPS = new Set(["intake", "review", "answers"]);
 
+interface CdPending {
+  segments: { passage: CD.Passage; groups: CD.QuestionGroup[] }[];
+  answerKey: Record<number, string>;
+  note: string;
+}
 interface CdDraft {
   skill: string;
-  passages: CD.Passage[];
-  curPassage: CD.Passage | null;
-  curGroups: CD.QuestionGroup[] | null;
+  passages: CD.Passage[];               // tasdiqlangan passage'lar (groups biriktirilgan)
+  answerKey: Record<number, string>;    // to'plangan global javob kaliti
+  pending: CdPending | null;            // ko'rib chiqilayotgan (tasdiqlanmagan) natija
+  failCount: number;                    // ketma-ket ajrata olmagan urinishlar
   settings: CD.Settings;
 }
 
 function newDraft(): CdDraft {
-  return { skill: "reading", passages: [], curPassage: null, curGroups: null,
-    settings: CD.newSettings() };
+  return { skill: "reading", passages: [], answerKey: {}, pending: null,
+    failCount: 0, settings: CD.newSettings() };
 }
 
 // Ketma-ket raqamlarni ixcham ko'rinishga keltiradi: [14,15,16,20] -> "14-16, 20"
@@ -938,10 +946,19 @@ function cdSkillKb(lang: Lang) {
     ],
   };
 }
-function cdMoreKb(lang: Lang) {
+// Topilgan material tasdig'i: tasdiqlash / yana passage / qayta yuborish / bekor
+function cdReviewKb(lang: Lang, canAdd: boolean) {
+  const rows: Btn[][] = [[{ text: t(lang, "btn_cd_confirm"), callback_data: "cd:rev:ok" }]];
+  if (canAdd) rows.push([{ text: t(lang, "btn_cd_addmore"), callback_data: "cd:rev:add" }]);
+  rows.push([{ text: t(lang, "btn_cd_redo_material"), callback_data: "cd:rev:redo" }]);
+  rows.push([{ text: t(lang, "btn_cd_cancel"), callback_data: "cd:cancel" }]);
+  return { inline_keyboard: rows };
+}
+// Javob kalitini so'rashda: materialni qayta yuborish / bekor
+function cdAnswersKb(lang: Lang) {
   return { inline_keyboard: [
-    [{ text: t(lang, "btn_cd_add"), callback_data: "cd:more:add" }],
-    [{ text: t(lang, "btn_cd_finish"), callback_data: "cd:more:finish" }],
+    [{ text: t(lang, "btn_cd_redo_material"), callback_data: "cd:ans:redo" }],
+    [{ text: t(lang, "btn_cd_cancel"), callback_data: "cd:cancel" }],
   ] };
 }
 // Test yaratilgandan keyin: yana yaratish / bosh menyu
@@ -985,8 +1002,8 @@ async function handleCdCallback(cq: any, sub: string[], lang: Lang) {
   }
   if (op === "skill") {
     if (sub[1] !== "reading") { await answerCallback(cq.id, t(lang, "cd_coming"), true); return; }
-    await setDraft(from.id, "passage", newDraft());
-    await editMessage(chatId, messageId, t(lang, "cd_ask_passage", 1));
+    await setDraft(from.id, "intake", newDraft());
+    await editMessage(chatId, messageId, t(lang, "cd_ask_material", 1));
     return;
   }
   if (op === "cancel") {
@@ -997,78 +1014,211 @@ async function handleCdCallback(cq: any, sub: string[], lang: Lang) {
   const d = await getDraft(from.id);
   if (!d) { await sendMessage(chatId, t(lang, "start_prompt")); return; }
 
-  if (op === "more") {
-    if (sub[1] === "add") {
-      await setDraft(from.id, "passage", d.data);
-      await editMessage(chatId, messageId, t(lang, "cd_ask_passage", d.data.passages.length + 1));
-    } else {
-      await cdFinish(chatId, from, d.data, lang);
+  // Ko'rib chiqish (review) tugmalari
+  if (op === "rev") {
+    if (!d.data.pending) { await sendMessage(chatId, t(lang, "cd_ask_material", 1)); return; }
+    if (sub[1] === "redo") {
+      d.data.pending = null;
+      await setDraft(from.id, "intake", d.data);
+      await editMessage(chatId, messageId, t(lang, "cd_ask_material", d.data.passages.length + 1));
+      return;
     }
+    // ok / add — pending segmentlarni tasdiqlab passages'ga qo'shamiz
+    cdCommitPending(d.data);
+    if (sub[1] === "add" && d.data.passages.length < 3) {
+      await setDraft(from.id, "intake", d.data);
+      await editMessage(chatId, messageId, t(lang, "cd_ask_material", d.data.passages.length + 1));
+      return;
+    }
+    await cdAfterConfirm(chatId, from, d.data, lang, messageId);
+    return;
+  }
+  // Javob kaliti bosqichida "materialni qayta yuborish"
+  if (op === "ans" && sub[1] === "redo") {
+    await setDraft(from.id, "intake", d.data);
+    await editMessage(chatId, messageId, t(lang, "cd_ask_material", d.data.passages.length + 1));
     return;
   }
 }
 
+// PDF'dan ajratilgan rasmlarni diagram/flow-chart bor passage'ga biriktiramiz
+function cdAttachImages(seg: CD.Segmentation, images: string[]) {
+  for (const s of seg.segments) {
+    if (s.groups.some((g) => g.qtype === "diagram" || g.qtype === "flowchart")) {
+      s.passage.images = images;
+    }
+  }
+}
+
+// Ko'rib chiqish (review) hisoboti: nima topilgani + kalit holati + yana qo'shsa bo'ladimi
+function cdSegReport(data: CdDraft, seg: CD.Segmentation, lang: Lang) {
+  const base = data.passages.length;   // allaqachon tasdiqlangan passage'lar
+  const lines = seg.segments.map((s, i) => {
+    const idx = base + i + 1;
+    const title = s.passage.title || "—";
+    const paras = s.passage.paragraphs.length;
+    if (s.groups.length) {
+      const nums = s.groups.flatMap((g) => CD.numbersOf(g));
+      return t(lang, "cd_seg_pline", idx, title, paras, new Set(nums).size, compactNums(nums));
+    }
+    return t(lang, "cd_seg_pline_noq", idx, title, paras);
+  });
+  const keyCount = Object.keys(seg.answerKey).length;
+  const keyLine = keyCount ? t(lang, "cd_seg_key_found", keyCount) : t(lang, "cd_seg_key_none");
+  return { body: lines.join("\n"), keyLine, canAdd: (base + seg.segments.length) < 3 };
+}
+
+// pending segmentlarni tasdiqlab passages'ga qo'shamiz + kalitni biriktiramiz
+function cdCommitPending(data: CdDraft) {
+  if (!data.pending) return;
+  for (const s of data.pending.segments) {
+    if (data.passages.length >= 3) break;
+    const p = s.passage;
+    p.groups = s.groups;
+    p.answers = {};
+    data.passages.push(p);
+  }
+  Object.assign(data.answerKey, data.pending.answerKey);
+  data.pending = null;
+  cdApplyAnswerKey(data);
+}
+
+// Global javob kalitidan har passage'ning javoblarini to'ldiradi
+function cdApplyAnswerKey(data: CdDraft) {
+  for (const p of data.passages) {
+    p.answers = {};
+    for (const g of p.groups) for (const n of CD.numbersOf(g)) {
+      if (n in data.answerKey && String(data.answerKey[n]).trim()) p.answers[n] = data.answerKey[n];
+    }
+  }
+}
+
+// Hali javobi yo'q savol raqamlari
+function cdMissingNums(data: CdDraft): number[] {
+  const missing: number[] = [];
+  for (const p of data.passages) for (const g of p.groups) for (const n of CD.numbersOf(g)) {
+    if (!(n in data.answerKey) || !String(data.answerKey[n]).trim()) missing.push(n);
+  }
+  return missing;
+}
+
+// Savol turiga mos kelmagan javoblar bo'yicha ogohlantirish (barcha passage bo'ylab)
+function cdKeyWarnings(data: CdDraft, lang: Lang): string {
+  const badByKind: Record<string, number[]> = {};
+  for (const p of data.passages) {
+    const v = CD.validateAnswerKey(data.answerKey, p.groups);
+    for (const k of Object.keys(v.badByKind)) (badByKind[k] ||= []).push(...v.badByKind[k]);
+  }
+  return Object.keys(badByKind).length ? cdMismatchMsg(badByKind, lang) : "";
+}
+
+// Tasdiqlagach: savol yo'q bo'lsa — savol so'raymiz; kalit to'liq bo'lsa — quramiz;
+// aks holda kalitni so'raymiz
+async function cdAfterConfirm(chatId: number, from: any, data: CdDraft, lang: Lang, messageId?: number) {
+  const totalQ = data.passages.reduce((a, p) => a + p.groups.length, 0);
+  if (!totalQ) {
+    // passage bor, lekin savol yo'q — savollarni alohida so'raymiz
+    await setDraft(from.id, "intake", data);
+    const txt = t(lang, "cd_ask_material", data.passages.length + 1);
+    if (messageId) await editMessage(chatId, messageId, txt);
+    else await sendMessage(chatId, txt);
+    return;
+  }
+  const missing = cdMissingNums(data);
+  if (missing.length) {
+    await setDraft(from.id, "answers", data);
+    const txt = t(lang, "cd_ask_key", compactNums(missing));
+    if (messageId) await editMessage(chatId, messageId, txt, cdAnswersKb(lang));
+    else await sendMessage(chatId, txt, cdAnswersKb(lang));
+  } else {
+    await cdFinish(chatId, from, data, lang);
+  }
+}
+
+// Qismlarni alohida yuborish: passage allaqachon bor bo'lsa, kelgan matnni
+// (faqat) savol yoki (faqat) javob kaliti sifatida biriktirishga urinamiz.
+const CD_Q_START = /^\s*(questions?\s+\d|complete the|choose the correct|do the following|which\s+(section|paragraph)|label the|list of headings|match each|classify)/i;
+function cdFirstLine(text: string): string {
+  for (const l of (text || "").split(/\r?\n/)) if (l.trim()) return l.trim();
+  return "";
+}
+async function cdHandlePartial(chatId: number, from: any, data: CdDraft, text: string, images: string[], lang: Lang): Promise<boolean> {
+  const noGroupP = data.passages.find((p) => !p.groups.length);
+  // (a) savolsiz passage kutmoqda — kelgan matn savollarga o'xshasa biriktiramiz
+  if (noGroupP && CD_Q_START.test(cdFirstLine(text))) {
+    const qGroups = CD.parseQuestions(text, noGroupP.paragraphs.length).filter((g) => CD.numbersOf(g).length);
+    if (qGroups.length) {
+      noGroupP.groups = qGroups;
+      if (images.length && qGroups.some((g) => g.qtype === "diagram" || g.qtype === "flowchart")) noGroupP.images = images;
+      cdApplyAnswerKey(data);
+      data.failCount = 0;
+      const nums = qGroups.flatMap((g) => CD.numbersOf(g));
+      await sendMessage(chatId, t(lang, "cd_seg_pline", data.passages.indexOf(noGroupP) + 1,
+        noGroupP.title || "—", noGroupP.paragraphs.length, new Set(nums).size, compactNums(nums)));
+      await cdAfterConfirm(chatId, from, data, lang);
+      return true;
+    }
+  }
+  // (b) savolli passage(lar) bor — matn faqat javob kalitiga o'xshasa biriktiramiz
+  const hasQ = data.passages.some((p) => p.groups.length);
+  const looksKey = !/reading\s+passage|questions?\s+\d/i.test(text) && text.length < 1500;
+  if (hasQ && looksKey) {
+    const key = CD.parseAnswerKey(text);
+    if (Object.keys(key).length) {
+      Object.assign(data.answerKey, key);
+      cdApplyAnswerKey(data);
+      data.failCount = 0;
+      await sendMessage(chatId, t(lang, "cd_key_added_ok", Object.keys(key).length, cdKeyWarnings(data, lang)));
+      await cdAfterConfirm(chatId, from, data, lang);
+      return true;
+    }
+  }
+  return false;
+}
+
 // ---- xabar (matn/fayl) ----
 async function cdHandleInput(chatId: number, from: any, step: string, data: CdDraft, text: string, images: string[] = [], lang: Lang = "uz") {
-  if (step === "passage") {
-    const [passagePart] = CD.splitPassageAndQuestions(text);
-    const idx = data.passages.length + 1;
-    const p = CD.parsePassage(passagePart || text, idx);
-    if (!p.paragraphs.length) { await sendMessage(chatId, t(lang, "cd_passage_empty")); return; }
-    data.curPassage = p;
-    await setDraft(from.id, "questions", data);
-    const lettered = p.lettered ? t(lang, "cd_lettered_note") : "";
-    let preview = p.paragraphs.join(" ").slice(0, 180).trim();
-    preview = preview ? preview + "…" : t(lang, "cd_preview_none");
-    await sendMessage(chatId, cdWarnText(p.warnings, lang) +
-      t(lang, "cd_ask_questions", p.title || "—", p.paragraphs.length, lettered, preview));
-  } else if (step === "questions") {
-    const p = data.curPassage!;
-    const groups = CD.parseQuestions(text, p.paragraphs.length).filter((g) => CD.numbersOf(g).length);
-    if (!groups.length) { await sendMessage(chatId, t(lang, "cd_no_q")); return; }
-    data.curGroups = groups;
-    // Diagram/flow-chart bo'lsa — PDF'dan ajratilgan rasmlarni passage'ga biriktiramiz
-    const hasVisual = groups.some((g) => g.qtype === "diagram" || g.qtype === "flowchart");
-    if (images.length && hasVisual) p.images = images;
-    await setDraft(from.id, "answers", data);
-    const lines = groups.map((g) => `• ${CD.labelOf(g)}: Q${g.start}–${g.end}`).join("\n");
-    const nums = groups.flatMap((g) => CD.numbersOf(g));
-    const first = Math.min(...nums), last = Math.max(...nums);
-    const ex = groups.slice(0, 4).map((g) => {
-      const k = CD.kindOf(g);
-      if (k === "tfng") return `${g.start}. TRUE`;
-      if (k === "ynng") return `${g.start}. YES`;
-      if (k === "mcq_multi") return `${g.start}-${g.end}. B, D`;
-      if (k === "mcq" || k === "matching") return `${g.start}. B`;
-      return `${g.start}. answer`;
-    }).join("\n");
-    await sendMessage(chatId, t(lang, "cd_q_detected", lines, new Set(nums).size, first, last, ex));
-  } else if (step === "answers") {
-    const key = CD.parseAnswerKey(text);
-    const groups = data.curGroups!;
-    // Umuman o'qib bo'lmasa — savol turlariga qarab qanday yuborishni ko'rsatamiz
-    if (!Object.keys(key).length) {
-      await sendMessage(chatId, t(lang, "cd_ans_unreadable") + "\n\n" + cdFormatGuide(groups, lang));
+  // intake yoki review paytida kelgan matn/fayl — (qayta) material sifatida ajratiladi
+  if (step === "intake" || step === "review") {
+    // Qismlarni alohida yuborish: passage bor bo'lsa — savol/kalitni biriktirishga urinamiz
+    if (step === "intake" && data.passages.length) {
+      if (await cdHandlePartial(chatId, from, data, text, images, lang)) return;
+    }
+    const seg = CD.segmentMaterial(text);
+    if (images.length) cdAttachImages(seg, images);
+    if (seg.note === "no_passage" || !seg.segments.length) {
+      data.failCount = (data.failCount || 0) + 1;
+      data.pending = null;
+      await setDraft(from.id, "intake", data);
+      await sendMessage(chatId, data.failCount >= 2 ? t(lang, "cd_seg_fail_again") : t(lang, "cd_seg_fail"));
       return;
     }
-    const p = data.curPassage!;
-    const expected = groups.flatMap((g) => CD.numbersOf(g));
-    // Javob kalitini savol turlariga qarab tekshiramiz (moslashuvchan, bloklamaydi)
-    const v = CD.validateAnswerKey(key, groups);
-    p.groups = groups;
-    p.answers = {};
-    for (const n of expected) if (n in key) p.answers[n] = key[n];
-    data.passages.push(p);
-    data.curPassage = null; data.curGroups = null;
-    let warn = v.missing.length ? t(lang, "cd_missing", v.missing.slice(0, 20).join(", ")) : "";
-    if (v.extra.length) warn += t(lang, "cd_key_extra", compactNums(v.extra.slice(0, 30)));
-    if (Object.keys(v.badByKind).length) warn += cdMismatchMsg(v.badByKind, lang);
-    if (data.passages.length >= 3) {
-      await sendMessage(chatId, t(lang, "cd_ans_ok_limit", Object.keys(p.answers).length, warn));
-      await cdFinish(chatId, from, data, lang);
+    data.failCount = 0;
+    data.pending = { segments: seg.segments, answerKey: seg.answerKey, note: seg.note };
+    await setDraft(from.id, "review", data);
+    const rep = cdSegReport(data, seg, lang);
+    let msg = t(lang, "cd_seg_review", rep.body, rep.keyLine);
+    if (seg.segments.some((s) => !s.groups.length)) msg += t(lang, "cd_seg_no_q_warn");
+    await sendMessage(chatId, msg, cdReviewKb(lang, rep.canAdd));
+    return;
+  }
+  if (step === "answers") {
+    const key = CD.parseAnswerKey(text);
+    if (!Object.keys(key).length) {
+      const groups = data.passages.flatMap((p) => p.groups);
+      await sendMessage(chatId, t(lang, "cd_ans_unreadable") + "\n\n" + cdFormatGuide(groups, lang), cdAnswersKb(lang));
+      return;
+    }
+    Object.assign(data.answerKey, key);
+    cdApplyAnswerKey(data);
+    const warn = cdKeyWarnings(data, lang);
+    await sendMessage(chatId, t(lang, "cd_key_added_ok", Object.keys(key).length, warn));
+    const missing = cdMissingNums(data);
+    if (missing.length) {
+      await setDraft(from.id, "answers", data);
+      await sendMessage(chatId, t(lang, "cd_ask_key", compactNums(missing)), cdAnswersKb(lang));
     } else {
-      await setDraft(from.id, "await_more", data);
-      await sendMessage(chatId, t(lang, "cd_ans_ok_more", Object.keys(p.answers).length, warn), cdMoreKb(lang));
+      await cdFinish(chatId, from, data, lang);
     }
   }
 }
@@ -1112,8 +1262,8 @@ async function handleCdDocument(chatId: number, from: any, doc: any, lang: Lang)
   try {
     const bytes = await downloadTgFile(doc.file_id);
     text = await cdExtractText(bytes, doc.file_name || "");
-    // Savollar bosqichida diagramma rasmlarini ajratib olamiz
-    if (d.step === "questions") {
+    // Material bosqichida (intake/review) diagramma rasmlarini ajratib olamiz
+    if (d.step === "intake" || d.step === "review") {
       try { images = await cdExtractImages(bytes, doc.file_name || ""); } catch (_) { images = []; }
     }
   } catch (e) {

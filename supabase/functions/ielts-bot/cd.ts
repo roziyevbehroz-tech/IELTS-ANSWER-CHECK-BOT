@@ -228,6 +228,120 @@ export function splitPassageAndQuestions(text: string): [string, string] {
   return [lines.slice(0, cut).join("\n").trim(), lines.slice(cut).join("\n").trim()];
 }
 
+// ============================ universal ajratkich ============================
+// Bir fayl/matn ichida passage(lar) + savol + javob kaliti aralash kelishi mumkin.
+// Bir necha passage (1text-1savol, 2text-2savol...) bo'lsa ham topib ajratadi.
+
+export interface Segment { passage: Passage; groups: QuestionGroup[]; }
+export interface Segmentation {
+  segments: Segment[];
+  answerKey: Record<number, string>;
+  warnings: string[];
+  note: string;   // ok | no_questions | no_passage | empty
+}
+
+const ANSWER_HEADER =
+  /^\s*(answer\s*keys?|answers?|key\s*answers?|javob(?:lar)?(?:\s*kaliti)?|kalit(?:lar)?)\s*[:.\-]?\s*$/i;
+const PASSAGE_HDR = /^\s*\d{0,3}\s*reading\s+passage\s+\d+\b/i;
+const PASSAGE_HDR_DESPACED = /^\d{0,3}readingpassage\d+$/;
+// Savol-blok markeri (passage.py _QUESTION_MARKERS bilan bir xil)
+const QUESTION_MARKERS_ANY = QUESTION_MARKERS;
+const NUM_LINE_SEG = /^\s*\d{1,3}\s*[.\):]?\s+/;
+
+function isPassageHeader(line: string): boolean {
+  if (PASSAGE_HDR.test(line)) return true;
+  const despaced = line.replace(/[\s.:|·•–—-]+/g, "").toLowerCase();
+  return despaced.length <= 22 && PASSAGE_HDR_DESPACED.test(despaced);
+}
+
+function splitOffAnswerKey(text: string): [string, string] {
+  const lines = text.split("\n");
+  let hdr = -1;
+  for (let i = 0; i < lines.length; i++) if (ANSWER_HEADER.test(lines[i])) hdr = i;
+  if (hdr < 2) return [text, ""];
+  return [lines.slice(0, hdr).join("\n").trim(), lines.slice(hdr + 1).join("\n").trim()];
+}
+
+function findProseBlockStart(seg: string[]): number | null {
+  const n = seg.length;
+  let i = 0;
+  let pendingTitle: number | null = null;
+  while (i < n) {
+    if (!seg[i].trim()) { i++; continue; }
+    if (QUESTION_MARKERS_ANY.test(seg[i])) return null;
+    let j = i;
+    const block: string[] = [];
+    while (j < n && seg[j].trim() && !QUESTION_MARKERS_ANY.test(seg[j])) { block.push(seg[j]); j++; }
+    const text = block.map((x) => x.trim()).join(" ");
+    const numbered = block.filter((x) => NUM_LINE_SEG.test(x.trim())).length;
+    if (text.length > 250 && numbered <= Math.max(1, block.length) * 0.3) {
+      return pendingTitle !== null ? pendingTitle : i;
+    }
+    if (block.length <= 2 && text.length <= 90 && numbered === 0) pendingTitle = i;
+    else pendingTitle = null;
+    i = j + 1;
+  }
+  return null;
+}
+
+function interleavedRegions(lines: string[]): string[] {
+  const qIdx: number[] = [];
+  for (let i = 0; i < lines.length; i++) if (QUESTION_MARKERS_ANY.test(lines[i])) qIdx.push(i);
+  if (qIdx.length < 2) return [];
+  const boundaries = [0];
+  for (let k = 0; k < qIdx.length - 1; k++) {
+    const a = qIdx[k], b = qIdx[k + 1];
+    const rel = findProseBlockStart(lines.slice(a + 1, b));
+    if (rel !== null) boundaries.push(a + 1 + rel);
+  }
+  boundaries.push(lines.length);
+  const regions: string[] = [];
+  for (let k = 0; k < boundaries.length - 1; k++) {
+    const r = lines.slice(boundaries[k], boundaries[k + 1]).join("\n").trim();
+    if (r) regions.push(r);
+  }
+  return regions.length >= 2 ? regions : [];
+}
+
+function passageRegions(body: string): string[] {
+  const lines = body.split("\n");
+  const markerIdx: number[] = [];
+  for (let i = 0; i < lines.length; i++) if (isPassageHeader(lines[i])) markerIdx.push(i);
+  if (markerIdx.length >= 2) {
+    const bounds = markerIdx.concat([lines.length]);
+    const regions: string[] = [];
+    for (let k = 0; k < bounds.length - 1; k++) {
+      const seg = lines.slice(bounds[k], bounds[k + 1]).join("\n").trim();
+      if (seg) regions.push(seg);
+    }
+    if (regions.length >= 2) return regions;
+  }
+  const inter = interleavedRegions(lines);
+  if (inter.length >= 2) return inter;
+  return [body];
+}
+
+export function segmentMaterial(text: string): Segmentation {
+  text = (text || "").trim();
+  if (!text) return { segments: [], answerKey: {}, warnings: [], note: "empty" };
+  const [body, keyText] = splitOffAnswerKey(text);
+  const answerKey = keyText ? parseAnswerKey(keyText) : {};
+  const regions = passageRegions(body);
+  const segments: Segment[] = [];
+  const warnings: string[] = [];
+  for (let idx = 0; idx < Math.min(regions.length, 3); idx++) {
+    const [ptext, qtext] = splitPassageAndQuestions(regions[idx]);
+    const p = parsePassage(ptext || regions[idx], idx + 1);
+    const groups = qtext ? parseQuestions(qtext, p.paragraphs.length).filter((g) => numbersOf(g).length) : [];
+    for (const w of p.warnings) if (!warnings.includes(w)) warnings.push(w);
+    segments.push({ passage: p, groups });
+  }
+  let note = "ok";
+  if (!segments.length || !segments.some((s) => s.passage.paragraphs.length)) note = "no_passage";
+  else if (!segments.some((s) => s.groups.length)) note = "no_questions";
+  return { segments, answerKey, warnings, note };
+}
+
 // Izohli lug'at (footnote): qator boshida */**/*** + izoh — passage muhim qismi
 const GLOSSARY_RE = /^\s*\*{1,3}\s*\S/;
 function extractGlossary(text: string): [string, string[]] {
@@ -484,6 +598,9 @@ function buildGap(qtype: string, start: number | null, end: number | null,
       lines[0].split(/\s+/).length <= 8 && !/^[-•*|]/.test(lines[0].trim())) {
     title = lines[0].trim(); lines = lines.slice(1);
   }
+  // Word-bank (A-I so'zlar ro'yxati) — javoblari harf bo'lgan completion
+  let wordbank: [string, string][] = [];
+  [lines, wordbank] = extractWordBank(lines);
   const body = lines.join("\n").trim();
   const [normalized, numbers] = normalizeGaps(body, start);
   if (start === null && numbers.length) start = Math.min(...numbers);
@@ -492,7 +609,23 @@ function buildGap(qtype: string, start: number | null, end: number | null,
   end = end ?? (numbers.length ? Math.max(...numbers) : start);
   const g = mkGroup({ qtype, start, end, instructions, body: normalized, title });
   g.items = numbers.map((n) => ({ number: n, text: "", options: [] }));
+  if (wordbank.length) { g.options = wordbank; g.optionsTitle = "List of Words"; }
   return g;
+}
+// Completion bloki ichidan so'zlar ro'yxatini (A-I word bank) ajratadi.
+// Qat'iy: A dan ketma-ket ≥4 ta, har biri qisqa (≤6 so'z), gap belgisiz.
+function extractWordBank(lines: string[]): [string[], [string, string][]] {
+  const optLines = lines.filter((ln) => looksLikeOption(ln) && !hasGap(ln));
+  if (!optLines.length) return [lines, []];
+  let opts = splitGluedOptions(optLines.map((l) => l.trim()).join(" "));
+  if (opts.length < 4) opts = collectOptions(optLines);
+  if (opts.length < 4) return [lines, []];
+  const letters = opts.map((o) => o[0]);
+  const expected = opts.map((_, i) => String.fromCharCode(65 + i));
+  if (letters.join("") !== expected.join("")) return [lines, []];
+  if (!opts.every(([, t]) => t && t.split(/\s+/).length <= 6)) return [lines, []];
+  const remaining = lines.filter((ln) => !(looksLikeOption(ln) && !hasGap(ln)));
+  return [remaining, opts];
 }
 function normalizeGaps(body: string, start: number | null): [string, number[]] {
   const numbers: number[] = [];
@@ -855,9 +988,17 @@ function renderGroup(g: QuestionGroup, p: Passage): string {
   if (kind === "gap" && g.qtype === "flowchart") return renderFlowchart(g, prompt);
   if (kind === "gap" && g.qtype === "diagram") return renderDiagram(g, prompt, p);
   if (kind === "gap") {
-    const body = renderGapBody(g);
+    // Word-bank (A-I so'zlar ro'yxati) — gaplar select bilan to'ldiriladi
+    const wordbank = g.options && g.options.length ? g.options : null;
+    const body = renderGapBody(g, wordbank);
     const title = g.title ? `<h4 class="text-center" style="font-weight:bold;margin:12px 0;">${esc(g.title)}</h4>` : "";
-    return `<div class="question" data-q-start="${g.start}" data-q-end="${g.end}">${prompt}<div class="notes-content">${title}${body}</div></div>`;
+    let bank = "";
+    if (wordbank) {
+      const bankTitle = g.optionsTitle ? esc(g.optionsTitle) : "List of Words";
+      const rows = wordbank.map(([l, txt]) => `<li><strong>${esc(l)}</strong>&nbsp;${esc(txt)}</li>`).join("");
+      bank = `<div class="heading-bank"><p><strong>${bankTitle}</strong></p><ul class="opt-list">${rows}</ul></div>`;
+    }
+    return `<div class="question" data-q-start="${g.start}" data-q-end="${g.end}">${prompt}<div class="notes-content">${title}${bank}${body}</div></div>`;
   }
   if (kind === "tfng" || kind === "ynng") return renderStatements(g, prompt);
   if (kind === "mcq") return renderMcq(g, prompt);
@@ -905,10 +1046,16 @@ function renderDiagram(g: QuestionGroup, prompt: string, p: Passage): string {
   return `<div class="question" data-q-start="${g.start}" data-q-end="${g.end}">${prompt}<div class="diagram-block">${title}${imgHtml}${bank}<div class="diagram-rows">${rowsHtml}</div></div></div>`;
 }
 const TOKEN_RE = /\{\{Q(\d+)\}\}/g;
-function injectInputs(s: string): string {
-  return esc(s).replace(TOKEN_RE, (_m, n) => `<input type="text" class="answer-input gap-input" id="q${n}" placeholder="${n}">`);
+function injectInputs(s: string, wordbank?: [string, string][] | null): string {
+  const optsHtml = wordbank
+    ? '<option value="">–</option>' + wordbank.map(([l]) => `<option value="${l}">${l}</option>`).join("")
+    : "";
+  return esc(s).replace(TOKEN_RE, (_m, n) =>
+    wordbank
+      ? `<select class="answer-input gap-input" id="q${n}">${optsHtml}</select>`
+      : `<input type="text" class="answer-input gap-input" id="q${n}" placeholder="${n}">`);
 }
-function renderGapBody(g: QuestionGroup): string {
+function renderGapBody(g: QuestionGroup, wordbank?: [string, string][] | null): string {
   const body = g.body || "";
   if (g.qtype === "table" && body.split("\n").some((ln) => ln.includes("|"))) return renderTable(body);
   const lines = body.split("\n");
@@ -920,8 +1067,8 @@ function renderGapBody(g: QuestionGroup): string {
   for (const raw of lines) {
     const s = raw.trim();
     if (!s) { flush(); continue; }
-    const content = injectInputs(s);
-    if (/^[-•*]/.test(s)) bullets.push(injectInputs(s.replace(/^[-•*\s]+/, "").trim()));
+    const content = injectInputs(s, wordbank);
+    if (/^[-•*]/.test(s)) bullets.push(injectInputs(s.replace(/^[-•*\s]+/, "").trim(), wordbank));
     else if (!TOKEN_RE.test(s) && s.split(/\s+/).length <= 8 && !s.endsWith(":") && s.length < 60 && /^[A-Z]/.test(s)) {
       flush(); out.push(`<h5 style="font-weight:bold;margin-top:12px;">${content}</h5>`);
     } else { flush(); out.push(`<p style="line-height:2.2;">${content}</p>`); }
