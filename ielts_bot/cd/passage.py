@@ -48,6 +48,7 @@ _BOILERPLATE = re.compile(
     r"|.*\bbased\s+on\s+reading\s+passage\b"   # wrap davomi: "...based on Reading Passage 2 below"
     r"|.*\bwhich\s+are\s+based\s+on\b"
     r"|reading\s+passage\s+\d+\s+has\b"        # "...has seven paragraphs A-G"
+    r"|passage\s+\d+\s+on\s+pages?\b"          # wrap davomi: "Passage 3 on pages 10 and 11."
     r"|the\s+reading\s+passage\s+below\b"
     r"|turn\s+over\b"                          # "TURN OVER"
     r"|page\s+\d+\b"
@@ -152,10 +153,13 @@ def strip_boilerplate(text: str) -> Tuple[str, List[str]]:
             continue
         is_real = len(b) > 60 or b.rstrip().endswith((".", "!", "?", '"', "”"))
         is_letter_marker = bool(re.match(r"^[A-M]([.\)]|\s|$)", b))
+        # Savol-sarlavha bloklari ("Questions 27–32", "Choose the correct...")
+        # HECH QACHON o'chirilmaydi — ular kesim (split) uchun langar.
+        is_q_marker = bool(_QUESTION_MARKERS.match(b))
         # Asl kontentdan keyingi qisqa, BIR QATORLI, jumla bo'lmagan, harf-markeri
         # bo'lmagan blok = furnitura (footer/watermark/label) — olib tashlaymiz.
         if (seen_real and not is_real and len(b) < 50
-                and "\n" not in b and not is_letter_marker):
+                and "\n" not in b and not is_letter_marker and not is_q_marker):
             continue
         kept.append(b)
         if is_real:

@@ -699,6 +699,62 @@ def test_segment_single_marker_consecutive_qgroups():
     assert len(s.segments[0].groups[1].options) == 6
 
 
+def test_segment_standalone_question_headers_survive():
+    # "Questions 27–32" YOLG'IZ blok bo'lsa (PDF'da sarlavha va yo'riqnoma
+    # orasida bo'sh qator) — furnitura-filtr uni o'chirmasligi kerak
+    # (Music soothes regressiyasi: 27-35 passage ichida qolib ketardi).
+    from ielts_bot.cd.segment import segment_material
+    text = (
+        "READING PASSAGE 3\n\n"
+        "You should spend about 20 minutes on Questions 27-40, which are based on Reading\n"
+        "Passage 3 on pages 10 and 11.\n\n"
+        "Music soothes and awes – and may help us heal\n\n"
+        + _long_prose(6) + "\n\n" + _long_prose(6) + "\n\n"
+        "Questions 27–29\n\n"
+        "Do the following statements agree with the views of the writer in Reading Passage 3?\n"
+        "27 Dan has been able to communicate through music since he was very young.\n"
+        "28 Armies respond to music that is loud and rhythmic.\n"
+        "29 Researchers have determined why people react so emotionally to music.\n\n"
+        "Questions 33–34\n\n"
+        "Choose the correct letter, A, B, C, or D.\n"
+        "33 According to the article, music stimulates higher brain activity when it\n"
+        "A provokes hunger.\nB requires thought.\nC is soothing.\nD is pleasing.\n"
+        "34 Some stroke patients may regain speech if\n"
+        "A they practise sounds.\nB they reactivate the left side.\n"
+        "C they receive therapy daily.\nD they listen in groups.\n"
+    )
+    s = segment_material(text)
+    assert len(s.segments) == 1
+    p = s.segments[0].passage
+    # sarlavha yeb yuborilmagan ("Passage 3 on pages..." wrap-qatori olib tashlangan)
+    assert p.title == "Music soothes and awes – and may help us heal"
+    kinds = [(g.qtype, g.start, g.end) for g in s.segments[0].groups]
+    assert kinds == [("ynng", 27, 29), ("mcq", 33, 34)], kinds
+
+
+def test_segment_questions_grouped_at_end():
+    # Hamma passage'lar oldin, savollar oxirida jamlangan holat —
+    # raqam-diapazon bo'yicha taqsimlanadi (P1 1-13, P2 14-26, P3 27-40).
+    from ielts_bot.cd.segment import segment_material
+
+    def ptext(n, title):
+        return f"READING PASSAGE {n}\n{title}\n\n" + _long_prose(5)
+
+    def qblock(qs, qe):
+        items = "\n".join(f"{i}  Statement number {i} here." for i in range(qs, qe + 1))
+        return (f"Questions {qs}-{qe}\n"
+                "Do the following statements agree? Write TRUE, FALSE or NOT GIVEN.\n"
+                + items)
+    text = (ptext(1, "Alpha") + "\n\n" + ptext(2, "Beta") + "\n\n" + ptext(3, "Gamma")
+            + "\n\n" + qblock(1, 3) + "\n\n" + qblock(14, 16) + "\n\n" + qblock(27, 29))
+    s = segment_material(text)
+    assert len(s.segments) == 3
+    per = [[(g.qtype, g.start, g.end) for g in seg.groups] for seg in s.segments]
+    assert per[0] == [("tfng", 1, 3)], per
+    assert per[1] == [("tfng", 14, 16)], per
+    assert per[2] == [("tfng", 27, 29)], per
+
+
 def test_segment_no_questions_note():
     from ielts_bot.cd.segment import segment_material
     s = segment_material("Just A Title\n\n" + _long_prose())
