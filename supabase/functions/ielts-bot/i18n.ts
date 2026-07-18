@@ -180,6 +180,7 @@ const uz: Dict = {
   cd_key_mismatch: (body: string) => `\n\n⚠️ *Ba'zi javoblar savol turiga mos kelmadi* — tekshiring:\n${body}`,
   cd_key_extra: (list: string) => `\n⚠️ Bu raqamlar bu passage savollariga kirmaydi: ${list}`,
   cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
+  cd_processing: "⏳ Qabul qilindi — o'qiyapman va tahlil qilyapman…",
   cd_preparing: "⏳ CD test tayyorlanmoqda…",
   cd_caption: (total: number, passages: number, botLink: string) =>
     `✅ *CD Reading test tayyor* — ${total} ta savol, ${passages} ta passage.\n\n` +
@@ -397,6 +398,7 @@ const ru: Dict = {
   cd_key_mismatch: (body: string) => `\n\n⚠️ *Некоторые ответы не соответствуют типу вопроса* — проверьте:\n${body}`,
   cd_key_extra: (list: string) => `\n⚠️ Эти номера не относятся к вопросам этого passage: ${list}`,
   cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
+  cd_processing: "⏳ Получено — читаю и анализирую…",
   cd_preparing: "⏳ CD-тест готовится…",
   cd_caption: (total: number, passages: number, botLink: string) =>
     `✅ *CD Reading-тест готов* — ${total} вопросов, ${passages} passage.\n\n` +
@@ -611,6 +613,7 @@ const en: Dict = {
   cd_key_mismatch: (body: string) => `\n\n⚠️ *Some answers don't match the question type* — please check:\n${body}`,
   cd_key_extra: (list: string) => `\n⚠️ These numbers don't belong to this passage's questions: ${list}`,
   cd_fmt_line: (nums: string, fmt: string) => `• Q${nums} — ${fmt}`,
+  cd_processing: "⏳ Received — reading and analysing…",
   cd_preparing: "⏳ Preparing the CD test…",
   cd_caption: (total: number, passages: number, botLink: string) =>
     `✅ *Your CD Reading test is ready* — ${total} questions, ${passages} passage(s).\n\n` +

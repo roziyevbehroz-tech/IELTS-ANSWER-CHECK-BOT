@@ -87,6 +87,21 @@ function _parseGroupLine(line: string): { nums: number[]; letters: string[] } | 
   return { nums, letters };
 }
 
+// Bir qatordagi ketma-ket "N javob N javob" juftlarini ajratadi (delimiter
+// ixtiyoriy): "27. D 28. A ... 40. NO" -> [[27,"D"],[28,"A"],...,[40,"NO"]].
+// Javob raqamdan boshlanmaydi; keyingi raqamgacha (yoki oxirigacha) davom etadi.
+const _INLINE_PAIRS = /(\d{1,3})\s*[.\)\-:–—]?\s*([^\d\s][^\n]*?)(?=\s+\d{1,3}\s*[.\)\-:–—]?\s|$)/g;
+function _inlinePairs(line: string): [number, string][] {
+  const out: [number, string][] = [];
+  let m: RegExpExecArray | null;
+  _INLINE_PAIRS.lastIndex = 0;
+  while ((m = _INLINE_PAIRS.exec(line)) !== null) {
+    const v = m[2].trim().replace(/[.,;]+$/, "").trim();
+    if (v) out.push([Number(m[1]), v]);
+  }
+  return out;
+}
+
 export function parseAnswerKey(text: string): Record<number, string> {
   const out: Record<number, string> = {};
   const rest: string[] = [];
@@ -97,16 +112,20 @@ export function parseAnswerKey(text: string): Record<number, string> {
     if (g) { for (let i = 0; i < g.nums.length; i++) out[g.nums[i]] = g.letters[i]; continue; }
     rest.push(line);
   }
-  // Qolgan qatorlar: "N. javob" (bitta) yoki bir qatorda ketma-ket "N. javob N. javob"
+  // Har qator: agar 2+ "N. javob" jufti bo'lsa — ketma-ket alohida javoblar
+  // (userlar hammasini bitta qatorda yuborishi mumkin), aks holda yakka "N. javob"
   for (const line of rest) {
+    const pairs = _inlinePairs(line);
+    if (pairs.length >= 2) {
+      for (const [n, v] of pairs) if (!(n in out)) out[n] = v;
+      continue;
+    }
     const m = line.match(_LINE_ONE);
     if (m) { if (!(Number(m[1]) in out)) out[Number(m[1])] = m[2].trim(); continue; }
   }
-  // Umuman qator topilmasa — bitta qatordagi inline "1. a 2. b" ni ham sinaymiz
+  // Umuman topilmasa — butun matn bo'ylab inline
   if (!Object.keys(out).length) {
-    const INLINE = /(\d{1,3})\s*[.\)\-:–—]\s*([^\d][^\n]*?)(?=\s+\d{1,3}\s*[.\)\-:–—]|$)/g;
-    let m: RegExpExecArray | null;
-    while ((m = INLINE.exec(text || "")) !== null) out[Number(m[1])] = m[2].trim();
+    for (const [n, v] of _inlinePairs((text || "").replace(/\n/g, " "))) out[n] = v;
   }
   return out;
 }
@@ -1159,7 +1178,7 @@ function renderMcq(g: QuestionGroup, prompt: string): string {
   const parts = [`<div class="question" data-q-start="${g.start}" data-q-end="${g.end}">`, prompt];
   for (const it of g.items) {
     const opts = it.options.map(([letter, text]) =>
-      `<div class="multi-choice-option"><label><input type="radio" name="q${it.number}" value="${letter}"> <strong>${letter}</strong>&nbsp;${esc(text)}</label></div>`).join("");
+      `<div class="multi-choice-option"><label><input type="radio" name="q${it.number}" value="${letter}"><span class="mc-text"><strong>${letter}</strong>&nbsp;${esc(text)}</span></label></div>`).join("");
     parts.push(`<div class="multi-choice-question" data-qgroup="q${it.number}" data-q-start="${it.number}" data-q-end="${it.number}"><div class="question-prompt"><p><strong>${it.number}</strong>&nbsp;${esc(it.text)}</p></div>${opts}</div>`);
   }
   parts.push("</div>");
@@ -1169,7 +1188,7 @@ function renderMcqMulti(g: QuestionGroup, prompt: string): string {
   const n = g.end - g.start + 1;
   const word = ({ 2: "TWO", 3: "THREE", 4: "FOUR" } as Record<number, string>)[n] || String(n);
   const boxes = g.options.map(([letter, text]) =>
-    `<div class="multi-choice-option"><label><input type="checkbox" name="qm${g.start}" value="${letter}"> <strong>${letter}</strong>&nbsp;${esc(text)}</label></div>`).join("");
+    `<div class="multi-choice-option"><label><input type="checkbox" name="qm${g.start}" value="${letter}"><span class="mc-text"><strong>${letter}</strong>&nbsp;${esc(text)}</span></label></div>`).join("");
   return `<div class="question" data-q-start="${g.start}" data-q-end="${g.end}">${prompt}<p><em>Choose ${word} letters.</em></p><div class="multi-choice-question">${boxes}</div></div>`;
 }
 function renderMatching(g: QuestionGroup, prompt: string, p: Passage): string {

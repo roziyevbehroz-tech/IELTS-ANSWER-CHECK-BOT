@@ -755,6 +755,21 @@ def test_segment_questions_grouped_at_end():
     assert per[2] == [("tfng", 27, 29)], per
 
 
+def test_answer_key_single_line_sequential():
+    # Barcha javoblar BITTA qatorda ketma-ket kelsa ham alohida javob deb tanilsin
+    key = ans_mod.parse_answer_key(
+        "27. D 28. A 29. D 30. B 31. D 32. B 33. E 34. A 35. F 36. H "
+        "37. NO 38. NOT GIVEN 39. YES 40. NO")
+    assert key[27] == "D" and key[28] == "A" and key[36] == "H"
+    assert key[38] == "NOT GIVEN" and key[40] == "NO"
+    assert len(key) == 14
+    # muqobil javob (bitta qator) buzilmasin
+    assert ans_mod.parse_answer_key("24. vegetable / vegetation") == {24: "vegetable / vegetation"}
+    # delimitersiz ham
+    assert ans_mod.parse_answer_key("27 D 28 A 29 NOT GIVEN 30 B") == {
+        27: "D", 28: "A", 29: "NOT GIVEN", 30: "B"}
+
+
 def test_segment_no_questions_note():
     from ielts_bot.cd.segment import segment_material
     s = segment_material("Just A Title\n\n" + _long_prose())

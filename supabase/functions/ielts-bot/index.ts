@@ -320,6 +320,20 @@ async function editMessage(chatId: number, messageId: number, text: string, repl
   }
 }
 
+// Vaqtinchalik "jarayon ketmoqda" xabari — yuboriladi, ish tugagach o'chiriladi
+// (userga jimlik o'rniga darrov javob: qabul qilindi, tahlil qilinyapti).
+async function cdNotice(chatId: number, lang: Lang): Promise<number | null> {
+  try {
+    bg(tg("sendChatAction", { chat_id: chatId, action: "typing" }));
+    const r = await tg("sendMessage", { chat_id: chatId, text: t(lang, "cd_processing") });
+    return r?.result?.message_id ?? null;
+  } catch (_) { return null; }
+}
+async function cdNoticeDone(chatId: number, messageId: number | null): Promise<void> {
+  if (!messageId) return;
+  try { await tg("deleteMessage", { chat_id: chatId, message_id: messageId }); } catch (_) { /* ignore */ }
+}
+
 async function answerCallback(id: string, text?: string, alert = false) {
   const p: Record<string, unknown> = { callback_query_id: id };
   if (text) { p.text = text; p.show_alert = alert; }
@@ -657,7 +671,9 @@ async function handleText(chatId: number, from: any, text: string, lang: Lang) {
   // CD test yaratish oqimi faol bo'lsa — o'sha yerga yo'naltiramiz
   const draft = await getDraft(from.id);
   if (draft && CD_STEPS.has(draft.step)) {
-    await cdHandleInput(chatId, from, draft.step, draft.data, text, [], lang);
+    const notice = await cdNotice(chatId, lang);
+    try { await cdHandleInput(chatId, from, draft.step, draft.data, text, [], lang); }
+    finally { await cdNoticeDone(chatId, notice); }
     return;
   }
 
@@ -1268,6 +1284,8 @@ async function handleCdDocument(chatId: number, from: any, doc: any, lang: Lang)
     return;
   }
   if (doc.file_size && doc.file_size > CD_MAX_FILE) { await sendMessage(chatId, t(lang, "cd_file_too_big")); return; }
+  // Fayl yuklab olinishi + PDF tahlili vaqt oladi — darrov "jarayon" xabari
+  const notice = await cdNotice(chatId, lang);
   let text: string;
   let images: string[] = [];
   try {
@@ -1278,10 +1296,12 @@ async function handleCdDocument(chatId: number, from: any, doc: any, lang: Lang)
       try { images = await cdExtractImages(bytes, doc.file_name || ""); } catch (_) { images = []; }
     }
   } catch (e) {
+    await cdNoticeDone(chatId, notice);
     await sendMessage(chatId, t(lang, "cd_file_unreadable", (e as Error).message));
     return;
   }
-  await cdHandleInput(chatId, from, d.step, d.data, text, images, lang);
+  try { await cdHandleInput(chatId, from, d.step, d.data, text, images, lang); }
+  finally { await cdNoticeDone(chatId, notice); }
 }
 
 // ======================= update'larni qayta ishlash =======================

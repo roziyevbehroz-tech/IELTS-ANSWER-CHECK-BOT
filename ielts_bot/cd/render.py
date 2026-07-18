@@ -355,8 +355,8 @@ def _render_mcq(g: QuestionGroup, prompt: str) -> str:
     for it in g.items:
         opts = "".join(
             f'<div class="multi-choice-option"><label>'
-            f'<input type="radio" name="q{it.number}" value="{letter}"> '
-            f'<strong>{letter}</strong>&nbsp;{html.escape(text)}</label></div>'
+            f'<input type="radio" name="q{it.number}" value="{letter}">'
+            f'<span class="mc-text"><strong>{letter}</strong>&nbsp;{html.escape(text)}</span></label></div>'
             for letter, text in it.options)
         parts.append(
             f'<div class="multi-choice-question" data-qgroup="q{it.number}" '
@@ -372,8 +372,8 @@ def _render_mcq_multi(g: QuestionGroup, prompt: str) -> str:
     hint = f'<p><em>Choose {_num_word(n)} letters.</em></p>'
     boxes = "".join(
         f'<div class="multi-choice-option"><label>'
-        f'<input type="checkbox" name="qm{g.start}" value="{letter}"> '
-        f'<strong>{letter}</strong>&nbsp;{html.escape(text)}</label></div>'
+        f'<input type="checkbox" name="qm{g.start}" value="{letter}">'
+        f'<span class="mc-text"><strong>{letter}</strong>&nbsp;{html.escape(text)}</span></label></div>'
         for letter, text in g.options)
     return (f'<div class="question" data-q-start="{g.start}" data-q-end="{g.end}">'
             f'{prompt}{hint}<div class="multi-choice-question">{boxes}</div></div>')

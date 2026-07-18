@@ -53,6 +53,9 @@
       vocab_locate: "Matndan topish",
       vocab_def_title: "Ma'nosi (izoh)", def_loading: "Yuklanmoqda…",
       def_none: "Izoh topilmadi", vocab_no_def: "—",
+      kw_title: "Kalit so'zlar jadvali", kw_handle: "Kalit so'zlar jadvali — ochish",
+      kw_col_passage: "Similar words in the passage", kw_col_question: "Keywords in questions",
+      kw_copy_title: "Jadvalni nusxalash",
     },
     ru: {
       part_n: function (l) { return "Часть " + l; },
@@ -87,6 +90,9 @@
       vocab_locate: "Найти в тексте",
       vocab_def_title: "Значение", def_loading: "Загрузка…",
       def_none: "Значение не найдено", vocab_no_def: "—",
+      kw_title: "Таблица ключевых слов", kw_handle: "Таблица ключевых слов — открыть",
+      kw_col_passage: "Similar words in the passage", kw_col_question: "Keywords in questions",
+      kw_copy_title: "Копировать таблицу",
     },
     en: {
       part_n: function (l) { return "Part " + l; },
@@ -121,6 +127,9 @@
       vocab_locate: "Find in text",
       vocab_def_title: "Meaning", def_loading: "Loading…",
       def_none: "No definition found", vocab_no_def: "—",
+      kw_title: "Key word table", kw_handle: "Key word table — open",
+      kw_col_passage: "Similar words in the passage", kw_col_question: "Keywords in questions",
+      kw_copy_title: "Copy table",
     },
   };
   var CD_LANGS = ["uz", "ru", "en"];
@@ -178,6 +187,7 @@
     setupEditor();
     setupHighlight();
     setupVocab();
+    setupKeywords();
     setupDarkMode();
     injectPerQuestion();
     // Yakka «tekshirish» tugmalari (event delegation)
@@ -944,6 +954,117 @@
       });
     }
   }
+  // -------------------------- key word table --------------------------
+  // Passage/savol kalit so'zlarini yozib qo'yiladigan 2 ustunli jadval.
+  // Pastdagi ingichka yashil dastakni bosib ochiladi. Har HTML fayl o'z
+  // jadvalini o'zida saqlaydi (vocab kabi per-fayl kalit). Qatorlar
+  // avtomatik raqamlanadi va oxirgi qator to'lsa yangi qator qo'shiladi.
+  var KW_KEY = "cd-kw:" + testSig();
+  function loadKw() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(KW_KEY) || "[]") || [];
+      return raw.map(function (x) { return { p: (x && x.p) || "", q: (x && x.q) || "" }; });
+    } catch (e) { return []; }
+  }
+  function saveKw(arr) { try { localStorage.setItem(KW_KEY, JSON.stringify(arr)); } catch (e) {} }
+  function kwNonEmpty(arr) {
+    return arr.filter(function (r) { return (r.p || "").trim() || (r.q || "").trim(); });
+  }
+  function readKwDom() {
+    var rows = [];
+    document.querySelectorAll("#cd-kw-list .cd-kw-row").forEach(function (r) {
+      rows.push({ p: r.querySelector(".cd-kw-p").value, q: r.querySelector(".cd-kw-q").value });
+    });
+    return rows;
+  }
+  function persistKw() { saveKw(kwNonEmpty(readKwDom())); }
+  function kwRowHtml() {
+    return '<div class="cd-kw-row"><span class="cd-kw-num"></span>' +
+      '<input class="cd-kw-p" type="text" autocomplete="off">' +
+      '<input class="cd-kw-q" type="text" autocomplete="off"></div>';
+  }
+  function renumberKw() {
+    var rows = document.querySelectorAll("#cd-kw-list .cd-kw-row");
+    for (var i = 0; i < rows.length; i++) rows[i].querySelector(".cd-kw-num").textContent = (i + 1);
+  }
+  function ensureTrailingKwRow() {
+    var list = document.getElementById("cd-kw-list");
+    if (!list) return;
+    var rows = list.querySelectorAll(".cd-kw-row");
+    if (!rows.length) { list.insertAdjacentHTML("beforeend", kwRowHtml()); renumberKw(); return; }
+    var last = rows[rows.length - 1];
+    var filled = last.querySelector(".cd-kw-p").value.trim() || last.querySelector(".cd-kw-q").value.trim();
+    if (filled) { list.insertAdjacentHTML("beforeend", kwRowHtml()); renumberKw(); }
+  }
+  function renderKw() {
+    var list = document.getElementById("cd-kw-list");
+    if (!list) return;
+    var data = loadKw();
+    if (!data.length) data = [{ p: "", q: "" }];   // dastlab bitta bo'sh qator
+    list.innerHTML = data.map(kwRowHtml).join("");
+    var rows = list.querySelectorAll(".cd-kw-row");
+    data.forEach(function (d, i) {
+      rows[i].querySelector(".cd-kw-p").value = d.p || "";
+      rows[i].querySelector(".cd-kw-q").value = d.q || "";
+    });
+    renumberKw();
+    ensureTrailingKwRow();
+  }
+  function kwHtmlTable() {
+    var rows = kwNonEmpty(readKwDom()).map(function (r, i) {
+      return "<tr><td>" + (i + 1) + "</td><td>" + esc(r.p) + "</td><td>" + esc(r.q) + "</td></tr>";
+    }).join("");
+    return "<table style=\"border-collapse:collapse\" border=\"1\" cellpadding=\"6\" cellspacing=\"0\">" +
+      "<thead><tr><th>#</th><th>" + esc(T("kw_col_passage")) + "</th><th>" + esc(T("kw_col_question")) + "</th></tr></thead>" +
+      "<tbody>" + rows + "</tbody></table>";
+  }
+  function kwTextTable() {
+    return kwNonEmpty(readKwDom()).map(function (r, i) { return (i + 1) + "\t" + r.p + "\t" + r.q; }).join("\n");
+  }
+  function copyKw(btn) {
+    if (!kwNonEmpty(readKwDom()).length) return;
+    var html = kwHtmlTable(), text = kwTextTable();
+    function done() { if (btn) { btn.classList.add("copied"); setTimeout(function () { btn.classList.remove("copied"); }, 1400); } }
+    try {
+      if (navigator.clipboard && typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        var item = new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" })
+        });
+        navigator.clipboard.write([item]).then(done, function () { legacyCopyHtml(html, text); done(); });
+      } else { legacyCopyHtml(html, text); done(); }
+    } catch (e) { legacyCopyHtml(html, text); done(); }
+    vocabToast(T("vocab_copied"));
+  }
+  function setupKeywords() {
+    var handle = document.getElementById("cd-kw-handle");
+    var panel = document.getElementById("cd-kw-panel");
+    var list = document.getElementById("cd-kw-list");
+    var closeB = document.getElementById("cd-kw-close");
+    var copyB = document.getElementById("cd-kw-copy");
+    if (!handle || !panel || !list) return;
+    renderKw();
+    handle.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (panel.classList.contains("show")) { persistKw(); panel.classList.remove("show"); }
+      else { renderKw(); panel.classList.add("show"); }
+    });
+    if (closeB) closeB.addEventListener("click", function () { persistKw(); panel.classList.remove("show"); });
+    if (copyB) copyB.addEventListener("click", function () { copyKw(copyB); });
+    list.addEventListener("input", function (e) {
+      var t = e.target;
+      if (t && t.classList && (t.classList.contains("cd-kw-p") || t.classList.contains("cd-kw-q"))) {
+        ensureTrailingKwRow();
+        persistKw();
+      }
+    });
+    document.addEventListener("mousedown", function (e) {
+      if (panel.classList.contains("show") && !panel.contains(e.target) && !handle.contains(e.target)) {
+        persistKw(); panel.classList.remove("show");
+      }
+    });
+  }
+
   function unwrapMark(m) {
     var par = m.parentNode;
     while (m.firstChild) par.insertBefore(m.firstChild, m);
@@ -1430,6 +1551,7 @@
         m.replaceWith(document.createTextNode(m.textContent));
       });
       var vp = clone.querySelector("#cd-vocab-panel"); if (vp) vp.classList.remove("show");
+      var kp = clone.querySelector("#cd-kw-panel"); if (kp) kp.classList.remove("show");
       var dc = clone.querySelector("#cd-def-cloud"); if (dc) { dc.classList.remove("show"); dc.classList.add("hidden"); }
       var cls = clone.querySelector("body"); if (cls) cls.classList.remove("cd-editing", "results-mode");
       var html = "<!DOCTYPE html>\n" + clone.outerHTML;

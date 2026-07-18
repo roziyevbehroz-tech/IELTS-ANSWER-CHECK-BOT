@@ -1358,6 +1358,9 @@
             cursor: pointer;
             font-size: 16px;
         }
+        /* Variant matni bitta flex-element: ichida highlight qilinganda
+           so'zlar orasidagi bo'shliqlar yo'qolmaydi. */
+        .multi-choice-option label .mc-text { flex: 1 1 auto; min-width: 0; }
         .multi-choice-option input[type="checkbox"],
         .multi-choice-option input[type="radio"] {
             margin-right: 12px;

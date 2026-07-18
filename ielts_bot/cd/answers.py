@@ -19,6 +19,21 @@ _RANGE_LETTERS = re.compile(
     r"([A-Za-z](?:\s*[,/&]?\s*[A-Za-z])*)\s*$"
 )
 
+# Bir qatordagi ketma-ket "N javob N javob" juftlari (delimiter ixtiyoriy):
+# "27. D 28. A ... 40. NO" -> [(27,"D"),(28,"A"),...,(40,"NO")]
+_INLINE_PAIRS = re.compile(
+    r"(\d{1,3})\s*[.\)\-:–—]?\s*([^\d\s][^\n]*?)(?=\s+\d{1,3}\s*[.\)\-:–—]?\s|$)"
+)
+
+
+def _inline_pairs(line: str) -> List[Tuple[int, str]]:
+    out: List[Tuple[int, str]] = []
+    for m in _INLINE_PAIRS.finditer(line):
+        v = m.group(2).strip().rstrip(".,;").strip()
+        if v:
+            out.append((int(m.group(1)), v))
+    return out
+
 
 def parse_answer_key(text: str) -> Dict[int, str]:
     """Matndan {savol_raqami: javob} lug'atini qaytaradi.
@@ -40,6 +55,13 @@ def parse_answer_key(text: str) -> Dict[int, str]:
                 for i, q in enumerate(range(s, e + 1)):
                     out[q] = letters[i] if i < len(letters) else letters[-1]
                 continue
+        # Bir qatorda 2+ "N. javob" jufti bo'lsa — alohida javoblar (userlar
+        # hammasini bitta qatorda yuborishi mumkin)
+        pairs = _inline_pairs(line)
+        if len(pairs) >= 2:
+            for n, v in pairs:
+                out.setdefault(n, v)
+            continue
         rest.append(raw)
     base = parsing.parse_answers("\n".join(rest))
     for k, v in base.items():
