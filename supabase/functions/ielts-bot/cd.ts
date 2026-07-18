@@ -262,6 +262,14 @@ function splitOffAnswerKey(text: string): [string, string] {
   return [lines.slice(0, hdr).join("\n").trim(), lines.slice(hdr + 1).join("\n").trim()];
 }
 
+// Savol-mazmuni qatorlari (passage prose EMAS): raqamli stem, variant harfi, gap
+const OPT_HDR_SEG = /^[A-Z][.\)]\s+\S/;
+const OPT_BARE_SEG = /^[A-Z]\s+\S/;
+const GAP_LINE_SEG = /(_{2,}|\.{4,}|…|[….‥·•]{2,})/;
+function isQuestionLine(s: string): boolean {
+  return NUM_LINE_SEG.test(s) || OPT_HDR_SEG.test(s) || OPT_BARE_SEG.test(s) || GAP_LINE_SEG.test(s);
+}
+
 function findProseBlockStart(seg: string[]): number | null {
   const n = seg.length;
   let i = 0;
@@ -273,11 +281,13 @@ function findProseBlockStart(seg: string[]): number | null {
     const block: string[] = [];
     while (j < n && seg[j].trim() && !QUESTION_MARKERS_ANY.test(seg[j])) { block.push(seg[j]); j++; }
     const text = block.map((x) => x.trim()).join(" ");
-    const numbered = block.filter((x) => NUM_LINE_SEG.test(x.trim())).length;
-    if (text.length > 250 && numbered <= Math.max(1, block.length) * 0.3) {
+    const structured = block.filter((x) => isQuestionLine(x.trim())).length;
+    const ratio = structured / Math.max(1, block.length);
+    // Uzun VA savol-mazmuni kam bo'lgan blok — haqiqiy passage prose'i
+    if (text.length > 250 && ratio <= 0.25) {
       return pendingTitle !== null ? pendingTitle : i;
     }
-    if (block.length <= 2 && text.length <= 90 && numbered === 0) pendingTitle = i;
+    if (block.length <= 2 && text.length <= 90 && structured === 0) pendingTitle = i;
     else pendingTitle = null;
     i = j + 1;
   }
@@ -316,6 +326,9 @@ function passageRegions(body: string): string[] {
     }
     if (regions.length >= 2) return regions;
   }
+  // Bitta "READING PASSAGE N" marker — bu bitta passage (savollari ketma-ket
+  // 27-32, 33-36... bo'lsa ham). Aralashtirmaymiz.
+  if (markerIdx.length === 1) return [body];
   const inter = interleavedRegions(lines);
   if (inter.length >= 2) return inter;
   return [body];

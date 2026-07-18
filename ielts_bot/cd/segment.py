@@ -97,6 +97,10 @@ def _passage_regions(body: str) -> List[str]:
                 regions.append(seg)
         if len(regions) >= 2:
             return regions
+    # Bitta "READING PASSAGE N" marker bo'lsa — bu bitta passage (savollari
+    # 27-32, 33-36... ketma-ket bo'lsa ham bitta). Aralashtirmaymiz.
+    if len(marker_idx) == 1:
+        return [body]
     # 2) Markersiz aralash: prose <-> savol almashinuvi bo'yicha
     inter = _interleaved_regions(lines)
     if len(inter) >= 2:
@@ -129,6 +133,17 @@ def _interleaved_regions(lines: List[str]) -> List[str]:
     return regions if len(regions) >= 2 else [""]
 
 
+# Savol-mazmuni qatorlari (passage prose EMAS): raqamli stem, variant harfi, gap
+_OPT_HDR = re.compile(r"^[A-Z][.\)]\s+\S")     # "A. matn" / "A) matn"
+_OPT_BARE = re.compile(r"^[A-Z]\s+\S")          # "A matn"
+_GAP_LINE = re.compile(r"(_{2,}|\.{4,}|…|[….‥·•]{2,})")
+
+
+def _is_question_line(s: str) -> bool:
+    return bool(_NUM_LINE.match(s) or _OPT_HDR.match(s) or _OPT_BARE.match(s)
+                or _GAP_LINE.search(s))
+
+
 def _find_prose_block_start(seg: List[str]) -> Optional[int]:
     """savol-blok ichida yangi passage prose'i boshlanadigan joyni topadi."""
     n = len(seg)
@@ -146,12 +161,14 @@ def _find_prose_block_start(seg: List[str]) -> Optional[int]:
             block.append(seg[j])
             j += 1
         text = " ".join(x.strip() for x in block)
-        numbered = sum(1 for x in block if _NUM_LINE.match(x.strip()))
-        # uzun, raqamli qatorlar kam bo'lgan blok — passage prose'i
-        if len(text) > 250 and numbered <= max(1, len(block)) * 0.3:
+        structured = sum(1 for x in block if _is_question_line(x.strip()))
+        ratio = structured / max(1, len(block))
+        # Uzun VA savol-mazmuni kam bo'lgan blok — haqiqiy passage prose'i.
+        # (MCQ stem/variant/summary bloklari — savol, passage emas.)
+        if len(text) > 250 and ratio <= 0.25:
             return pending_title if pending_title is not None else i
-        # qisqa, raqamsiz blok — passage sarlavhasi bo'lishi mumkin
-        if len(block) <= 2 and len(text) <= 90 and numbered == 0:
+        # qisqa, savolsiz blok — passage sarlavhasi bo'lishi mumkin
+        if len(block) <= 2 and len(text) <= 90 and structured == 0:
             pending_title = i
         else:
             pending_title = None
