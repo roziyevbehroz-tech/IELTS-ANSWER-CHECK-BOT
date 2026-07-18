@@ -147,6 +147,10 @@ const uz: Dict = {
     "hammasini birga yuboring.",
   cd_key_added_ok: (count: number, warn: string) =>
     `✅ Javoblar qabul qilindi (${count} ta).${warn}`,
+  cd_ask_q_missing: (n: number) =>
+    `✅ Passage qabul qilindi (${n} ta), lekin *savollar topilmadi*.\n\n` +
+    "📩 Endi shu passage'ning *savollarini* yuboring (matn yoki fayl). " +
+    "Savollar ham materialda bo'lsa — *Materialni qayta yuborish*ni bosib, hammasini birga yuboring.",
   cd_lettered_note: " (A, B, C… belgilangan)",
   cd_no_q: "🤔 Savollarni ajratib bo'lmadi. Iltimos aniq shablondan foydalaning — /qtemplate ni yuboring.",
   cd_passage_empty: "🤔 Matn bo'sh ko'rinadi. Passage matnini qayta yuboring.",
@@ -219,6 +223,7 @@ const uz: Dict = {
   btn_cd_add: "➕ Yana passage qo'shish",
   btn_cd_finish: "✅ CD test yaratish",
   btn_cd_confirm: "✅ Tasdiqlash va davom etish",
+  btn_cd_skip_key: "⏭ Kalitsiz yaratish (javoblarsiz)",
   btn_cd_redo_material: "🔁 Materialni qayta yuborish",
   btn_cd_addmore: "➕ Yana passage qo'shish",
   btn_cd_cancel: "❌ Bekor qilish",
@@ -359,6 +364,10 @@ const ru: Dict = {
     "Или если ответы есть в материале — нажмите *Отправить заново* и пришлите всё вместе.",
   cd_key_added_ok: (count: number, warn: string) =>
     `✅ Ответы приняты (${count} шт.).${warn}`,
+  cd_ask_q_missing: (n: number) =>
+    `✅ Passage принят (${n} шт.), но *вопросы не найдены*.\n\n` +
+    "📩 Теперь отправьте *вопросы* к этому passage (текст или файл). " +
+    "Если вопросы есть в материале — нажмите *Отправить заново* и пришлите всё вместе.",
   cd_lettered_note: " (отмечены A, B, C…)",
   cd_no_q: "🤔 Не удалось выделить вопросы. Пожалуйста, используйте точный шаблон — отправьте /qtemplate.",
   cd_passage_empty: "🤔 Текст выглядит пустым. Отправьте текст passage ещё раз.",
@@ -430,6 +439,7 @@ const ru: Dict = {
   btn_cd_add: "➕ Добавить ещё passage",
   btn_cd_finish: "✅ Создать CD-тест",
   btn_cd_confirm: "✅ Подтвердить и продолжить",
+  btn_cd_skip_key: "⏭ Создать без ключа (без ответов)",
   btn_cd_redo_material: "🔁 Отправить заново",
   btn_cd_addmore: "➕ Добавить ещё passage",
   btn_cd_cancel: "❌ Отмена",
@@ -568,6 +578,10 @@ const en: Dict = {
     "Or if the answers are in the material — tap *Re-send* and send it all together.",
   cd_key_added_ok: (count: number, warn: string) =>
     `✅ Answers accepted (${count}).${warn}`,
+  cd_ask_q_missing: (n: number) =>
+    `✅ Passage received (${n}), but *no questions were found*.\n\n` +
+    "📩 Now send the *questions* for this passage (text or file). " +
+    "If the questions are in your material — tap *Re-send material* and send it all together.",
   cd_lettered_note: " (A, B, C… labelled)",
   cd_no_q: "🤔 Couldn't extract the questions. Please use the exact template — send /qtemplate.",
   cd_passage_empty: "🤔 The text looks empty. Please send the passage text again.",
@@ -639,6 +653,7 @@ const en: Dict = {
   btn_cd_add: "➕ Add another passage",
   btn_cd_finish: "✅ Create CD test",
   btn_cd_confirm: "✅ Confirm & continue",
+  btn_cd_skip_key: "⏭ Create without answer key",
   btn_cd_redo_material: "🔁 Re-send material",
   btn_cd_addmore: "➕ Add another passage",
   btn_cd_cancel: "❌ Cancel",
