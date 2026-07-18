@@ -21,15 +21,19 @@ def main() -> None:
     styles = (TPL / "styles.css").read_text(encoding="utf-8")
     app_js = (TPL / "app.js").read_text(encoding="utf-8")
     base = (TPL / "base.html").read_text(encoding="utf-8")
+    dict_js = (TPL / "dict.js").read_text(encoding="utf-8")
+    dict_data = (TPL / "dict_data.js").read_text(encoding="utf-8")
     logo = ""
     if LOGO.exists():
         b64 = base64.b64encode(LOGO.read_bytes()).decode("ascii")
         logo = f'<img class="brand-logo" src="data:image/jpeg;base64,{b64}" alt="logo">'
     OUT.write_text(
         "// AVTOMATIK generatsiya (scripts/build_cd_template.py). Tahrirlamang.\n"
-        "// Manba: ielts_bot/cd/templates/{styles.css, app.js, base.html}\n"
+        "// Manba: ielts_bot/cd/templates/{styles.css, app.js, base.html, dict.js, dict_data.js}\n"
         "export const STYLES = " + json.dumps(styles, ensure_ascii=False) + ";\n"
         "export const APP_JS = " + json.dumps(app_js, ensure_ascii=False) + ";\n"
+        "export const DICT_JS = " + json.dumps(dict_js, ensure_ascii=False) + ";\n"
+        "export const DICT_DATA = " + json.dumps(dict_data, ensure_ascii=False) + ";\n"
         "export const LOGO_HTML = " + json.dumps(logo, ensure_ascii=False) + ";\n"
         "export const BASE_HTML = " + json.dumps(base, ensure_ascii=False) + ";\n",
         encoding="utf-8",

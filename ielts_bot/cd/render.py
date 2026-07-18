@@ -35,6 +35,8 @@ def render_test(test: ReadingTest) -> str:
     tpl = (_TPL_DIR / "base.html").read_text(encoding="utf-8")
     styles = (_TPL_DIR / "styles.css").read_text(encoding="utf-8")
     app_js = (_TPL_DIR / "app.js").read_text(encoding="utf-8")
+    dict_js = (_TPL_DIR / "dict.js").read_text(encoding="utf-8")
+    dict_data = (_TPL_DIR / "dict_data.js").read_text(encoding="utf-8")
 
     passages_html = []
     part_headers = []
@@ -72,6 +74,8 @@ def render_test(test: ReadingTest) -> str:
         "{{QUESTION_SETS}}": "\n".join(question_sets),
         "{{DATA_JSON}}": json.dumps(data, ensure_ascii=False),
         "{{STYLES}}": styles,
+        "{{DICT_DATA}}": _safe_js(dict_data),
+        "{{DICT_JS}}": _safe_js(dict_js),
         "{{APP_JS}}": _safe_js(app_js),
     }
     for k, v in replacements.items():

@@ -47,7 +47,9 @@
       vocab_added: "✅ Lug'atga qo'shildi", vocab_exists: "Bu so'z allaqachon bor",
       vocab_del_title: "O'chirish", vocab_copy_title: "Barchasini nusxalash",
       vocab_copied: "✅ Nusxalandi", vocab_tr_ph: "tarjima…",
-      vocab_col_word: "So'z", vocab_col_tr: "Tarjima",
+      vocab_col_word: "So'z", vocab_col_tr: "Tarjima", vocab_col_def: "Izoh",
+      vocab_def_title: "Ma'nosi (izoh)", def_loading: "Yuklanmoqda…",
+      def_none: "Izoh topilmadi", vocab_no_def: "—",
     },
     ru: {
       part_n: function (l) { return "Часть " + l; },
@@ -76,7 +78,9 @@
       vocab_added: "✅ Добавлено в словарь", vocab_exists: "Это слово уже есть",
       vocab_del_title: "Удалить", vocab_copy_title: "Копировать всё",
       vocab_copied: "✅ Скопировано", vocab_tr_ph: "перевод…",
-      vocab_col_word: "Слово", vocab_col_tr: "Перевод",
+      vocab_col_word: "Слово", vocab_col_tr: "Перевод", vocab_col_def: "Значение",
+      vocab_def_title: "Значение", def_loading: "Загрузка…",
+      def_none: "Значение не найдено", vocab_no_def: "—",
     },
     en: {
       part_n: function (l) { return "Part " + l; },
@@ -105,7 +109,9 @@
       vocab_added: "✅ Added to vocabulary", vocab_exists: "Already in your vocabulary",
       vocab_del_title: "Delete", vocab_copy_title: "Copy all",
       vocab_copied: "✅ Copied", vocab_tr_ph: "translation…",
-      vocab_col_word: "Word", vocab_col_tr: "Translation",
+      vocab_col_word: "Word", vocab_col_tr: "Translation", vocab_col_def: "Definition",
+      vocab_def_title: "Meaning", def_loading: "Loading…",
+      def_none: "No definition found", vocab_no_def: "—",
     },
   };
   var CD_LANGS = ["uz", "ru", "en"];
@@ -447,8 +453,9 @@
     var pop = document.getElementById("hl-popup");
     var markBtn = document.getElementById("hl-mark");
     var addBtn = document.getElementById("hl-add");
+    var defBtn = document.getElementById("hl-def");
     if (!root || !pop) return;
-    var lastText = "";
+    var lastText = "", lastRect = null;
     // Mavjud highlight ustiga bosib olib tashlash
     root.addEventListener("click", function (e) {
       var m = e.target.closest ? e.target.closest(".cd-hl") : null;
@@ -458,35 +465,86 @@
       if (document.body.classList.contains("cd-editing")) return;
       setTimeout(function () {
         var sel = window.getSelection();
-        if (!sel || sel.isCollapsed || !sel.toString().trim()) { pop.classList.add("hidden"); return; }
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) { hideHL(); return; }
         var range = sel.getRangeAt(0);
-        if (!root.contains(range.commonAncestorContainer)) { pop.classList.add("hidden"); return; }
+        if (!root.contains(range.commonAncestorContainer)) { hideHL(); return; }
         lastText = sel.toString().trim();
+        lastRect = range.getBoundingClientRect();
+        hideDefCloud();   // yangi tanlov — eski bulutni yopamiz
         // Tanlov highlight ustida bo'lsa — tugma "olib tashlash" rejimida
         if (markBtn) markBtn.textContent = marksInRange(range).length ? T("hl_remove") : T("hl_add");
-        var rect = range.getBoundingClientRect();
+        // Panelni so'z OSTIGA joylashtiramiz (bulut ustidan chiqadi)
         pop.classList.remove("hidden");
-        var w = pop.offsetWidth || 120;
-        pop.style.top = (window.scrollY + rect.top - 46) + "px";
-        pop.style.left = (window.scrollX + rect.left + rect.width / 2 - w / 2) + "px";
+        var w = pop.offsetWidth || 140;
+        pop.style.top = (window.scrollY + lastRect.bottom + 8) + "px";
+        pop.style.left = (window.scrollX + lastRect.left + lastRect.width / 2 - w / 2) + "px";
       }, 10);
     });
     pop.addEventListener("mousedown", function (e) { e.preventDefault(); });
     if (markBtn) markBtn.addEventListener("click", function () {
       highlightSelection();
-      pop.classList.add("hidden");
+      hideHL();
+    });
+    if (defBtn) defBtn.addEventListener("click", function () {
+      if (lastText && lastRect) showDefCloud(lastRect, lastText);
     });
     if (addBtn) addBtn.addEventListener("click", function () {
       var r = addBtn.getBoundingClientRect();
       var fromX = r.left + r.width / 2, fromY = r.top + r.height / 2;
-      var added = lastText ? addVocabWord(lastText) : false;
-      pop.classList.add("hidden");
+      var text = lastText;
+      pop.classList.add("hidden"); hideDefCloud();
       var sel = window.getSelection(); if (sel) sel.removeAllRanges();
-      if (added) flyToVocab(fromX, fromY);
+      if (text) addVocabWord(text).then(function (added) { if (added) flyToVocab(fromX, fromY); });
     });
     document.addEventListener("mousedown", function (e) {
-      if (!pop.contains(e.target)) pop.classList.add("hidden");
+      var cloud = document.getElementById("cd-def-cloud");
+      if (!pop.contains(e.target) && !(cloud && cloud.contains(e.target))) hideHL();
     });
+  }
+  function hideHL() {
+    var pop = document.getElementById("hl-popup");
+    if (pop) pop.classList.add("hidden");
+    hideDefCloud();
+  }
+  function hideDefCloud() {
+    var cloud = document.getElementById("cd-def-cloud");
+    if (cloud) { cloud.classList.remove("show"); cloud.classList.add("hidden"); }
+  }
+  // Ma'no buluti — so'z USTIDAN chiqadi (barcha ma'nolar, scroll bilan)
+  function showDefCloud(rect, word) {
+    var cloud = document.getElementById("cd-def-cloud");
+    if (!cloud) return;
+    var wordEl = cloud.querySelector(".cd-def-word");
+    var listEl = cloud.querySelector(".cd-def-list");
+    wordEl.textContent = word;
+    listEl.innerHTML = '<div class="cd-def-msg">' + esc(T("def_loading")) + '</div>';
+    cloud.classList.remove("hidden");
+    function place() {
+      var w = cloud.offsetWidth || 330, h = cloud.offsetHeight || 120;
+      var vw = document.documentElement.clientWidth;
+      var left = rect.left + rect.width / 2 - w / 2;
+      left = Math.max(6, Math.min(left, vw - w - 6));
+      cloud.style.left = (window.scrollX + left) + "px";
+      cloud.style.top = (window.scrollY + rect.top - h - 12) + "px";
+    }
+    place();
+    requestAnimationFrame(function () { cloud.classList.add("show"); place(); });
+    if (window.CDDict && window.CDDict.lookup) {
+      window.CDDict.lookup(word).then(function (res) {
+        listEl.innerHTML = defListHtml(res);
+        place();
+      }).catch(function () { listEl.innerHTML = '<div class="cd-def-msg">' + esc(T("def_none")) + '</div>'; place(); });
+    } else {
+      listEl.innerHTML = '<div class="cd-def-msg">' + esc(T("def_none")) + '</div>';
+    }
+  }
+  function defListHtml(res) {
+    if (!res || !res.defs || !res.defs.length) return '<div class="cd-def-msg">' + esc(T("def_none")) + '</div>';
+    return res.defs.map(function (d) {
+      return '<div class="cd-def-item">' +
+        (d[0] ? '<span class="cd-def-pos">' + esc(d[0]) + '</span>' : '') +
+        '<span class="cd-def-text">' + esc(d[1]) + '</span></div>';
+    }).join("");
   }
 
   // ---------------------------- vocabulary ----------------------------
@@ -498,21 +556,33 @@
     try {
       var raw = JSON.parse(localStorage.getItem(VOCAB_KEY) || "[]") || [];
       return raw.map(function (x) {
-        return typeof x === "string" ? { w: x, t: "" } : { w: (x && x.w) || "", t: (x && x.t) || "" };
+        if (typeof x === "string") return { w: x, d: [], t: "" };
+        return { w: (x && x.w) || "", d: (x && x.d) || [], t: (x && x.t) || "" };
       }).filter(function (x) { return x.w; });
     } catch (e) { return []; }
   }
   function saveVocab(arr) { try { localStorage.setItem(VOCAB_KEY, JSON.stringify(arr)); } catch (e) {} }
+  function hasWord(v, w) { var l = w.toLowerCase(); return v.some(function (x) { return x.w.toLowerCase() === l; }); }
+  // Async: so'z qo'shishdan oldin offline lug'atdan izohni topib saqlaydi
   function addVocabWord(text) {
     var w = (text || "").replace(/\s+/g, " ").trim();
-    if (!w) return false;
+    if (!w) return Promise.resolve(false);
     if (w.length > 90) w = w.slice(0, 90);
-    var v = loadVocab();
-    if (v.some(function (x) { return x.w.toLowerCase() === w.toLowerCase(); })) { vocabToast(T("vocab_exists")); return false; }
-    v.push({ w: w, t: "" }); saveVocab(v);
-    updateVocabBadge(); renderVocab();
-    vocabToast(T("vocab_added"));
-    return true;
+    if (hasWord(loadVocab(), w)) { vocabToast(T("vocab_exists")); return Promise.resolve(false); }
+    function finish(defs) {
+      var v = loadVocab();
+      if (hasWord(v, w)) return false;
+      v.push({ w: w, d: defs || [], t: "" }); saveVocab(v);
+      updateVocabBadge(); renderVocab();
+      vocabToast(T("vocab_added"));
+      return true;
+    }
+    if (window.CDDict && window.CDDict.lookup) {
+      return window.CDDict.lookup(w).then(function (res) {
+        return finish(res && res.defs ? res.defs : []);
+      }).catch(function () { return finish([]); });
+    }
+    return Promise.resolve(finish([]));
   }
   function removeVocabWord(w) {
     saveVocab(loadVocab().filter(function (x) { return x.w !== w; }));
@@ -543,11 +613,20 @@
       item.className = "cd-vocab-item";
       item.innerHTML =
         '<span class="cd-vocab-word"></span>' +
+        '<div class="cd-vocab-def"></div>' +
         '<input class="cd-vocab-tr" type="text" autocomplete="off" placeholder="' + esc(T("vocab_tr_ph")) + '">' +
         '<button class="cd-vocab-del" title="' + esc(T("vocab_del_title")) + '" aria-label="delete">🗑</button>' +
         '<span class="cd-vocab-cf"><button class="cd-vocab-yes" aria-label="confirm">✓</button>' +
         '<button class="cd-vocab-no" aria-label="cancel">✕</button></span>';
       item.querySelector(".cd-vocab-word").textContent = entry.w;
+      var defEl = item.querySelector(".cd-vocab-def");
+      if (entry.d && entry.d.length) {
+        defEl.innerHTML = entry.d.map(function (d) {
+          return '<div class="vd">' + (d[0] ? '<span class="vp">' + esc(d[0]) + '</span>' : '') + esc(d[1]) + '</div>';
+        }).join("");
+      } else {
+        defEl.innerHTML = '<span class="vd-empty">' + esc(T("vocab_no_def")) + '</span>';
+      }
       var tr = item.querySelector(".cd-vocab-tr");
       tr.value = entry.t || "";
       item._word = entry.w;
@@ -1135,6 +1214,7 @@
       });
       clone.querySelectorAll("[contenteditable]").forEach(function (e) { e.removeAttribute("contenteditable"); });
       var vp = clone.querySelector("#cd-vocab-panel"); if (vp) vp.classList.remove("show");
+      var dc = clone.querySelector("#cd-def-cloud"); if (dc) { dc.classList.remove("show"); dc.classList.add("hidden"); }
       var cls = clone.querySelector("body"); if (cls) cls.classList.remove("cd-editing", "results-mode");
       var html = "<!DOCTYPE html>\n" + clone.outerHTML;
       try {

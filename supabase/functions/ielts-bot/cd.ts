@@ -2,7 +2,7 @@
 // Manba (aynan mantiq): ielts_bot/cd/{passage,questions,render}.py
 // AI'siz: matn/DOCX'dan passage + savollar + javoblardan mustaqil CD HTML.
 
-import { STYLES, APP_JS, LOGO_HTML, BASE_HTML } from "./cd_template.ts";
+import { STYLES, APP_JS, DICT_JS, DICT_DATA, LOGO_HTML, BASE_HTML } from "./cd_template.ts";
 
 // ============================ modellar ============================
 
@@ -801,6 +801,8 @@ export function renderTest(test: ReadingTest): string {
     "{{PART_TABS}}": partTabs.join("\n"), "{{PART_HEADERS}}": partHeaders.join("\n"),
     "{{PASSAGES}}": passagesHtml.join("\n"), "{{QUESTION_SETS}}": questionSets.join("\n"),
     "{{DATA_JSON}}": JSON.stringify(data), "{{STYLES}}": STYLES,
+    "{{DICT_DATA}}": DICT_DATA.replace(/<\/script/g, "<\\/script"),
+    "{{DICT_JS}}": DICT_JS.replace(/<\/script/g, "<\\/script"),
     "{{APP_JS}}": APP_JS.replace(/<\/script/g, "<\\/script"),
   };
   let out = BASE_HTML;
