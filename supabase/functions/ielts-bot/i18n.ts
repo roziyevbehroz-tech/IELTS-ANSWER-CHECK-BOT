@@ -147,6 +147,9 @@ const uz: Dict = {
     "hammasini birga yuboring.",
   cd_key_added_ok: (count: number, warn: string) =>
     `✅ Javoblar qabul qilindi (${count} ta).${warn}`,
+  cd_ready_more: (passages: number, total: number) =>
+    `✅ *Bu passage tayyor!* Hozircha: ${passages} passage, ${total} savol.\n\n` +
+    "Yana passage qo'shasizmi (matn+savol+kalit), yoki CD testni hoziroq yarataymi?",
   cd_ask_q_missing: (n: number) =>
     `✅ Passage qabul qilindi (${n} ta), lekin *savollar topilmadi*.\n\n` +
     "📩 Endi shu passage'ning *savollarini* yuboring (matn yoki fayl). " +
@@ -365,6 +368,9 @@ const ru: Dict = {
     "Или если ответы есть в материале — нажмите *Отправить заново* и пришлите всё вместе.",
   cd_key_added_ok: (count: number, warn: string) =>
     `✅ Ответы приняты (${count} шт.).${warn}`,
+  cd_ready_more: (passages: number, total: number) =>
+    `✅ *Этот passage готов!* Пока: ${passages} passage, ${total} вопросов.\n\n` +
+    "Добавить ещё passage (текст+вопросы+ключ) или создать CD-тест сейчас?",
   cd_ask_q_missing: (n: number) =>
     `✅ Passage принят (${n} шт.), но *вопросы не найдены*.\n\n` +
     "📩 Теперь отправьте *вопросы* к этому passage (текст или файл). " +
@@ -580,6 +586,9 @@ const en: Dict = {
     "Or if the answers are in the material — tap *Re-send* and send it all together.",
   cd_key_added_ok: (count: number, warn: string) =>
     `✅ Answers accepted (${count}).${warn}`,
+  cd_ready_more: (passages: number, total: number) =>
+    `✅ *This passage is ready!* So far: ${passages} passage(s), ${total} questions.\n\n` +
+    "Add another passage (text+questions+key), or create the CD test now?",
   cd_ask_q_missing: (n: number) =>
     `✅ Passage received (${n}), but *no questions were found*.\n\n` +
     "📩 Now send the *questions* for this passage (text or file). " +
