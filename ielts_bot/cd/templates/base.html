@@ -137,26 +137,76 @@
         .cd-vocab-empty { padding:22px 16px; text-align:center; color:#9ca3af; font-size:13.5px; line-height:1.5; }
         .cd-vocab-cols { display:flex; gap:8px; padding:6px 12px 2px; font-size:11.5px; font-weight:700;
             color:#9ca3af; text-transform:uppercase; letter-spacing:.4px; }
-        .cd-vocab-cols .c-w { flex:0 0 24%; }
-        .cd-vocab-cols .c-d { flex:0 0 38%; }
-        .cd-vocab-cols .c-t { flex:1; }
+        .cd-vocab-cols .c-w { flex:0 0 26%; }
+        .cd-vocab-cols .c-d { flex:1; }
         .cd-vocab-list { overflow-y:auto; padding:4px 6px 8px; }
-        .cd-vocab-item { display:flex; align-items:flex-start; gap:8px; padding:7px 8px; border-radius:9px;
+        .cd-vocab-item { padding:7px 8px; border-radius:9px;
             transition:background .12s, max-height .2s ease, opacity .2s ease, padding .2s ease;
-            max-height:110px; overflow:hidden; }
+            max-height:220px; overflow:hidden; }
         .cd-vocab-item:hover { background:#f8fafc; }
         .cd-vocab-item.removing { max-height:0; opacity:0; padding-top:0; padding-bottom:0; }
-        .cd-vocab-word { flex:0 0 24%; font-size:14px; font-weight:700; color:#111827; word-break:break-word; padding-top:3px; }
-        .cd-vocab-def { flex:0 0 38%; max-height:84px; overflow-y:auto; font-size:12.5px; line-height:1.45;
+        .cd-vocab-main { display:flex; align-items:flex-start; gap:8px; }
+        .cd-vocab-word { flex:0 0 26%; font-size:14px; font-weight:700; color:#111827;
+            word-break:break-word; padding-top:3px; cursor:pointer; }
+        .cd-vocab-word:hover { color:#16a34a; text-decoration:underline; text-decoration-color:#16a34a; }
+        .cd-vocab-def { flex:1; max-height:84px; overflow-y:auto; font-size:12.5px; line-height:1.45;
             color:#4b5563; padding-right:4px; }
         .cd-vocab-def .vd { padding:1px 0; }
         .cd-vocab-def .vp { color:#1aa0f0; font-weight:700; font-size:10.5px; margin-right:4px; text-transform:uppercase; }
         .cd-vocab-def .vd-empty { color:#c4c9d2; font-style:italic; }
-        .cd-vocab-tr { flex:1 1 auto; min-width:0; border:1px solid #e5e7eb; border-radius:7px;
-            padding:6px 8px; font-size:13.5px; color:#111827; background:#fff; }
-        .cd-vocab-tr:focus { outline:none; border-color:#16a34a; }
+        .cd-vocab-acts { flex:0 0 auto; display:inline-flex; align-items:center; gap:4px; padding-top:1px; }
+        .cd-vocab-note-btn { width:26px; height:26px; border:none; border-radius:8px; cursor:pointer;
+            font-size:17px; line-height:1; color:#16a34a; background:#e7f6ee; display:inline-flex;
+            align-items:center; justify-content:center; transition:background .12s, transform .1s; }
+        .cd-vocab-note-btn:hover { background:#d3efe0; }
+        .cd-vocab-note-btn:active { transform:scale(.9); }
+        .cd-vocab-item.has-note .cd-vocab-note-btn { background:#16a34a; color:#fff; }
+        .cd-vocab-item.noting .cd-vocab-note-btn { background:#16a34a; color:#fff; }
+        /* saqlangan izoh (yig'ilgan holatda ko'rinadi) */
+        .cd-vocab-note-show { display:none; margin:5px 0 0 calc(26% + 8px); padding:5px 9px;
+            background:#eef7f1; border-left:3px solid #16a34a; border-radius:6px;
+            font-size:12.5px; color:#166534; cursor:pointer; word-break:break-word; }
+        .cd-vocab-item.has-note:not(.noting) .cd-vocab-note-show { display:block; }
+        /* izoh tahrirlash qatori (＋ bosilganda ochiladi) */
+        .cd-vocab-note { display:none; margin:6px 0 0 calc(26% + 8px); gap:6px; align-items:center; }
+        .cd-vocab-item.noting .cd-vocab-note { display:flex; }
+        .cd-vocab-note-input { flex:1 1 auto; min-width:0; border:1px solid #cfe9d9; border-radius:7px;
+            padding:6px 9px; font-size:13.5px; color:#111827; background:#fff; }
+        .cd-vocab-note-input:focus { outline:none; border-color:#16a34a; }
+        .cd-vocab-note-save, .cd-vocab-note-cancel { flex:0 0 auto; width:28px; height:28px; border:none;
+            border-radius:8px; cursor:pointer; font-size:14px; display:inline-flex; align-items:center; justify-content:center; }
+        .cd-vocab-note-save { background:#16a34a; color:#fff; }
+        .cd-vocab-note-save:hover { background:#12813c; }
+        .cd-vocab-note-cancel { background:#e5e7eb; color:#374151; }
+        .cd-vocab-note-cancel:hover { background:#d1d5db; }
         body.cd-dark .cd-vocab-def { color:#b8bcc4; }
         body.cd-dark .cd-vocab-def .vp { color:#7ec8f5; }
+        body.cd-dark .cd-vocab-note-btn { background:#123524; color:#7ee2a8; }
+        body.cd-dark .cd-vocab-item.has-note .cd-vocab-note-btn,
+        body.cd-dark .cd-vocab-item.noting .cd-vocab-note-btn { background:#1aa260; color:#08130c; }
+        body.cd-dark .cd-vocab-note-show { background:#122a1c; border-left-color:#1aa260; color:#9de9bd; }
+        body.cd-dark .cd-vocab-note-input { background:#1c1c22; color:#f0f0f0; border-color:#2a4b39; }
+        body.cd-dark .cd-vocab-note-input:focus { border-color:#1aa260; }
+        body.cd-dark .cd-vocab-note-cancel { background:#33333a; color:#d8d8d8; }
+        /* passageda vocab so'zi ostidagi ingichka yashil chiziq + porlash */
+        .cd-vw { border-bottom:2px solid rgba(22,163,74,.55); border-radius:1px;
+            transition:background .2s ease, border-color .2s ease; }
+        .cd-vw.pulse { animation:cdVwPulse 1.25s ease; }
+        @keyframes cdVwPulse {
+            0% { background:transparent; border-bottom-color:rgba(22,163,74,.55); }
+            25% { background:rgba(22,163,74,.28); border-bottom-color:#16a34a; transform:scale(1.06); }
+            60% { background:rgba(22,163,74,.14); }
+            100% { background:transparent; border-bottom-color:rgba(22,163,74,.55); transform:scale(1); }
+        }
+        .cd-vw.pulse { display:inline-block; transform-origin:center bottom; }
+        body.cd-dark .cd-vw { border-bottom-color:rgba(94,226,168,.5); }
+        body.cd-dark .cd-vw.pulse { animation:cdVwPulseDark 1.25s ease; }
+        @keyframes cdVwPulseDark {
+            0% { background:transparent; }
+            25% { background:rgba(94,226,168,.30); border-bottom-color:#5ee2a8; transform:scale(1.06); }
+            60% { background:rgba(94,226,168,.15); }
+            100% { background:transparent; transform:scale(1); }
+        }
         /* Uchib boradigan nuqta + list ikonka "bump" */
         .cd-fly-dot { position:fixed; width:12px; height:12px; border-radius:50%; background:#16a34a;
             box-shadow:0 0 10px rgba(22,163,74,.7); z-index:500; pointer-events:none;
@@ -188,8 +238,6 @@
         body.cd-dark .cd-vocab-del:hover { background:#3a1f2a; }
         body.cd-dark .cd-vocab-item.confirming { background:#2a1720; }
         body.cd-dark .cd-vocab-no { background:#33333a; color:#d8d8d8; }
-        body.cd-dark .cd-vocab-tr { background:#1c1c22; color:#f0f0f0; border-color:#3a3a42; }
-        body.cd-dark .cd-vocab-tr:focus { border-color:#1aa260; }
         body.cd-dark .cd-vocab-copy { color:#9aa0a6; }
         body.cd-dark .cd-vocab-copy:hover { background:#26262d; color:#7ee2a8; }
         body.cd-dark .cd-vocab-copy.copied { color:#7ee2a8; background:#123524; }
@@ -416,7 +464,6 @@
         <div id="cd-vocab-cols" class="cd-vocab-cols hidden">
             <span class="c-w" data-i18n="vocab_col_word">So'z</span>
             <span class="c-d" data-i18n="vocab_col_def">Izoh</span>
-            <span class="c-t" data-i18n="vocab_col_tr">Tarjima</span>
         </div>
         <div id="cd-vocab-list" class="cd-vocab-list"></div>
     </div>

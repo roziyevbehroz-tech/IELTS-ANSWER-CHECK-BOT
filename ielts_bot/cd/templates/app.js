@@ -46,8 +46,11 @@
       vocab_empty: "Hozircha so'z yo'q. Matndan so'z belgilab ＋ ni bosing.",
       vocab_added: "✅ Lug'atga qo'shildi", vocab_exists: "Bu so'z allaqachon bor",
       vocab_del_title: "O'chirish", vocab_copy_title: "Barchasini nusxalash",
-      vocab_copied: "✅ Nusxalandi", vocab_tr_ph: "tarjima…",
+      vocab_copied: "✅ Nusxalandi", vocab_tr_ph: "tarjima / izoh / example…",
       vocab_col_word: "So'z", vocab_col_tr: "Tarjima", vocab_col_def: "Izoh",
+      vocab_col_note: "Izoh/tarjima", vocab_note_add: "Izoh yoki tarjima qo'shish",
+      vocab_note_save: "Saqlash", vocab_note_del: "Izohni o'chirish",
+      vocab_locate: "Matndan topish",
       vocab_def_title: "Ma'nosi (izoh)", def_loading: "Yuklanmoqda…",
       def_none: "Izoh topilmadi", vocab_no_def: "—",
     },
@@ -77,8 +80,11 @@
       vocab_empty: "Пока нет слов. Выделите слово в тексте и нажмите ＋.",
       vocab_added: "✅ Добавлено в словарь", vocab_exists: "Это слово уже есть",
       vocab_del_title: "Удалить", vocab_copy_title: "Копировать всё",
-      vocab_copied: "✅ Скопировано", vocab_tr_ph: "перевод…",
+      vocab_copied: "✅ Скопировано", vocab_tr_ph: "перевод / заметка / пример…",
       vocab_col_word: "Слово", vocab_col_tr: "Перевод", vocab_col_def: "Значение",
+      vocab_col_note: "Заметка/перевод", vocab_note_add: "Добавить заметку или перевод",
+      vocab_note_save: "Сохранить", vocab_note_del: "Удалить заметку",
+      vocab_locate: "Найти в тексте",
       vocab_def_title: "Значение", def_loading: "Загрузка…",
       def_none: "Значение не найдено", vocab_no_def: "—",
     },
@@ -108,8 +114,11 @@
       vocab_empty: "No words yet. Select a word in the text and tap ＋.",
       vocab_added: "✅ Added to vocabulary", vocab_exists: "Already in your vocabulary",
       vocab_del_title: "Delete", vocab_copy_title: "Copy all",
-      vocab_copied: "✅ Copied", vocab_tr_ph: "translation…",
+      vocab_copied: "✅ Copied", vocab_tr_ph: "translation / note / example…",
       vocab_col_word: "Word", vocab_col_tr: "Translation", vocab_col_def: "Definition",
+      vocab_col_note: "Note/translation", vocab_note_add: "Add a note or translation",
+      vocab_note_save: "Save", vocab_note_del: "Delete note",
+      vocab_locate: "Find in text",
       vocab_def_title: "Meaning", def_loading: "Loading…",
       def_none: "No definition found", vocab_no_def: "—",
     },
@@ -551,7 +560,19 @@
   // Matndan belgilangan so'zlarni saqlash (localStorage). Pop-up jadval;
   // har so'zni tasdiq bilan o'chirish mumkin.
   // Har yozuv: { w: so'z, t: tarjima }. Eski (faqat so'z, string) format ham o'qiladi.
-  var VOCAB_KEY = "cd-vocab";
+  // Har HTML fayl o'z lug'atini o'zida saqlaydi: kalit test mazmunidan
+  // (sarlavha + savol soni + part diapazonlari) hosil qilinadi — boshqa
+  // fayllar bilan aralashmaydi.
+  function testSig() {
+    try {
+      var s = (document.title || "") + "|" + Object.keys(D.answers || {}).length +
+        "|" + JSON.stringify(D.parts || []);
+      var h = 5381;
+      for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+      return h.toString(36);
+    } catch (e) { return "x"; }
+  }
+  var VOCAB_KEY = "cd-vocab:" + testSig();
   function loadVocab() {
     try {
       var raw = JSON.parse(localStorage.getItem(VOCAB_KEY) || "[]") || [];
@@ -573,7 +594,7 @@
       var v = loadVocab();
       if (hasWord(v, w)) return false;
       v.push({ w: w, d: defs || [], t: "" }); saveVocab(v);
-      updateVocabBadge(); renderVocab();
+      updateVocabBadge(); renderVocab(); refreshVocabMarks();
       vocabToast(T("vocab_added"));
       return true;
     }
@@ -586,12 +607,111 @@
   }
   function removeVocabWord(w) {
     saveVocab(loadVocab().filter(function (x) { return x.w !== w; }));
-    updateVocabBadge();
+    updateVocabBadge(); refreshVocabMarks();
   }
   function setVocabTr(w, tr) {
     var v = loadVocab();
     for (var i = 0; i < v.length; i++) if (v[i].w === w) { v[i].t = tr; break; }
     saveVocab(v);
+  }
+
+  // ---- passageda vocab so'zlari ostiga ingichka yashil chiziq ----
+  function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  function unwrapVw(m) {
+    var par = m.parentNode; if (!par) return;
+    while (m.firstChild) par.insertBefore(m.firstChild, m);
+    par.removeChild(m);
+    if (par.normalize) par.normalize();
+  }
+  function vocabRoots() {
+    // Faqat passage matni — inputlar/savollar ichiga tegmaymiz
+    return document.querySelectorAll(".reading-passage");
+  }
+  function wrapMatches(root, re) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        var p = node.parentNode;
+        while (p && p !== root) {
+          var tag = p.nodeName;
+          if (tag === "SCRIPT" || tag === "STYLE" || tag === "INPUT" || tag === "TEXTAREA" ||
+              tag === "SELECT" || tag === "OPTION" || (p.classList && p.classList.contains("cd-vw"))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          p = p.parentNode;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var nodes = [], n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(function (node) {
+      var text = node.nodeValue;
+      re.lastIndex = 0;
+      if (!re.test(text)) return;
+      re.lastIndex = 0;
+      var frag = document.createDocumentFragment();
+      var last = 0, m;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        var span = document.createElement("span");
+        span.className = "cd-vw";
+        span.setAttribute("data-w", m[0].toLowerCase());
+        span.textContent = m[0];
+        frag.appendChild(span);
+        last = m.index + m[0].length;
+        if (re.lastIndex === m.index) re.lastIndex++;   // bo'sh moslikdan himoya
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+  var _markTimer = null;
+  function refreshVocabMarks() {
+    // eski belgilarni olib tashlaymiz
+    document.querySelectorAll(".cd-vw").forEach(unwrapVw);
+    var words = loadVocab().map(function (x) { return x.w; })
+      .filter(function (w) { return w && w.length >= 2; });
+    if (!words.length) return;
+    words.sort(function (a, b) { return b.length - a.length; });   // uzunroq avval
+    var alt = words.map(escapeRe).join("|");
+    var re;
+    try { re = new RegExp("(?<![\\w-])(" + alt + ")(?![\\w-])", "gi"); }
+    catch (e) { re = new RegExp("\\b(" + alt + ")\\b", "gi"); }   // eski brauzerlar
+    vocabRoots().forEach(function (root) {
+      try { wrapMatches(root, re); } catch (e) {}
+    });
+  }
+  // paneldan so'z bosilganda passagedagi yashil chiziqni topib "porlatamiz"
+  function locateVocab(word) {
+    var w = (word || "").toLowerCase();
+    var marks = Array.prototype.filter.call(
+      document.querySelectorAll(".cd-vw"),
+      function (m) { return m.getAttribute("data-w") === w; });
+    if (!marks.length) {
+      // bir so'zli bo'lmasa — birinchi bo'lagi bo'yicha
+      var first = w.split(" ")[0];
+      marks = Array.prototype.filter.call(document.querySelectorAll(".cd-vw"),
+        function (m) { return m.getAttribute("data-w") === first; });
+    }
+    if (!marks.length) return;
+    // ko'rinmaydigan (yashirin part) bo'lsa — o'sha part'ga o'tamiz
+    var target = marks[0];
+    var host = target.closest ? target.closest("[id^='passage-text-'],[id^='questions-']") : null;
+    if (host) {
+      var mm = host.id.match(/-(\d+)$/);
+      if (mm) { try { switchToPart(parseInt(mm[1], 10), true); } catch (e) {} }
+    }
+    var panel = document.getElementById("cd-vocab-panel");
+    if (panel) panel.classList.remove("show");
+    try { target.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { target.scrollIntoView(); }
+    marks.forEach(function (m) {
+      m.classList.remove("pulse");
+      // reflow — animatsiyani qayta ishga tushirish uchun
+      void m.offsetWidth;
+      m.classList.add("pulse");
+      setTimeout(function () { m.classList.remove("pulse"); }, 1300);
+    });
   }
   function updateVocabBadge() {
     var c = document.getElementById("cd-vocab-count");
@@ -610,14 +730,24 @@
     list.innerHTML = "";
     v.forEach(function (entry) {
       var item = document.createElement("div");
-      item.className = "cd-vocab-item";
+      item.className = "cd-vocab-item" + (entry.t ? " has-note" : "");
       item.innerHTML =
-        '<span class="cd-vocab-word"></span>' +
-        '<div class="cd-vocab-def"></div>' +
-        '<input class="cd-vocab-tr" type="text" autocomplete="off" placeholder="' + esc(T("vocab_tr_ph")) + '">' +
-        '<button class="cd-vocab-del" title="' + esc(T("vocab_del_title")) + '" aria-label="delete">🗑</button>' +
-        '<span class="cd-vocab-cf"><button class="cd-vocab-yes" aria-label="confirm">✓</button>' +
-        '<button class="cd-vocab-no" aria-label="cancel">✕</button></span>';
+        '<div class="cd-vocab-main">' +
+          '<span class="cd-vocab-word" title="' + esc(T("vocab_locate")) + '"></span>' +
+          '<div class="cd-vocab-def"></div>' +
+          '<span class="cd-vocab-acts">' +
+            '<button class="cd-vocab-note-btn" title="' + esc(T("vocab_note_add")) + '" aria-label="note">＋</button>' +
+            '<button class="cd-vocab-del" title="' + esc(T("vocab_del_title")) + '" aria-label="delete">🗑</button>' +
+            '<span class="cd-vocab-cf"><button class="cd-vocab-yes" aria-label="confirm">✓</button>' +
+            '<button class="cd-vocab-no" aria-label="cancel">✕</button></span>' +
+          '</span>' +
+        '</div>' +
+        '<div class="cd-vocab-note-show"></div>' +
+        '<div class="cd-vocab-note">' +
+          '<input class="cd-vocab-note-input" type="text" autocomplete="off" placeholder="' + esc(T("vocab_tr_ph")) + '">' +
+          '<button class="cd-vocab-note-save" title="' + esc(T("vocab_note_save")) + '" aria-label="save">✓</button>' +
+          '<button class="cd-vocab-note-cancel" title="' + esc(T("vocab_note_del")) + '" aria-label="delete">✕</button>' +
+        '</div>';
       item.querySelector(".cd-vocab-word").textContent = entry.w;
       var defEl = item.querySelector(".cd-vocab-def");
       if (entry.d && entry.d.length) {
@@ -627,14 +757,33 @@
       } else {
         defEl.innerHTML = '<span class="vd-empty">' + esc(T("vocab_no_def")) + '</span>';
       }
-      var tr = item.querySelector(".cd-vocab-tr");
-      tr.value = entry.t || "";
+      item.querySelector(".cd-vocab-note-show").textContent = entry.t || "";
+      item.querySelector(".cd-vocab-note-input").value = entry.t || "";
       item._word = entry.w;
       list.appendChild(item);
     });
   }
+  // Nusxa: oddiy matn (fallback) + chiroyli HTML jadval (Word/Docs/Sheets uchun)
+  function vocabDefStr(x) {
+    if (!x.d || !x.d.length) return "";
+    return x.d.map(function (d) { return (d[0] ? "(" + d[0] + ") " : "") + d[1]; }).join("; ");
+  }
   function vocabText() {
-    return loadVocab().map(function (x) { return x.t ? (x.w + " — " + x.t) : x.w; }).join("\n");
+    return loadVocab().map(function (x) {
+      return [x.w, vocabDefStr(x), x.t || ""].join("\t");
+    }).join("\n");
+  }
+  function vocabHtml() {
+    var rows = loadVocab().map(function (x) {
+      return "<tr><td>" + esc(x.w) + "</td><td>" + esc(vocabDefStr(x)) +
+        "</td><td>" + esc(x.t || "") + "</td></tr>";
+    }).join("");
+    return "<table style=\"border-collapse:collapse\" border=\"1\" cellpadding=\"6\" cellspacing=\"0\">" +
+      "<thead><tr>" +
+      "<th>" + esc(T("vocab_col_word")) + "</th>" +
+      "<th>" + esc(T("vocab_col_def")) + "</th>" +
+      "<th>" + esc(T("vocab_col_note")) + "</th>" +
+      "</tr></thead><tbody>" + rows + "</tbody></table>";
   }
   function vocabToast(text) {
     var t = document.getElementById("cd-toast");
@@ -669,19 +818,40 @@
     }, 520);
   }
   function copyVocab(btn) {
+    if (!loadVocab().length) return;
     var text = vocabText();
-    if (!text) return;
+    var html = vocabHtml();
     function done() {
       if (!btn) return;
       btn.classList.add("copied");
       setTimeout(function () { btn.classList.remove("copied"); }, 1400);
     }
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, function () { legacyCopyVocab(text); done(); });
-      } else { legacyCopyVocab(text); done(); }
-    } catch (e) { legacyCopyVocab(text); done(); }
+      if (navigator.clipboard && typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        var item = new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" })
+        });
+        navigator.clipboard.write([item]).then(done, function () { legacyCopyHtml(html, text); done(); });
+      } else { legacyCopyHtml(html, text); done(); }
+    } catch (e) { legacyCopyHtml(html, text); done(); }
     vocabToast(T("vocab_copied"));
+  }
+  // Rich (jadval) nusxa: contentEditable div'ni tanlab execCommand("copy")
+  function legacyCopyHtml(html, text) {
+    try {
+      var div = document.createElement("div");
+      div.contentEditable = "true";
+      div.innerHTML = html;
+      div.style.position = "fixed"; div.style.left = "-9999px"; div.style.top = "0"; div.style.opacity = "0";
+      document.body.appendChild(div);
+      var range = document.createRange(); range.selectNodeContents(div);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      var ok = document.execCommand("copy");
+      sel.removeAllRanges();
+      document.body.removeChild(div);
+      if (!ok) legacyCopyVocab(text);
+    } catch (e) { legacyCopyVocab(text); }
   }
   function legacyCopyVocab(text) {
     try {
@@ -698,7 +868,7 @@
     var copyB = document.getElementById("cd-vocab-copy");
     var list = document.getElementById("cd-vocab-list");
     if (!btn || !panel) return;
-    updateVocabBadge(); renderVocab();
+    updateVocabBadge(); renderVocab(); refreshVocabMarks();
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
       if (panel.classList.contains("show")) { panel.classList.remove("show"); }
@@ -711,24 +881,66 @@
         panel.classList.remove("show");
       }
     });
+    function openNote(item) {
+      item.classList.add("noting");
+      var inp = item.querySelector(".cd-vocab-note-input");
+      if (inp) { inp.value = (function () {
+        var v = loadVocab(); for (var i = 0; i < v.length; i++) if (v[i].w === item._word) return v[i].t || "";
+        return "";
+      })(); setTimeout(function () { inp.focus(); }, 30); }
+    }
+    function saveNote(item) {
+      var inp = item.querySelector(".cd-vocab-note-input");
+      var val = inp ? inp.value.replace(/\s+/g, " ").trim() : "";
+      setVocabTr(item._word, val);
+      item.classList.remove("noting");
+      item.classList.toggle("has-note", !!val);
+      var show = item.querySelector(".cd-vocab-note-show");
+      if (show) show.textContent = val;
+    }
+    function delNote(item) {
+      var inp = item.querySelector(".cd-vocab-note-input");
+      // Izoh bor bo'lsa — o'chiramiz; bo'sh bo'lsa — shunchaki yopamiz
+      var hadNote = item.classList.contains("has-note");
+      setVocabTr(item._word, "");
+      if (inp) inp.value = "";
+      item.classList.remove("noting", "has-note");
+      var show = item.querySelector(".cd-vocab-note-show");
+      if (show) show.textContent = "";
+      return hadNote;
+    }
     if (list) {
       list.addEventListener("click", function (e) {
         var item = e.target.closest ? e.target.closest(".cd-vocab-item") : null;
         if (!item) return;
+        // so'z o'chirish (tasdiq bilan)
         if (e.target.closest(".cd-vocab-del")) { item.classList.add("confirming"); return; }
         if (e.target.closest(".cd-vocab-no")) { item.classList.remove("confirming"); return; }
         if (e.target.closest(".cd-vocab-yes")) {
           var w = item._word;
           item.classList.add("removing");
           setTimeout(function () { removeVocabWord(w); renderVocab(); }, 220);
+          return;
         }
+        // izoh (note) tugmalari
+        if (e.target.closest(".cd-vocab-note-btn")) {
+          if (item.classList.contains("noting")) saveNote(item); else openNote(item);
+          return;
+        }
+        if (e.target.closest(".cd-vocab-note-save")) { saveNote(item); return; }
+        if (e.target.closest(".cd-vocab-note-cancel")) { delNote(item); return; }
+        if (e.target.closest(".cd-vocab-note-show")) { openNote(item); return; }
+        // so'z ustiga bosilsa — matndan topib porlatamiz
+        if (e.target.closest(".cd-vocab-word")) { locateVocab(item._word); return; }
       });
-      // Tarjima kiritilganda saqlash
-      list.addEventListener("input", function (e) {
-        var tr = e.target.closest ? e.target.closest(".cd-vocab-tr") : null;
-        if (!tr) return;
-        var item = tr.closest(".cd-vocab-item");
-        if (item && item._word != null) setVocabTr(item._word, tr.value);
+      // Enter — izohni saqlaydi
+      list.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter") return;
+        var inp = e.target.closest ? e.target.closest(".cd-vocab-note-input") : null;
+        if (!inp) return;
+        e.preventDefault();
+        var item = inp.closest(".cd-vocab-item");
+        if (item) saveNote(item);
       });
     }
   }
@@ -1213,6 +1425,10 @@
         var e = clone.querySelector("#" + id); if (e) e.remove();
       });
       clone.querySelectorAll("[contenteditable]").forEach(function (e) { e.removeAttribute("contenteditable"); });
+      // vocab yashil chiziqlarni faylga singdirmaymiz — ochilganda qaytadan chiziladi
+      clone.querySelectorAll(".cd-vw").forEach(function (m) {
+        m.replaceWith(document.createTextNode(m.textContent));
+      });
       var vp = clone.querySelector("#cd-vocab-panel"); if (vp) vp.classList.remove("show");
       var dc = clone.querySelector("#cd-def-cloud"); if (dc) { dc.classList.remove("show"); dc.classList.add("hidden"); }
       var cls = clone.querySelector("body"); if (cls) cls.classList.remove("cd-editing", "results-mode");
