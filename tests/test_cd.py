@@ -655,6 +655,50 @@ def test_segment_interleaved_no_markers():
     assert [seg.passage.title for seg in s.segments] == ["First Topic", "Second Topic"]
 
 
+def test_segment_single_marker_consecutive_qgroups():
+    # Bitta "READING PASSAGE N" + ketma-ket savol guruhlari (MCQ/summary/YNNG)
+    # — bitta passage bo'lib qolishi kerak, 3 taga bo'linmasin (Pirahã regressiya).
+    from ielts_bot.cd.segment import segment_material
+    text = (
+        "READING PASSAGE 3\n"
+        "You should spend about 20 minutes on Questions 27-40.\n"
+        "The Pirahã people of Brazil\n\n"
+        + _long_prose(6) + "\n\n" + _long_prose(6) + "\n\n"
+        "Questions 27-29\n"
+        "Choose the correct letter, A, B, C or D.\n"
+        "27 What are we told about Everett in the first paragraph?\n"
+        "A He has lived among them since 1977.\n"
+        "B It took him seven years to learn.\n"
+        "C No one would publish his research.\n"
+        "D Studying the language is his focus.\n"
+        "28 Which is the best summary of the second paragraph?\n"
+        "A Humans are the only creative species.\n"
+        "B Humans and animals share a trait.\n"
+        "C Language is not fully understood.\n"
+        "D Humans alone use syntax.\n"
+        "29 Why does the writer refer to subordinate clauses?\n"
+        "A to criticise linguistics.\n"
+        "B to compare two features.\n"
+        "C to explain difficulty.\n"
+        "D to exemplify an unusual feature.\n\n"
+        "Questions 33-34\n"
+        "Complete the summary using the list of words, A-F, below.\n"
+        "Everett believes language is a product of their 33 ....... and is 34 ....... varied.\n"
+        "A present  B culture  C time\n"
+        "D future  E infinitely  F grammar\n\n"
+        "Questions 37-38\n"
+        "Do the following statements agree with the views of the writer?\n"
+        "37 Everett was surprised by the reaction.\n"
+        "38 Chomsky criticised the methodology.\n"
+    )
+    s = segment_material(text)
+    assert len(s.segments) == 1, [(_s.passage.title, len(_s.groups)) for _s in s.segments]
+    kinds = [(g.qtype, g.start, g.end) for g in s.segments[0].groups]
+    assert kinds == [("mcq", 27, 29), ("summary", 33, 34), ("ynng", 37, 38)], kinds
+    # summary word-bank ajratildi
+    assert len(s.segments[0].groups[1].options) == 6
+
+
 def test_segment_no_questions_note():
     from ielts_bot.cd.segment import segment_material
     s = segment_material("Just A Title\n\n" + _long_prose())
