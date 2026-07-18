@@ -954,12 +954,12 @@ function cdReviewKb(lang: Lang, canAdd: boolean) {
   rows.push([{ text: t(lang, "btn_cd_cancel"), callback_data: "cd:cancel" }]);
   return { inline_keyboard: rows };
 }
-// Javob kalitini so'rashda: materialni qayta yuborish / bekor
-function cdAnswersKb(lang: Lang) {
-  return { inline_keyboard: [
-    [{ text: t(lang, "btn_cd_redo_material"), callback_data: "cd:ans:redo" }],
-    [{ text: t(lang, "btn_cd_cancel"), callback_data: "cd:cancel" }],
-  ] };
+// Javob kalitini so'rashda: qayta yuborish / kalitsiz yaratish / bekor
+function cdAnswersKb(lang: Lang, withSkip = true) {
+  const rows: Btn[][] = [[{ text: t(lang, "btn_cd_redo_material"), callback_data: "cd:ans:redo" }]];
+  if (withSkip) rows.push([{ text: t(lang, "btn_cd_skip_key"), callback_data: "cd:ans:skip" }]);
+  rows.push([{ text: t(lang, "btn_cd_cancel"), callback_data: "cd:cancel" }]);
+  return { inline_keyboard: rows };
 }
 // Test yaratilgandan keyin: yana yaratish / bosh menyu
 function cdDoneKb(lang: Lang) {
@@ -1037,6 +1037,16 @@ async function handleCdCallback(cq: any, sub: string[], lang: Lang) {
   if (op === "ans" && sub[1] === "redo") {
     await setDraft(from.id, "intake", d.data);
     await editMessage(chatId, messageId, t(lang, "cd_ask_material", d.data.passages.length + 1));
+    return;
+  }
+  // "Kalitsiz yaratish" — user javob kalitisiz test qurishni aniq tanladi
+  if (op === "ans" && sub[1] === "skip") {
+    if (!d.data.passages.some((p: CD.Passage) => p.groups.length)) {
+      await sendMessage(chatId, t(lang, "cd_ask_material", d.data.passages.length + 1));
+      return;
+    }
+    await editMessage(chatId, messageId, t(lang, "cd_preparing"));
+    await cdFinish(chatId, from, d.data, lang);
     return;
   }
 }
@@ -1117,11 +1127,12 @@ function cdKeyWarnings(data: CdDraft, lang: Lang): string {
 async function cdAfterConfirm(chatId: number, from: any, data: CdDraft, lang: Lang, messageId?: number) {
   const totalQ = data.passages.reduce((a, p) => a + p.groups.length, 0);
   if (!totalQ) {
-    // passage bor, lekin savol yo'q — savollarni alohida so'raymiz
+    // passage bor, lekin savol yo'q — nimani olganimizni aytib, savol so'raymiz
     await setDraft(from.id, "intake", data);
-    const txt = t(lang, "cd_ask_material", data.passages.length + 1);
-    if (messageId) await editMessage(chatId, messageId, txt);
-    else await sendMessage(chatId, txt);
+    const txt = t(lang, "cd_ask_q_missing", data.passages.length);
+    const kb = cdAnswersKb(lang, false);
+    if (messageId) await editMessage(chatId, messageId, txt, kb);
+    else await sendMessage(chatId, txt, kb);
     return;
   }
   const missing = cdMissingNums(data);
