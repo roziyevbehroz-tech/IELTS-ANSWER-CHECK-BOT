@@ -200,6 +200,8 @@ def segment_material(text: str) -> Segmentation:
                 all_warnings.append(w)
         segments.append(Segment(passage=p, groups=groups))
 
+    _redistribute_groups(segments)
+
     note = "ok"
     if not segments or not any(s.passage.paragraphs for s in segments):
         note = "no_passage"
@@ -207,3 +209,43 @@ def segment_material(text: str) -> Segmentation:
         note = "no_questions"
     return Segmentation(segments=segments, answer_key=answer_key,
                         warnings=all_warnings, note=note)
+
+
+def _std_range(n: int, total: int) -> Tuple[int, int]:
+    """IELTS standart savol diapazoni: P1 1-13, P2 14-26, P3 27-40."""
+    if total >= 3:
+        return {1: (1, 13), 2: (14, 26), 3: (27, 40)}.get(n, (0, 0))
+    return {1: (1, 13), 2: (14, 40)}.get(n, (0, 0))
+
+
+def _redistribute_groups(segments: List[Segment]) -> None:
+    """Savollar oxirida jamlangan holat: barcha guruhlar BITTA segmentda,
+    qolganlari bo'sh bo'lsa — raqam-diapazon bo'yicha passage'larga tarqatamiz
+    (P1: 1-13, P2: 14-26, P3: 27-40). Har passage o'z savoliga ega bo'lsa —
+    tegilmaydi.
+    """
+    if len(segments) < 2:
+        return
+    holders = [s for s in segments if s.groups]
+    if len(holders) != 1:
+        return
+    pool = holders[0].groups
+    total = len(segments)
+    # part_no aniqlangan bo'lsa undan, bo'lmasa pozitsiyadan foydalanamiz
+    assigned: List[List[QuestionGroup]] = [[] for _ in segments]
+    ok = True
+    for g in pool:
+        target = None
+        for i, s in enumerate(segments):
+            lo, hi = _std_range(s.passage.part_no or (i + 1), total)
+            if lo and lo <= g.start <= hi:
+                target = i
+                break
+        if target is None:
+            ok = False
+            break
+        assigned[target].append(g)
+    # Faqat haqiqatan tarqalsa qo'llaymiz (kamida 2 passage savolga ega bo'lsa)
+    if ok and sum(1 for a in assigned if a) >= 2:
+        for s, gl in zip(segments, assigned):
+            s.groups = gl

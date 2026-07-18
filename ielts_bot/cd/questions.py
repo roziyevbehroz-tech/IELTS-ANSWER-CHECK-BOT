@@ -569,6 +569,14 @@ def _auto_detect(text: str, para_count: int) -> List[QuestionGroup]:
         # yagona blok — turini aniqlab ko'ramiz
         g = _auto_one(text, None, None, para_count)
         return [g] if g else []
+    # Birinchi sarlavhadan OLDINGI matn ham savol bo'lishi mumkin ("Questions
+    # X-Y" qatori yo'qolgan/buzilgan holat) — elementlari topilsagina olamiz.
+    if idxs[0] > 0:
+        lead = "\n".join(lines[:idxs[0]]).strip()
+        if lead:
+            g = _auto_one(lead, None, None, para_count)
+            if g and g.items:
+                groups.append(g)
     idxs.append(len(lines))
     for a, b in zip(idxs, idxs[1:]):
         chunk = "\n".join(lines[a:b]).strip()

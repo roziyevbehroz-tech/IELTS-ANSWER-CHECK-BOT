@@ -167,7 +167,7 @@ const HEADER_NOISE =
 
 // IELTS "ishchi yozuvlari" — asl passage emas
 const BOILERPLATE =
-  /^\s*\d{0,3}\s*(reading\s+passage\b|part\s+\d+\s*$|section\s+\d+\s*$|you\s+should\s+spend\b|.*\bbased\s+on\s+reading\s+passage\b|.*\bwhich\s+are\s+based\s+on\b|reading\s+passage\s+\d+\s+has\b|the\s+reading\s+passage\s+below\b|turn\s+over\b|page\s+\d+\b|\d{1,3}\s+of\s+\d{1,3}\s*$)/i;
+  /^\s*\d{0,3}\s*(reading\s+passage\b|part\s+\d+\s*$|section\s+\d+\s*$|you\s+should\s+spend\b|.*\bbased\s+on\s+reading\s+passage\b|.*\bwhich\s+are\s+based\s+on\b|reading\s+passage\s+\d+\s+has\b|passage\s+\d+\s+on\s+pages?\b|the\s+reading\s+passage\s+below\b|turn\s+over\b|page\s+\d+\b|\d{1,3}\s+of\s+\d{1,3}\s*$)/i;
 // Harf-oralig'i: "R E A D I N G  P A S S A G E  2" -> "readingpassage2"
 // (oldida bet raqami bo'lishi mumkin: "1READING PASSAGE 2")
 const BOILERPLATE_DESPACED = /^\d{0,3}(readingpassage|passage|part|section)\d+$/;
@@ -207,7 +207,9 @@ export function stripBoilerplate(text: string): [string, string[]] {
     if (!b) continue;
     const isReal = b.length > 60 || /[.!?"”]$/.test(b.trimEnd());
     const isLetter = /^[A-M]([.\)]|\s|$)/.test(b);
-    if (seenReal && !isReal && b.length < 50 && b.indexOf("\n") === -1 && !isLetter) continue;
+    // Savol-sarlavha bloklari ("Questions 27–32") — kesim langari, o'chirilmaydi
+    const isQMarker = QUESTION_MARKERS.test(b);
+    if (seenReal && !isReal && b.length < 50 && b.indexOf("\n") === -1 && !isLetter && !isQMarker) continue;
     kept.push(b);
     if (isReal) seenReal = true;
   }
@@ -349,10 +351,42 @@ export function segmentMaterial(text: string): Segmentation {
     for (const w of p.warnings) if (!warnings.includes(w)) warnings.push(w);
     segments.push({ passage: p, groups });
   }
+  redistributeGroups(segments);
   let note = "ok";
   if (!segments.length || !segments.some((s) => s.passage.paragraphs.length)) note = "no_passage";
   else if (!segments.some((s) => s.groups.length)) note = "no_questions";
   return { segments, answerKey, warnings, note };
+}
+
+// IELTS standart savol diapazoni: P1 1-13, P2 14-26, P3 27-40
+function stdRange(n: number, total: number): [number, number] {
+  if (total >= 3) return ({ 1: [1, 13], 2: [14, 26], 3: [27, 40] } as Record<number, [number, number]>)[n] ?? [0, 0];
+  return ({ 1: [1, 13], 2: [14, 40] } as Record<number, [number, number]>)[n] ?? [0, 0];
+}
+
+// Savollar oxirida jamlangan holat: barcha guruhlar BITTA segmentda, qolganlari
+// bo'sh bo'lsa — raqam-diapazon bo'yicha passage'larga tarqatamiz.
+function redistributeGroups(segments: Segment[]): void {
+  if (segments.length < 2) return;
+  const holders = segments.filter((s) => s.groups.length);
+  if (holders.length !== 1) return;
+  const pool = holders[0].groups;
+  const total = segments.length;
+  const assigned: QuestionGroup[][] = segments.map(() => []);
+  let ok = true;
+  for (const g of pool) {
+    let target = -1;
+    for (let i = 0; i < segments.length; i++) {
+      const [lo, hi] = stdRange(segments[i].passage.partNo || (i + 1), total);
+      if (lo && lo <= g.start && g.start <= hi) { target = i; break; }
+    }
+    if (target < 0) { ok = false; break; }
+    assigned[target].push(g);
+  }
+  // Faqat haqiqatan tarqalsa qo'llaymiz (kamida 2 passage savolga ega bo'lsa)
+  if (ok && assigned.filter((a) => a.length).length >= 2) {
+    for (let i = 0; i < segments.length; i++) segments[i].groups = assigned[i];
+  }
 }
 
 // Izohli lug'at (footnote): qator boshida */**/*** + izoh — passage muhim qismi
@@ -844,8 +878,17 @@ function autoDetect(text: string, paraCount: number): QuestionGroup[] {
     const g = autoOne(text, null, null, paraCount);
     return g ? [g] : [];
   }
-  idxs.push(lines.length);
   const groups: QuestionGroup[] = [];
+  // Birinchi sarlavhadan OLDINGI matn ham savol bo'lishi mumkin ("Questions
+  // X-Y" qatori yo'qolgan/buzilgan holat) — elementlari topilsagina olamiz.
+  if (idxs[0] > 0) {
+    const lead = lines.slice(0, idxs[0]).join("\n").trim();
+    if (lead) {
+      const g = autoOne(lead, null, null, paraCount);
+      if (g && g.items.length) groups.push(g);
+    }
+  }
+  idxs.push(lines.length);
   for (let k = 0; k < idxs.length - 1; k++) {
     const chunk = lines.slice(idxs[k], idxs[k + 1]).join("\n").trim();
     const hdr = chunk.match(QUESTIONS_HDR);
