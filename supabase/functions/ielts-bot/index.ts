@@ -719,7 +719,7 @@ async function handleText(chatId: number, from: any, text: string, lang: Lang) {
 const CD_MAX_FILE = 8 * 1024 * 1024;
 // intake — universal material qabul qilish; review — topilganini tasdiqlash;
 // answers — javob kalitini so'rash
-const CD_STEPS = new Set(["intake", "review", "answers"]);
+const CD_STEPS = new Set(["intake", "review", "answers", "more"]);
 
 interface CdPending {
   segments: { passage: CD.Passage; groups: CD.QuestionGroup[] }[];
@@ -970,6 +970,15 @@ function cdReviewKb(lang: Lang, canAdd: boolean) {
   rows.push([{ text: t(lang, "btn_cd_cancel"), callback_data: "cd:cancel" }]);
   return { inline_keyboard: rows };
 }
+// To'liq passage tayyor bo'lgach: yana passage qo'shish / CD testni yakunlash
+function cdMoreKb(lang: Lang) {
+  return { inline_keyboard: [
+    [{ text: t(lang, "btn_cd_addmore"), callback_data: "cd:more:add" }],
+    [{ text: t(lang, "btn_cd_finish"), callback_data: "cd:more:finish" }],
+    [{ text: t(lang, "btn_cd_cancel"), callback_data: "cd:cancel" }],
+  ] };
+}
+
 // Javob kalitini so'rashda: qayta yuborish / kalitsiz yaratish / bekor
 function cdAnswersKb(lang: Lang, withSkip = true) {
   const rows: Btn[][] = [[{ text: t(lang, "btn_cd_redo_material"), callback_data: "cd:ans:redo" }]];
@@ -1061,8 +1070,19 @@ async function handleCdCallback(cq: any, sub: string[], lang: Lang) {
       await sendMessage(chatId, t(lang, "cd_ask_material", d.data.passages.length + 1));
       return;
     }
-    await editMessage(chatId, messageId, t(lang, "cd_preparing"));
-    await cdFinish(chatId, from, d.data, lang);
+    // kalitsiz ham darrov qurmasdan — yana passage yoki yakunlashni so'raymiz
+    await cdOfferMore(chatId, from, d.data, lang, messageId);
+    return;
+  }
+  // "Yana passage qo'shish" / "CD testni yakunlash"
+  if (op === "more") {
+    if (sub[1] === "add") {
+      await setDraft(from.id, "intake", d.data);
+      await editMessage(chatId, messageId, t(lang, "cd_ask_material", d.data.passages.length + 1));
+    } else {
+      await editMessage(chatId, messageId, t(lang, "cd_preparing"));
+      await cdFinish(chatId, from, d.data, lang);
+    }
     return;
   }
 }
@@ -1158,8 +1178,28 @@ async function cdAfterConfirm(chatId: number, from: any, data: CdDraft, lang: La
     if (messageId) await editMessage(chatId, messageId, txt, cdAnswersKb(lang));
     else await sendMessage(chatId, txt, cdAnswersKb(lang));
   } else {
-    await cdFinish(chatId, from, data, lang);
+    await cdOfferMore(chatId, from, data, lang, messageId);
   }
+}
+
+// To'liq passage (matn+savol+kalit) tayyor bo'lgach — darrov qurmasdan,
+// yana passage qo'shishni yoki CD testni yakunlashni so'raymiz. 3 ta passage
+// yig'ilgan bo'lsa (to'liq IELTS testi) — to'g'ridan-to'g'ri quramiz.
+function cdTotalQ(data: CdDraft): number {
+  let n = 0;
+  for (const p of data.passages) for (const g of p.groups) n += CD.numbersOf(g).length;
+  return n;
+}
+async function cdOfferMore(chatId: number, from: any, data: CdDraft, lang: Lang, messageId?: number) {
+  if (data.passages.length >= 3) {
+    if (messageId) await editMessage(chatId, messageId, t(lang, "cd_preparing"));
+    await cdFinish(chatId, from, data, lang);
+    return;
+  }
+  await setDraft(from.id, "more", data);
+  const txt = t(lang, "cd_ready_more", data.passages.length, cdTotalQ(data));
+  if (messageId) await editMessage(chatId, messageId, txt, cdMoreKb(lang));
+  else await sendMessage(chatId, txt, cdMoreKb(lang));
 }
 
 // Qismlarni alohida yuborish: passage allaqachon bor bo'lsa, kelgan matnni
@@ -1205,6 +1245,8 @@ async function cdHandlePartial(chatId: number, from: any, data: CdDraft, text: s
 
 // ---- xabar (matn/fayl) ----
 async function cdHandleInput(chatId: number, from: any, step: string, data: CdDraft, text: string, images: string[] = [], lang: Lang = "uz") {
+  // "more" bosqichida yangi material kelsa — uni intake kabi (yangi passage) qabul qilamiz
+  if (step === "more") step = "intake";
   // intake yoki review paytida kelgan matn/fayl — (qayta) material sifatida ajratiladi
   if (step === "intake" || step === "review") {
     // Qismlarni alohida yuborish: passage bor bo'lsa — savol/kalitni biriktirishga urinamiz
@@ -1245,7 +1287,8 @@ async function cdHandleInput(chatId: number, from: any, step: string, data: CdDr
       await setDraft(from.id, "answers", data);
       await sendMessage(chatId, t(lang, "cd_ask_key", compactNums(missing)), cdAnswersKb(lang));
     } else {
-      await cdFinish(chatId, from, data, lang);
+      // to'liq passage tayyor — darrov qurmasdan, yana passage yoki yakunlashni so'raymiz
+      await cdOfferMore(chatId, from, data, lang);
     }
   }
 }
