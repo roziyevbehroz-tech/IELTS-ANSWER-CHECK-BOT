@@ -556,6 +556,111 @@ def test_render_duration_scales_with_passages():
     assert '"duration":40' in html
 
 
+# ------------------------- word bank (A-I) -------------------------
+
+def test_summary_word_bank_captured():
+    from ielts_bot.cd import segment as seg_mod  # noqa: F401
+    qtext = (
+        "Questions 33-36\n"
+        "Complete the summary using the list of words, A-I, below.\n"
+        "The language lacks 33 ....... for counting.\n"
+        "Speakers could not perform 34 ....... tasks, which shows 35 ....... "
+        "shapes thought though 36 ....... remains debated.\n"
+        "A numbers  B culture  C memory\n"
+        "D language  E matching  F grammar\n"
+        "G colour  H tools  I society\n"
+    )
+    groups = q_mod.parse_questions(qtext, 7)
+    assert len(groups) == 1
+    g = groups[0]
+    assert g.qtype == "summary"
+    assert [it.number for it in g.items] == [33, 34, 35, 36]
+    # word bank A-I qo'lga olindi
+    assert len(g.options) == 9
+    assert g.options[0] == ("A", "numbers")
+    assert g.options[-1] == ("I", "society")
+
+
+def test_word_bank_renders_select():
+    p = passage_mod.parse_passage("Topic\n\nA body paragraph long enough here.\n")
+    p.groups = q_mod.parse_questions(
+        "Complete the summary using the list of words, A-D, below.\n"
+        "The main point is 1 ....... and later 2 ....... follows.\n"
+        "A alpha  B beta  C gamma  D delta\n"
+    )
+    p.answers = {1: "A", 2: "C"}
+    html = render.render_test(ReadingTest(passages=[p]))
+    # gap select bo'lib chiqadi + word bank ko'rinadi
+    assert '<select class="answer-input gap-input" id="q1">' in html
+    assert "List of Words" in html
+
+
+def test_normal_notes_not_treated_as_wordbank():
+    groups = q_mod.parse_questions(
+        "Complete the notes below.\nOrigin: found in 1 .......\nUse: 2 ....... making\n")
+    assert groups and not groups[0].options
+
+
+# ------------------------- segmentation -------------------------
+
+def _long_prose(n=4):
+    return ("This substantial passage body describes an interesting subject in "
+            "considerable depth and detail. ") * n
+
+
+def test_segment_single_passage_with_answer_key():
+    from ielts_bot.cd.segment import segment_material
+    text = (
+        "The Lost City\n\n" + _long_prose() + "\n\n" + _long_prose() + "\n\n"
+        "Questions 1-3\n"
+        "Do the following statements agree? Write TRUE, FALSE or NOT GIVEN.\n"
+        "1  Statement one.\n2  Statement two.\n3  Statement three.\n\n"
+        "Answer key\n1. NOT GIVEN\n2. TRUE\n3. TRUE\n"
+    )
+    s = segment_material(text)
+    assert s.note == "ok"
+    assert len(s.segments) == 1
+    assert s.answer_key == {1: "NOT GIVEN", 2: "TRUE", 3: "TRUE"}
+    assert s.segments[0].passage.title == "The Lost City"
+    assert [(g.qtype, g.start, g.end) for g in s.segments[0].groups] == [("tfng", 1, 3)]
+
+
+def test_segment_three_passages_with_markers():
+    from ielts_bot.cd.segment import segment_material
+
+    def block(n, title, qs):
+        return (f"READING PASSAGE {n}\n{title}\n\n" + _long_prose() +
+                f"\n\nQuestions {qs}-{qs + 1}\n"
+                "Do the following statements agree? Write TRUE, FALSE or NOT GIVEN.\n"
+                f"{qs}  First.\n{qs + 1}  Second.\n")
+    text = (block(1, "Alpha", 1) + "\n\n" + block(2, "Beta", 14) + "\n\n"
+            + block(3, "Gamma", 27) + "\n\nAnswers\n1. TRUE\n14. FALSE\n27. NOT GIVEN\n")
+    s = segment_material(text)
+    assert len(s.segments) == 3
+    assert [seg.groups[0].start for seg in s.segments] == [1, 14, 27]
+    assert s.answer_key == {1: "TRUE", 14: "FALSE", 27: "NOT GIVEN"}
+
+
+def test_segment_interleaved_no_markers():
+    from ielts_bot.cd.segment import segment_material
+
+    def block(title, qs):
+        return (f"{title}\n\n" + _long_prose() +
+                f"\n\nQuestions {qs}-{qs + 1}\n"
+                "Do the following statements agree? Write TRUE, FALSE or NOT GIVEN.\n"
+                f"{qs}  First.\n{qs + 1}  Second.\n")
+    text = block("First Topic", 1) + "\n\n" + block("Second Topic", 3)
+    s = segment_material(text)
+    assert len(s.segments) == 2
+    assert [seg.passage.title for seg in s.segments] == ["First Topic", "Second Topic"]
+
+
+def test_segment_no_questions_note():
+    from ielts_bot.cd.segment import segment_material
+    s = segment_material("Just A Title\n\n" + _long_prose())
+    assert s.note == "no_questions"
+
+
 if __name__ == "__main__":
     import traceback
 

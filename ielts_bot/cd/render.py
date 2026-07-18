@@ -160,10 +160,20 @@ def _render_group(g: QuestionGroup, p: Passage) -> str:
     if g.kind == "gap" and g.qtype == "diagram":
         return _render_diagram(g, prompt, p)
     if g.kind == "gap":
-        body = _render_gap_body(g)
+        # Word-bank (A-I so'zlar ro'yxati) — gaplar select bilan to'ldiriladi
+        wordbank = g.options if g.options else None
+        body = _render_gap_body(g, wordbank)
         title = f'<h4 class="text-center" style="font-weight:bold;margin:12px 0;">{html.escape(g.title)}</h4>' if g.title else ""
+        bank = ""
+        if wordbank:
+            bank_title = html.escape(g.options_title) if g.options_title else "List of Words"
+            rows = "".join(
+                f'<li><strong>{html.escape(letter)}</strong>&nbsp;{html.escape(txt)}</li>'
+                for letter, txt in wordbank)
+            bank = (f'<div class="heading-bank"><p><strong>{bank_title}</strong></p>'
+                    f'<ul class="opt-list">{rows}</ul></div>')
         return (f'<div class="question" data-q-start="{g.start}" data-q-end="{g.end}">'
-                f'{prompt}<div class="notes-content">{title}{body}</div></div>')
+                f'{prompt}<div class="notes-content">{title}{bank}{body}</div></div>')
     if g.kind in ("tfng", "ynng"):
         return _render_statements(g, prompt)
     if g.kind == "mcq":
@@ -192,7 +202,7 @@ def _prompt(g: QuestionGroup) -> str:
 
 # ------- gap (note/summary/sentence/table/flowchart/short/diagram) ------
 
-def _render_gap_body(g: QuestionGroup) -> str:
+def _render_gap_body(g: QuestionGroup, wordbank=None) -> str:
     body = g.body or ""
     # jadval bo'lsa (| ajratuvchi) — HTML jadval
     if any("|" in ln for ln in body.split("\n")) and g.qtype == "table":
@@ -212,9 +222,9 @@ def _render_gap_body(g: QuestionGroup) -> str:
         if not s:
             flush()
             continue
-        content = _inject_inputs(s)
+        content = _inject_inputs(s, wordbank)
         if s.startswith(("-", "•", "*")):
-            bullets.append(_inject_inputs(s.lstrip("-•* ").strip()))
+            bullets.append(_inject_inputs(s.lstrip("-•* ").strip(), wordbank))
         elif not _has_token(s) and len(s.split()) <= 8 and s.endswith(":") is False \
                 and s == s and len(s) < 60 and _is_subheading(s):
             flush()
@@ -238,11 +248,19 @@ def _has_token(s: str) -> bool:
     return bool(_TOKEN_RE.search(s))
 
 
-def _inject_inputs(s: str) -> str:
-    # avval xavfsiz escape, keyin tokenlarni input bilan almashtiramiz
+def _inject_inputs(s: str, wordbank=None) -> str:
+    # avval xavfsiz escape, keyin tokenlarni input/select bilan almashtiramiz
     esc = html.escape(s)
+    opts_html = ""
+    if wordbank:
+        opts_html = '<option value="">–</option>' + "".join(
+            f'<option value="{letter}">{letter}</option>' for letter, _ in wordbank)
+
     def repl(m):
         n = m.group(1)
+        if wordbank:
+            return (f'<select class="answer-input gap-input" id="q{n}">'
+                    f'{opts_html}</select>')
         return (f'<input type="text" class="answer-input gap-input" '
                 f'id="q{n}" placeholder="{n}">')
     # token escape'dan keyin ham o'zgarmaydi ({{Q1}} da maxsus belgi yo'q)

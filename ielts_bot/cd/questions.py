@@ -207,6 +207,9 @@ def _build_gap(qtype, start, end, instructions, body_lines) -> QuestionGroup:
             and len(lines[0].split()) <= 8 and not lines[0].strip().startswith(("-", "•", "*", "|")):
         title = lines[0].strip()
         lines = lines[1:]
+    # Word-bank (so'zlar ro'yxati A-I) — completion ichida bo'lsa ajratib olamiz:
+    # javoblar HARF (A-I) bo'ladi, gaplar select bilan to'ldiriladi.
+    lines, wordbank = _extract_word_bank(lines)
     body = "\n".join(lines).strip()
     normalized, numbers = _normalize_gaps(body, start)
     if start is None and numbers:
@@ -218,7 +221,38 @@ def _build_gap(qtype, start, end, instructions, body_lines) -> QuestionGroup:
     g = QuestionGroup(qtype=qtype, start=start, end=end,
                      instructions=instructions, body=normalized, title=title)
     g.items = [Item(number=n) for n in numbers]
+    if wordbank:
+        g.options = wordbank
+        g.options_title = "List of Words"
     return g
+
+
+def _extract_word_bank(lines: List[str]) -> Tuple[List[str], List[tuple]]:
+    """Completion bloki ichidan so'zlar ro'yxatini (A-I word bank) ajratadi.
+
+    Javoblari harf bo'lgan summary/note completion'da matn tagida
+    "A word  B word  C word ..." ko'rinishida ro'yxat keladi. Uni topib,
+    gap tanasidan chiqaramiz. (qolgan_qatorlar, variantlar) qaytaradi.
+    Xato ijobiy topishning oldini olish uchun qat'iy: A dan ketma-ket ≥4 ta,
+    har biri qisqa (≤6 so'z) va gap belgisi yo'q.
+    """
+    opt_lines = [ln for ln in lines if _looks_like_option(ln) and not _has_gap(ln)]
+    if not opt_lines:
+        return lines, []
+    # Bir yoki ko'p qatorli, yopishgan bo'lsa ham — A dan ketma-ket harflarni ajratamiz
+    opts = _split_glued_options(" ".join(ln.strip() for ln in opt_lines))
+    if len(opts) < 4:
+        opts = _collect_options(opt_lines)
+    if len(opts) < 4:
+        return lines, []
+    letters = [o[0] for o in opts]
+    expected = [chr(ord("A") + i) for i in range(len(opts))]
+    if letters != expected:
+        return lines, []
+    if not all(t and len(t.split()) <= 6 for _, t in opts):
+        return lines, []
+    remaining = [ln for ln in lines if not (_looks_like_option(ln) and not _has_gap(ln))]
+    return remaining, opts
 
 
 def _has_gap(line: str) -> bool:

@@ -112,6 +112,41 @@ const uz: Dict = {
     "Endi shu passage'ning *savollarini* yuboring (matn yoki fayl).\n\n" +
     "1️⃣ Toza Cambridge matni — bot turlarni o'zi taniydi.\n" +
     "2️⃣ Aniq shablon (100% ishonchli) — /qtemplate ni yuboring.",
+  // Universal intake + ko'rib chiqish (review) + tuzatish (recovery)
+  cd_ask_material: (n: number) =>
+    `📖 *Reading materialini yuboring*\n\n` +
+    "Hammasini *bitta faylda* yuborsangiz ham bo'ladi — bot matn, savol va " +
+    "javob kalitini o'zi topib ajratadi. Bitta faylda 3 tagacha passage bo'lsa ham " +
+    "topadi.\n\n" +
+    "Yoki bosqichma-bosqich: avval matn, keyin savol, keyin javoblar.\n\n" +
+    "Qabul qilinadi: 📄 PDF, DOCX yoki oddiy matn. _(Skaner/rasm PDF emas.)_",
+  cd_seg_review: (body: string, keyLine: string) =>
+    `🔎 *Men buni topdim:*\n\n${body}\n${keyLine}\n\n` +
+    "To'g'ri bo'lsa — *Tasdiqlash*ni bosing. Xato bo'lsa — *Qayta yuborish* orqali " +
+    "materialni qaytadan yuboring.",
+  cd_seg_pline: (idx: number, title: string, paras: number, qcount: number, qrange: string) =>
+    `📄 *Passage ${idx}:* ${title}\n   • ${paras} paragraf · ${qcount} savol (${qrange})`,
+  cd_seg_pline_noq: (idx: number, title: string, paras: number) =>
+    `📄 *Passage ${idx}:* ${title}\n   • ${paras} paragraf · ⚠️ savol topilmadi`,
+  cd_seg_key_found: (n: number) => `🔑 Javob kaliti topildi: ${n} ta javob ✅`,
+  cd_seg_key_none: "🔑 Javob kaliti topilmadi — tasdiqlagach so'rayman.",
+  cd_seg_fail:
+    "🤔 Kechirasiz, bu materialdan passage/savolni ajrata olmadim.\n\n" +
+    "Iltimos, *qaytadan yuboring* — matn to'liq va o'qiladigan (skaner emas) bo'lsin.",
+  cd_seg_fail_again:
+    "😔 Baribir ajrata olmadim.\n\nIltimos, qismlarni *alohida* yuboring:\n" +
+    "1️⃣ avval faqat *matn (passage)*,\n2️⃣ keyin faqat *savollar*,\n" +
+    "3️⃣ keyin *javob kaliti*.\nYoki testlarni bittalab yuboring.",
+  cd_seg_no_q_warn:
+    "\n\n⚠️ Ba'zi passage'larda savol topilmadi. Tasdiqlasangiz, keyin savolni " +
+    "qayta yuborishingiz mumkin.",
+  cd_ask_key: (missing: string) =>
+    `🔑 *Endi javob kalitini yuboring.*\n\nJavob berilmagan savollar: ${missing}\n\n` +
+    "Namuna:\n```\n1. TRUE\n2. paragraph\n3. B\n14-16. A, C, D\n```\n" +
+    "Yoki javoblar ham materialda bo'lsa — *Materialni qayta yuborish* orqali " +
+    "hammasini birga yuboring.",
+  cd_key_added_ok: (count: number, warn: string) =>
+    `✅ Javoblar qabul qilindi (${count} ta).${warn}`,
   cd_lettered_note: " (A, B, C… belgilangan)",
   cd_no_q: "🤔 Savollarni ajratib bo'lmadi. Iltimos aniq shablondan foydalaning — /qtemplate ni yuboring.",
   cd_passage_empty: "🤔 Matn bo'sh ko'rinadi. Passage matnini qayta yuboring.",
@@ -183,6 +218,10 @@ const uz: Dict = {
   btn_ct_start: "🚀 Testni boshlash",
   btn_cd_add: "➕ Yana passage qo'shish",
   btn_cd_finish: "✅ CD test yaratish",
+  btn_cd_confirm: "✅ Tasdiqlash va davom etish",
+  btn_cd_redo_material: "🔁 Materialni qayta yuborish",
+  btn_cd_addmore: "➕ Yana passage qo'shish",
+  btn_cd_cancel: "❌ Bekor qilish",
   btn_cd_more: "➕ Yana CD test yaratish",
   rk_cd: "🆕 CD Test yaratish",
   rk_check: "📚 Test tekshirish",
@@ -287,6 +326,39 @@ const ru: Dict = {
     "Теперь отправьте *вопросы* к этому passage (текст или файл).\n\n" +
     "1️⃣ Чистый текст Cambridge — бот сам распознает типы.\n" +
     "2️⃣ Точный шаблон (100% надёжно) — отправьте /qtemplate.",
+  // Универсальный приём + просмотр + исправление
+  cd_ask_material: (n: number) =>
+    `📖 *Отправьте материал Reading*\n\n` +
+    "Можно прислать всё *одним файлом* — бот сам найдёт текст, вопросы и ключ " +
+    "ответов. Если в одном файле до 3 passage — тоже распознает.\n\n" +
+    "Или пошагово: сначала текст, затем вопросы, затем ответы.\n\n" +
+    "Принимается: 📄 PDF, DOCX или обычный текст. _(Не скан/картинка.)_",
+  cd_seg_review: (body: string, keyLine: string) =>
+    `🔎 *Вот что я нашёл:*\n\n${body}\n${keyLine}\n\n` +
+    "Если всё верно — нажмите *Подтвердить*. Если нет — *Отправить заново* и " +
+    "пришлите материал ещё раз.",
+  cd_seg_pline: (idx: number, title: string, paras: number, qcount: number, qrange: string) =>
+    `📄 *Passage ${idx}:* ${title}\n   • ${paras} абз. · ${qcount} вопр. (${qrange})`,
+  cd_seg_pline_noq: (idx: number, title: string, paras: number) =>
+    `📄 *Passage ${idx}:* ${title}\n   • ${paras} абз. · ⚠️ вопросы не найдены`,
+  cd_seg_key_found: (n: number) => `🔑 Ключ ответов найден: ${n} шт. ✅`,
+  cd_seg_key_none: "🔑 Ключ ответов не найден — спрошу после подтверждения.",
+  cd_seg_fail:
+    "🤔 Извините, не удалось выделить passage/вопросы из материала.\n\n" +
+    "Пожалуйста, *отправьте заново* — текст должен быть полным и читаемым (не скан).",
+  cd_seg_fail_again:
+    "😔 Всё равно не получилось.\n\nПришлите части *по отдельности*:\n" +
+    "1️⃣ сначала только *текст (passage)*,\n2️⃣ затем только *вопросы*,\n" +
+    "3️⃣ затем *ключ ответов*.\nИли отправляйте тесты по одному.",
+  cd_seg_no_q_warn:
+    "\n\n⚠️ В некоторых passage не найдены вопросы. После подтверждения их можно " +
+    "прислать заново.",
+  cd_ask_key: (missing: string) =>
+    `🔑 *Теперь отправьте ключ ответов.*\n\nБез ответа: ${missing}\n\n` +
+    "Пример:\n```\n1. TRUE\n2. paragraph\n3. B\n14-16. A, C, D\n```\n" +
+    "Или если ответы есть в материале — нажмите *Отправить заново* и пришлите всё вместе.",
+  cd_key_added_ok: (count: number, warn: string) =>
+    `✅ Ответы приняты (${count} шт.).${warn}`,
   cd_lettered_note: " (отмечены A, B, C…)",
   cd_no_q: "🤔 Не удалось выделить вопросы. Пожалуйста, используйте точный шаблон — отправьте /qtemplate.",
   cd_passage_empty: "🤔 Текст выглядит пустым. Отправьте текст passage ещё раз.",
@@ -357,6 +429,10 @@ const ru: Dict = {
   btn_ct_start: "🚀 Начать тест",
   btn_cd_add: "➕ Добавить ещё passage",
   btn_cd_finish: "✅ Создать CD-тест",
+  btn_cd_confirm: "✅ Подтвердить и продолжить",
+  btn_cd_redo_material: "🔁 Отправить заново",
+  btn_cd_addmore: "➕ Добавить ещё passage",
+  btn_cd_cancel: "❌ Отмена",
   btn_cd_more: "➕ Создать ещё CD-тест",
   rk_cd: "🆕 Создать CD-тест",
   rk_check: "📚 Проверка теста",
@@ -461,6 +537,37 @@ const en: Dict = {
     "Now send the *questions* for this passage (text or file).\n\n" +
     "1️⃣ Clean Cambridge text — the bot detects the types itself.\n" +
     "2️⃣ Exact template (100% reliable) — send /qtemplate.",
+  // Universal intake + review + recovery
+  cd_ask_material: (n: number) =>
+    `📖 *Send your Reading material*\n\n` +
+    "You can send everything in *one file* — the bot will find the text, questions " +
+    "and answer key itself. It also handles up to 3 passages in one file.\n\n" +
+    "Or step by step: text first, then questions, then answers.\n\n" +
+    "Accepted: 📄 PDF, DOCX or plain text. _(Not a scanned/image PDF.)_",
+  cd_seg_review: (body: string, keyLine: string) =>
+    `🔎 *Here's what I found:*\n\n${body}\n${keyLine}\n\n` +
+    "If it's correct — tap *Confirm*. If not — tap *Re-send* and send the material again.",
+  cd_seg_pline: (idx: number, title: string, paras: number, qcount: number, qrange: string) =>
+    `📄 *Passage ${idx}:* ${title}\n   • ${paras} paragraphs · ${qcount} questions (${qrange})`,
+  cd_seg_pline_noq: (idx: number, title: string, paras: number) =>
+    `📄 *Passage ${idx}:* ${title}\n   • ${paras} paragraphs · ⚠️ no questions found`,
+  cd_seg_key_found: (n: number) => `🔑 Answer key found: ${n} answers ✅`,
+  cd_seg_key_none: "🔑 No answer key found — I'll ask after you confirm.",
+  cd_seg_fail:
+    "🤔 Sorry, I couldn't separate the passage/questions from this material.\n\n" +
+    "Please *send it again* — the text should be complete and readable (not a scan).",
+  cd_seg_fail_again:
+    "😔 Still couldn't parse it.\n\nPlease send the parts *separately*:\n" +
+    "1️⃣ first just the *passage text*,\n2️⃣ then just the *questions*,\n" +
+    "3️⃣ then the *answer key*.\nOr send the tests one by one.",
+  cd_seg_no_q_warn:
+    "\n\n⚠️ Some passages have no questions found. After you confirm, you can re-send them.",
+  cd_ask_key: (missing: string) =>
+    `🔑 *Now send the answer key.*\n\nUnanswered: ${missing}\n\n` +
+    "Example:\n```\n1. TRUE\n2. paragraph\n3. B\n14-16. A, C, D\n```\n" +
+    "Or if the answers are in the material — tap *Re-send* and send it all together.",
+  cd_key_added_ok: (count: number, warn: string) =>
+    `✅ Answers accepted (${count}).${warn}`,
   cd_lettered_note: " (A, B, C… labelled)",
   cd_no_q: "🤔 Couldn't extract the questions. Please use the exact template — send /qtemplate.",
   cd_passage_empty: "🤔 The text looks empty. Please send the passage text again.",
@@ -531,6 +638,10 @@ const en: Dict = {
   btn_ct_start: "🚀 Start test",
   btn_cd_add: "➕ Add another passage",
   btn_cd_finish: "✅ Create CD test",
+  btn_cd_confirm: "✅ Confirm & continue",
+  btn_cd_redo_material: "🔁 Re-send material",
+  btn_cd_addmore: "➕ Add another passage",
+  btn_cd_cancel: "❌ Cancel",
   btn_cd_more: "➕ Create another CD test",
   rk_cd: "🆕 Create CD test",
   rk_check: "📚 Check a test",
