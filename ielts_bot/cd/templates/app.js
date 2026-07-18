@@ -42,6 +42,10 @@
       res_hint: function (w) { return "✅ To'g'ri javoblar qulflandi. «Yopish»ni bosib, qolgan <b>" + w + " ta</b> xato javobni tuzatib, yana topshiring. Yoki to'g'ri javoblarni ko'rish uchun quyidagi tugmani bosing."; },
       save_error: "Saqlashda xato. Iltimos faylni tashqi brauzerda (Chrome/Safari) oching.",
       img_del: "Rasmni o'chirish",
+      vocab_title: "Mening lug'atim", vocab_add_title: "Lug'atga qo'shish",
+      vocab_empty: "Hozircha so'z yo'q. Matndan so'z belgilab ＋ ni bosing.",
+      vocab_added: "✅ Lug'atga qo'shildi", vocab_exists: "Bu so'z allaqachon bor",
+      vocab_del_title: "O'chirish",
     },
     ru: {
       part_n: function (l) { return "Часть " + l; },
@@ -65,6 +69,10 @@
       res_hint: function (w) { return "✅ Правильные ответы зафиксированы. Нажмите «Закрыть», исправьте оставшиеся <b>" + w + "</b> неверных ответа и отправьте снова. Или нажмите кнопку ниже, чтобы увидеть правильные ответы."; },
       save_error: "Ошибка сохранения. Пожалуйста, откройте файл во внешнем браузере (Chrome/Safari).",
       img_del: "Удалить картинку",
+      vocab_title: "Мой словарь", vocab_add_title: "Добавить в словарь",
+      vocab_empty: "Пока нет слов. Выделите слово в тексте и нажмите ＋.",
+      vocab_added: "✅ Добавлено в словарь", vocab_exists: "Это слово уже есть",
+      vocab_del_title: "Удалить",
     },
     en: {
       part_n: function (l) { return "Part " + l; },
@@ -88,6 +96,10 @@
       res_hint: function (w) { return "✅ Correct answers are locked. Press «Close», fix the remaining <b>" + w + "</b> wrong answers and submit again. Or press the button below to see the correct answers."; },
       save_error: "Save failed. Please open the file in an external browser (Chrome/Safari).",
       img_del: "Delete image",
+      vocab_title: "My vocabulary", vocab_add_title: "Add to vocabulary",
+      vocab_empty: "No words yet. Select a word in the text and tap ＋.",
+      vocab_added: "✅ Added to vocabulary", vocab_exists: "Already in your vocabulary",
+      vocab_del_title: "Delete",
     },
   };
   var CD_LANGS = ["uz", "ru", "en"];
@@ -128,6 +140,7 @@
       b.textContent = "🌐 " + LANG.toUpperCase();
       applyI18n();
       buildBottomNav();
+      renderVocab();
       var modal = document.getElementById("results-modal");
       if (modal && !modal.classList.contains("hidden")) setResultsHint();
     });
@@ -143,6 +156,7 @@
     setupParts();
     setupEditor();
     setupHighlight();
+    setupVocab();
     setupDarkMode();
     injectPerQuestion();
     // Yakka «tekshirish» tugmalari (event delegation)
@@ -425,7 +439,10 @@
     // Passage VA savollar paneli — ikkalasida ham highlight ishlaydi
     var root = document.querySelector(".panels-container") || document.getElementById("main-container");
     var pop = document.getElementById("hl-popup");
+    var markBtn = document.getElementById("hl-mark");
+    var addBtn = document.getElementById("hl-add");
     if (!root || !pop) return;
+    var lastText = "";
     // Mavjud highlight ustiga bosib olib tashlash
     root.addEventListener("click", function (e) {
       var m = e.target.closest ? e.target.closest(".cd-hl") : null;
@@ -438,21 +455,113 @@
         if (!sel || sel.isCollapsed || !sel.toString().trim()) { pop.classList.add("hidden"); return; }
         var range = sel.getRangeAt(0);
         if (!root.contains(range.commonAncestorContainer)) { pop.classList.add("hidden"); return; }
+        lastText = sel.toString().trim();
         // Tanlov highlight ustida bo'lsa — tugma "olib tashlash" rejimida
-        pop.textContent = marksInRange(range).length ? T("hl_remove") : T("hl_add");
+        if (markBtn) markBtn.textContent = marksInRange(range).length ? T("hl_remove") : T("hl_add");
         var rect = range.getBoundingClientRect();
-        pop.style.top = (window.scrollY + rect.top - 42) + "px";
-        pop.style.left = (window.scrollX + rect.left + rect.width / 2 - 55) + "px";
         pop.classList.remove("hidden");
+        var w = pop.offsetWidth || 120;
+        pop.style.top = (window.scrollY + rect.top - 46) + "px";
+        pop.style.left = (window.scrollX + rect.left + rect.width / 2 - w / 2) + "px";
       }, 10);
     });
     pop.addEventListener("mousedown", function (e) { e.preventDefault(); });
-    pop.addEventListener("click", function () {
+    if (markBtn) markBtn.addEventListener("click", function () {
       highlightSelection();
       pop.classList.add("hidden");
     });
+    if (addBtn) addBtn.addEventListener("click", function () {
+      if (lastText) addVocabWord(lastText);
+      pop.classList.add("hidden");
+      var sel = window.getSelection(); if (sel) sel.removeAllRanges();
+    });
     document.addEventListener("mousedown", function (e) {
       if (!pop.contains(e.target)) pop.classList.add("hidden");
+    });
+  }
+
+  // ---------------------------- vocabulary ----------------------------
+  // Matndan belgilangan so'zlarni saqlash (localStorage). Pop-up jadval;
+  // har so'zni tasdiq bilan o'chirish mumkin.
+  var VOCAB_KEY = "cd-vocab";
+  function loadVocab() { try { return JSON.parse(localStorage.getItem(VOCAB_KEY) || "[]") || []; } catch (e) { return []; } }
+  function saveVocab(arr) { try { localStorage.setItem(VOCAB_KEY, JSON.stringify(arr)); } catch (e) {} }
+  function addVocabWord(text) {
+    var w = (text || "").replace(/\s+/g, " ").trim();
+    if (!w) return;
+    if (w.length > 90) w = w.slice(0, 90);
+    var v = loadVocab();
+    if (v.some(function (x) { return x.toLowerCase() === w.toLowerCase(); })) { vocabToast(T("vocab_exists")); return; }
+    v.push(w); saveVocab(v);
+    updateVocabBadge(); renderVocab();
+    vocabToast(T("vocab_added"));
+  }
+  function removeVocabWord(w) {
+    saveVocab(loadVocab().filter(function (x) { return x !== w; }));
+    updateVocabBadge();
+  }
+  function updateVocabBadge() {
+    var c = document.getElementById("cd-vocab-count");
+    if (!c) return;
+    var n = loadVocab().length;
+    c.textContent = n; c.classList.toggle("hidden", n === 0);
+  }
+  function renderVocab() {
+    var list = document.getElementById("cd-vocab-list");
+    var empty = document.getElementById("cd-vocab-empty");
+    if (!list) return;
+    var v = loadVocab();
+    if (empty) empty.classList.toggle("hidden", v.length > 0);
+    list.innerHTML = "";
+    v.forEach(function (w) {
+      var item = document.createElement("div");
+      item.className = "cd-vocab-item";
+      item.innerHTML =
+        '<span class="cd-vocab-word"></span>' +
+        '<button class="cd-vocab-del" title="' + esc(T("vocab_del_title")) + '" aria-label="delete">🗑</button>' +
+        '<span class="cd-vocab-cf"><button class="cd-vocab-yes" aria-label="confirm">✓</button>' +
+        '<button class="cd-vocab-no" aria-label="cancel">✕</button></span>';
+      item.querySelector(".cd-vocab-word").textContent = w;
+      item._word = w;
+      list.appendChild(item);
+    });
+  }
+  function vocabToast(text) {
+    var t = document.getElementById("cd-toast");
+    if (!t) return;
+    t.textContent = text;
+    t.className = "cd-toast show info";
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = "cd-toast info"; }, 2200);
+  }
+  function setupVocab() {
+    var btn = document.getElementById("cd-vocab-btn");
+    var panel = document.getElementById("cd-vocab-panel");
+    var closeB = document.getElementById("cd-vocab-close");
+    var list = document.getElementById("cd-vocab-list");
+    if (!btn || !panel) return;
+    updateVocabBadge(); renderVocab();
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (panel.classList.contains("show")) { panel.classList.remove("show"); }
+      else { renderVocab(); panel.classList.add("show"); }
+    });
+    if (closeB) closeB.addEventListener("click", function () { panel.classList.remove("show"); });
+    document.addEventListener("mousedown", function (e) {
+      if (panel.classList.contains("show") && !panel.contains(e.target) && !btn.contains(e.target)) {
+        panel.classList.remove("show");
+      }
+    });
+    if (list) list.addEventListener("click", function (e) {
+      var item = e.target.closest ? e.target.closest(".cd-vocab-item") : null;
+      if (!item) return;
+      if (e.target.closest(".cd-vocab-del")) { item.classList.add("confirming"); return; }
+      if (e.target.closest(".cd-vocab-no")) { item.classList.remove("confirming"); return; }
+      if (e.target.closest(".cd-vocab-yes")) {
+        var w = item._word;
+        item.classList.add("removing");
+        setTimeout(function () { removeVocabWord(w); renderVocab(); }, 220);
+      }
     });
   }
   function unwrapMark(m) {
@@ -936,6 +1045,7 @@
         var e = clone.querySelector("#" + id); if (e) e.remove();
       });
       clone.querySelectorAll("[contenteditable]").forEach(function (e) { e.removeAttribute("contenteditable"); });
+      var vp = clone.querySelector("#cd-vocab-panel"); if (vp) vp.classList.remove("show");
       var cls = clone.querySelector("body"); if (cls) cls.classList.remove("cd-editing", "results-mode");
       var html = "<!DOCTYPE html>\n" + clone.outerHTML;
       try {
