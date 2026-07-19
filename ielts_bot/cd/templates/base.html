@@ -142,6 +142,18 @@
         .cd-vocab-copy svg { fill:currentColor; }
         .cd-vocab-copy:hover { background:#f1f5f9; color:#16a34a; }
         .cd-vocab-copy.copied { color:#16a34a; background:#e7f6ee; }
+        /* Nusxa turi menyusi */
+        .cd-vocab-copy-wrap { position:relative; display:inline-flex; }
+        .cd-vocab-copy-menu { position:absolute; top:100%; left:0; margin-top:4px; z-index:20;
+            background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.16);
+            padding:4px; min-width:190px; display:none; }
+        .cd-vocab-copy-menu.show { display:block; }
+        .cd-vocab-copy-menu button { display:block; width:100%; text-align:left; border:none; background:none;
+            padding:8px 11px; border-radius:7px; font-size:13px; color:#111827; cursor:pointer; }
+        .cd-vocab-copy-menu button:hover { background:#eef7f1; color:#166534; }
+        body.cd-dark .cd-vocab-copy-menu { background:#1c1c22; border-color:#2a2a2e; }
+        body.cd-dark .cd-vocab-copy-menu button { color:#f0f0f0; }
+        body.cd-dark .cd-vocab-copy-menu button:hover { background:#173026; color:#9de9bd; }
         .cd-vocab-x { background:none; border:none; font-size:16px; cursor:pointer; color:#6b7280;
             padding:2px 6px; border-radius:6px; }
         .cd-vocab-x:hover { background:#f1f5f9; color:#111827; }
@@ -157,6 +169,9 @@
         .cd-vocab-item:hover { background:#f8fafc; }
         .cd-vocab-item.removing { max-height:0; opacity:0; padding-top:0; padding-bottom:0; }
         .cd-vocab-main { display:flex; align-items:flex-start; gap:8px; }
+        .cd-vocab-idx { flex:0 0 auto; min-width:18px; text-align:right; font-size:12px; font-weight:700;
+            color:#9ca3af; padding-top:4px; }
+        body.cd-dark .cd-vocab-idx { color:#6b6b73; }
         .cd-vocab-word { flex:0 0 26%; font-size:14px; font-weight:700; color:#111827;
             word-break:break-word; padding-top:3px; cursor:pointer; }
         .cd-vocab-word:hover { color:#16a34a; text-decoration:underline; text-decoration-color:#16a34a; }
@@ -499,9 +514,17 @@
     <!-- Mening lug'atim — silliq ochiladigan pop-up jadval -->
     <div id="cd-vocab-panel" class="cd-vocab-panel">
         <div class="cd-vocab-head">
-            <button id="cd-vocab-copy" class="cd-vocab-copy" data-i18n-title="vocab_copy_title" title="Barchasini nusxalash" aria-label="copy">
-                <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18"><path d="M16 1H4a2 2 0 0 0-2 2v12h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
-            </button>
+            <div class="cd-vocab-copy-wrap">
+                <button id="cd-vocab-copy" class="cd-vocab-copy" data-i18n-title="vocab_copy_title" title="Nusxalash" aria-label="copy">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18"><path d="M16 1H4a2 2 0 0 0-2 2v12h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
+                <div id="cd-vocab-copy-menu" class="cd-vocab-copy-menu">
+                    <button data-copy="def" data-i18n="vocab_copy_def">So'z + izoh</button>
+                    <button data-copy="ex" data-i18n="vocab_copy_ex">So'z + example</button>
+                    <button data-copy="defex" data-i18n="vocab_copy_defex">So'z + izoh + example</button>
+                    <button data-copy="onlyex" data-i18n="vocab_copy_onlyex">Faqat example</button>
+                </div>
+            </div>
             <span class="cd-vocab-title" data-i18n="vocab_title">Mening lug'atim</span>
             <button id="cd-vocab-close" class="cd-vocab-x" aria-label="close">✕</button>
         </div>
