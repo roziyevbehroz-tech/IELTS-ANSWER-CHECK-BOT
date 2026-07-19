@@ -142,7 +142,7 @@
         .cd-vocab-list { overflow-y:auto; padding:4px 6px 8px; }
         .cd-vocab-item { padding:7px 8px; border-radius:9px;
             transition:background .12s, max-height .2s ease, opacity .2s ease, padding .2s ease;
-            max-height:220px; overflow:hidden; }
+            max-height:600px; overflow:hidden; }
         .cd-vocab-item:hover { background:#f8fafc; }
         .cd-vocab-item.removing { max-height:0; opacity:0; padding-top:0; padding-bottom:0; }
         .cd-vocab-main { display:flex; align-items:flex-start; gap:8px; }
@@ -162,16 +162,17 @@
         .cd-vocab-note-btn:active { transform:scale(.9); }
         .cd-vocab-item.has-note .cd-vocab-note-btn { background:#16a34a; color:#fff; }
         .cd-vocab-item.noting .cd-vocab-note-btn { background:#16a34a; color:#fff; }
-        /* saqlangan izoh (yig'ilgan holatda ko'rinadi) — so'z+izoh TAGIDA, to'liq kenglikda */
-        .cd-vocab-note-show { display:none; margin:6px 2px 2px; padding:7px 11px;
+        /* saqlangan izohlar — har biri o'z qatorida, bosilsa tahrirlanadi */
+        .cd-vocab-notes { margin:0 2px; }
+        .cd-vocab-note-show { display:block; margin-top:6px; padding:7px 11px;
             background:#eef7f1; border-left:3px solid #16a34a; border-radius:7px;
             font-size:13px; color:#166534; cursor:pointer; word-break:break-word; }
-        .cd-vocab-item.has-note:not(.noting) .cd-vocab-note-show { display:block; }
         /* izoh tahrirlash qatori (＋ bosilganda ochiladi) — to'liq kenglikdagi uzun box */
-        .cd-vocab-note { display:none; margin:7px 2px 2px; gap:6px; align-items:center; }
+        .cd-vocab-note { display:none; margin:7px 2px 2px; gap:6px; align-items:flex-start; }
         .cd-vocab-item.noting .cd-vocab-note { display:flex; }
         .cd-vocab-note-input { flex:1 1 auto; min-width:0; border:1px solid #cfe9d9; border-radius:7px;
-            padding:6px 9px; font-size:13.5px; color:#111827; background:#fff; }
+            padding:6px 9px; font-size:13.5px; color:#111827; background:#fff;
+            resize:none; overflow:hidden; min-height:32px; line-height:1.45; font-family:inherit; }
         .cd-vocab-note-input:focus { outline:none; border-color:#16a34a; }
         .cd-vocab-note-save, .cd-vocab-note-cancel { flex:0 0 auto; width:28px; height:28px; border:none;
             border-radius:8px; cursor:pointer; font-size:14px; display:inline-flex; align-items:center; justify-content:center; }
@@ -227,10 +228,11 @@
         .cd-kw-cols .c-n { flex:0 0 34px; text-align:center; }
         .cd-kw-cols .c-p, .cd-kw-cols .c-q { flex:1; }
         .cd-kw-list { overflow-y:auto; padding:6px; }
-        .cd-kw-row { display:flex; align-items:center; gap:8px; padding:2px 4px; }
-        .cd-kw-num { flex:0 0 34px; text-align:center; font-weight:700; color:#9ca3af; font-size:13px; }
+        .cd-kw-row { display:flex; align-items:flex-start; gap:8px; padding:2px 4px; }
+        .cd-kw-num { flex:0 0 34px; text-align:center; font-weight:700; color:#9ca3af; font-size:13px; padding-top:9px; }
         .cd-kw-p, .cd-kw-q { flex:1; min-width:0; border:1px solid #e5e7eb; border-radius:7px;
-            padding:7px 9px; font-size:13.5px; color:#111827; background:#fff; }
+            padding:7px 9px; font-size:13.5px; color:#111827; background:#fff;
+            resize:none; overflow:hidden; min-height:34px; line-height:1.4; font-family:inherit; }
         .cd-kw-p:focus, .cd-kw-q:focus { outline:none; border-color:#7c5cd6; box-shadow:0 0 0 2px rgba(124,92,214,.12); }
         body.cd-dark .cd-kw-panel { background:#17171b; border-color:#2a2a2e; }
         body.cd-dark .cd-kw-head { border-bottom-color:#2a2a2e; }

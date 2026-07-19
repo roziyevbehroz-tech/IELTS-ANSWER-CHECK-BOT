@@ -587,8 +587,10 @@
     try {
       var raw = JSON.parse(localStorage.getItem(VOCAB_KEY) || "[]") || [];
       return raw.map(function (x) {
-        if (typeof x === "string") return { w: x, d: [], t: "" };
-        return { w: (x && x.w) || "", d: (x && x.d) || [], t: (x && x.t) || "" };
+        if (typeof x === "string") return { w: x, d: [], n: [] };
+        // n: izohlar ro'yxati (bir so'zga bir nechta). Eski t (bitta izoh) ham o'qiladi.
+        var notes = (x && x.n) ? x.n : ((x && x.t) ? [x.t] : []);
+        return { w: (x && x.w) || "", d: (x && x.d) || [], n: notes };
       }).filter(function (x) { return x.w; });
     } catch (e) { return []; }
   }
@@ -603,7 +605,7 @@
     function finish(defs) {
       var v = loadVocab();
       if (hasWord(v, w)) return false;
-      v.push({ w: w, d: defs || [], t: "" }); saveVocab(v);
+      v.push({ w: w, d: defs || [], n: [] }); saveVocab(v);
       updateVocabBadge(); renderVocab(); refreshVocabMarks();
       vocabToast(T("vocab_added"));
       return true;
@@ -619,10 +621,21 @@
     saveVocab(loadVocab().filter(function (x) { return x.w !== w; }));
     updateVocabBadge(); refreshVocabMarks();
   }
-  function setVocabTr(w, tr) {
+  function findVocabEntry(w) {
     var v = loadVocab();
-    for (var i = 0; i < v.length; i++) if (v[i].w === w) { v[i].t = tr; break; }
+    for (var i = 0; i < v.length; i++) if (v[i].w === w) return v[i];
+    return null;
+  }
+  function setVocabNotes(w, notes) {
+    var v = loadVocab();
+    for (var i = 0; i < v.length; i++) if (v[i].w === w) { v[i].n = notes; break; }
     saveVocab(v);
+  }
+  // textarea balandligini matnga moslab kengaytiradi (matn pastga tushadi)
+  function autoGrow(el) {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = (el.scrollHeight + 2) + "px";
   }
 
   // ---- passageda vocab so'zlari ostiga ingichka yashil chiziq ----
@@ -740,7 +753,8 @@
     list.innerHTML = "";
     v.forEach(function (entry) {
       var item = document.createElement("div");
-      item.className = "cd-vocab-item" + (entry.t ? " has-note" : "");
+      var notes = entry.n || [];
+      item.className = "cd-vocab-item" + (notes.length ? " has-note" : "");
       item.innerHTML =
         '<div class="cd-vocab-main">' +
           '<span class="cd-vocab-word" title="' + esc(T("vocab_locate")) + '"></span>' +
@@ -752,9 +766,9 @@
             '<button class="cd-vocab-no" aria-label="cancel">✕</button></span>' +
           '</span>' +
         '</div>' +
-        '<div class="cd-vocab-note-show"></div>' +
+        '<div class="cd-vocab-notes"></div>' +
         '<div class="cd-vocab-note">' +
-          '<input class="cd-vocab-note-input" type="text" autocomplete="off" placeholder="' + esc(T("vocab_tr_ph")) + '">' +
+          '<textarea class="cd-vocab-note-input" rows="1" autocomplete="off" placeholder="' + esc(T("vocab_tr_ph")) + '"></textarea>' +
           '<button class="cd-vocab-note-save" title="' + esc(T("vocab_note_save")) + '" aria-label="save">✓</button>' +
           '<button class="cd-vocab-note-cancel" title="' + esc(T("vocab_note_del")) + '" aria-label="delete">✕</button>' +
         '</div>';
@@ -767,9 +781,17 @@
       } else {
         defEl.innerHTML = '<span class="vd-empty">' + esc(T("vocab_no_def")) + '</span>';
       }
-      item.querySelector(".cd-vocab-note-show").textContent = entry.t || "";
-      item.querySelector(".cd-vocab-note-input").value = entry.t || "";
+      // Izoh chiplari: har biri o'z qatorida, bosilsa tahrirlanadi
+      var notesEl = item.querySelector(".cd-vocab-notes");
+      notes.forEach(function (txt, i) {
+        var chip = document.createElement("div");
+        chip.className = "cd-vocab-note-show";
+        chip.setAttribute("data-idx", String(i));
+        chip.textContent = txt;
+        notesEl.appendChild(chip);
+      });
       item._word = entry.w;
+      item._editIdx = -1;
       list.appendChild(item);
     });
   }
@@ -778,15 +800,16 @@
     if (!x.d || !x.d.length) return "";
     return x.d.map(function (d) { return (d[0] ? "(" + d[0] + ") " : "") + d[1]; }).join("; ");
   }
+  function vocabNoteStr(x) { return (x.n || []).join("; "); }
   function vocabText() {
     return loadVocab().map(function (x) {
-      return [x.w, vocabDefStr(x), x.t || ""].join("\t");
+      return [x.w, vocabDefStr(x), vocabNoteStr(x)].join("\t");
     }).join("\n");
   }
   function vocabHtml() {
     var rows = loadVocab().map(function (x) {
       return "<tr><td>" + esc(x.w) + "</td><td>" + esc(vocabDefStr(x)) +
-        "</td><td>" + esc(x.t || "") + "</td></tr>";
+        "</td><td>" + esc(vocabNoteStr(x)) + "</td></tr>";
     }).join("");
     return "<table style=\"border-collapse:collapse\" border=\"1\" cellpadding=\"6\" cellspacing=\"0\">" +
       "<thead><tr>" +
@@ -891,33 +914,40 @@
         panel.classList.remove("show");
       }
     });
-    function openNote(item) {
+    // idx: tahrirlanayotgan izoh raqami (-1 = yangi izoh qatori)
+    function openNote(item, idx) {
       item.classList.add("noting");
+      item._editIdx = (typeof idx === "number") ? idx : -1;
       var inp = item.querySelector(".cd-vocab-note-input");
-      if (inp) { inp.value = (function () {
-        var v = loadVocab(); for (var i = 0; i < v.length; i++) if (v[i].w === item._word) return v[i].t || "";
-        return "";
-      })(); setTimeout(function () { inp.focus(); }, 30); }
+      if (inp) {
+        var entry = findVocabEntry(item._word);
+        inp.value = (item._editIdx >= 0 && entry && entry.n) ? (entry.n[item._editIdx] || "") : "";
+        autoGrow(inp);
+        setTimeout(function () { inp.focus(); }, 30);
+      }
     }
     function saveNote(item) {
       var inp = item.querySelector(".cd-vocab-note-input");
       var val = inp ? inp.value.replace(/\s+/g, " ").trim() : "";
-      setVocabTr(item._word, val);
-      item.classList.remove("noting");
-      item.classList.toggle("has-note", !!val);
-      var show = item.querySelector(".cd-vocab-note-show");
-      if (show) show.textContent = val;
+      var entry = findVocabEntry(item._word);
+      var n = (entry && entry.n ? entry.n : []).slice();
+      if (item._editIdx >= 0) {
+        if (val) n[item._editIdx] = val; else n.splice(item._editIdx, 1);
+      } else if (val) n.push(val);
+      setVocabNotes(item._word, n);
+      renderVocab();
     }
+    // ✗ — tahrirlanayotgan izohni o'chiradi (yangi bo'lsa shunchaki yopadi)
     function delNote(item) {
-      var inp = item.querySelector(".cd-vocab-note-input");
-      // Izoh bor bo'lsa — o'chiramiz; bo'sh bo'lsa — shunchaki yopamiz
-      var hadNote = item.classList.contains("has-note");
-      setVocabTr(item._word, "");
-      if (inp) inp.value = "";
-      item.classList.remove("noting", "has-note");
-      var show = item.querySelector(".cd-vocab-note-show");
-      if (show) show.textContent = "";
-      return hadNote;
+      var entry = findVocabEntry(item._word);
+      var n = (entry && entry.n ? entry.n : []).slice();
+      if (item._editIdx >= 0) { n.splice(item._editIdx, 1); setVocabNotes(item._word, n); }
+      renderVocab();
+    }
+    function findItem(w) {
+      var items = list ? list.querySelectorAll(".cd-vocab-item") : [];
+      for (var i = 0; i < items.length; i++) if (items[i]._word === w) return items[i];
+      return null;
     }
     if (list) {
       list.addEventListener("click", function (e) {
@@ -932,25 +962,37 @@
           setTimeout(function () { removeVocabWord(w); renderVocab(); }, 220);
           return;
         }
-        // izoh (note) tugmalari
+        // ＋ — har bosilganda YANGI izoh qatori (avvalgisi yozilayotgan bo'lsa saqlanadi)
         if (e.target.closest(".cd-vocab-note-btn")) {
-          if (item.classList.contains("noting")) saveNote(item); else openNote(item);
+          if (item.classList.contains("noting")) {
+            var w2 = item._word;
+            saveNote(item);
+            var again = findItem(w2);
+            if (again) openNote(again, -1);
+          } else openNote(item, -1);
           return;
         }
         if (e.target.closest(".cd-vocab-note-save")) { saveNote(item); return; }
         if (e.target.closest(".cd-vocab-note-cancel")) { delNote(item); return; }
-        if (e.target.closest(".cd-vocab-note-show")) { openNote(item); return; }
+        // chip ustiga bosilsa — o'sha izohni tahrirlash
+        var chip = e.target.closest ? e.target.closest(".cd-vocab-note-show") : null;
+        if (chip) { openNote(item, parseInt(chip.getAttribute("data-idx"), 10)); return; }
         // so'z ustiga bosilsa — matndan topib porlatamiz
         if (e.target.closest(".cd-vocab-word")) { locateVocab(item._word); return; }
       });
-      // Enter — izohni saqlaydi
+      // Enter — izohni saqlaydi (Shift+Enter — yangi qator)
       list.addEventListener("keydown", function (e) {
-        if (e.key !== "Enter") return;
+        if (e.key !== "Enter" || e.shiftKey) return;
         var inp = e.target.closest ? e.target.closest(".cd-vocab-note-input") : null;
         if (!inp) return;
         e.preventDefault();
         var item = inp.closest(".cd-vocab-item");
         if (item) saveNote(item);
+      });
+      // textarea kengayishi — matn pastga tushadi, ichkarida yo'qolmaydi
+      list.addEventListener("input", function (e) {
+        var inp = e.target.closest ? e.target.closest(".cd-vocab-note-input") : null;
+        if (inp) autoGrow(inp);
       });
     }
   }
@@ -979,9 +1021,10 @@
   }
   function persistKw() { saveKw(kwNonEmpty(readKwDom())); }
   function kwRowHtml() {
+    // textarea — matn to'lsa pastga tushadi (autoGrow), ichkarida yo'qolmaydi
     return '<div class="cd-kw-row"><span class="cd-kw-num"></span>' +
-      '<input class="cd-kw-p" type="text" autocomplete="off">' +
-      '<input class="cd-kw-q" type="text" autocomplete="off"></div>';
+      '<textarea class="cd-kw-p" rows="1" autocomplete="off"></textarea>' +
+      '<textarea class="cd-kw-q" rows="1" autocomplete="off"></textarea></div>';
   }
   function renumberKw() {
     var rows = document.querySelectorAll("#cd-kw-list .cd-kw-row");
@@ -1004,8 +1047,9 @@
     list.innerHTML = data.map(kwRowHtml).join("");
     var rows = list.querySelectorAll(".cd-kw-row");
     data.forEach(function (d, i) {
-      rows[i].querySelector(".cd-kw-p").value = d.p || "";
-      rows[i].querySelector(".cd-kw-q").value = d.q || "";
+      var p = rows[i].querySelector(".cd-kw-p"), q = rows[i].querySelector(".cd-kw-q");
+      p.value = d.p || ""; q.value = d.q || "";
+      autoGrow(p); autoGrow(q);
     });
     renumberKw();
     ensureTrailingKwRow();
@@ -1054,6 +1098,7 @@
     list.addEventListener("input", function (e) {
       var t = e.target;
       if (t && t.classList && (t.classList.contains("cd-kw-p") || t.classList.contains("cd-kw-q"))) {
+        autoGrow(t);
         ensureTrailingKwRow();
         persistKw();
       }
