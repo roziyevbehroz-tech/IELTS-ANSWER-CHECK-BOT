@@ -61,6 +61,25 @@
         /* Vaqt tugaganda taymer qizil (faqat eslatma) */
         .timer-display.time-up { color:#c1121f; font-weight:700; }
 
+        /* --- Eksport (PDF/Word) menyusi --- */
+        .cd-export-wrap { position:relative; display:inline-flex; }
+        #cd-export-btn { background:none; border:none; cursor:pointer; padding:4px 6px; border-radius:8px;
+            display:inline-flex; align-items:center; }
+        #cd-export-btn svg { fill:#374151; }
+        #cd-export-btn:hover { background:rgba(0,0,0,.06); }
+        body.cd-dark #cd-export-btn svg { fill:#cfcfcf; }
+        body.cd-dark #cd-export-btn:hover { background:rgba(255,255,255,.12); }
+        .cd-export-menu { position:absolute; top:100%; right:0; margin-top:6px; z-index:340;
+            background:#fff; border:1px solid #e5e7eb; border-radius:11px; box-shadow:0 10px 30px rgba(0,0,0,.18);
+            padding:5px; min-width:170px; display:none; }
+        .cd-export-menu.show { display:block; }
+        .cd-export-menu button { display:block; width:100%; text-align:left; border:none; background:none;
+            padding:9px 12px; border-radius:8px; font-size:13.5px; color:#111827; cursor:pointer; }
+        .cd-export-menu button:hover { background:#eef2ff; color:#3730a3; }
+        body.cd-dark .cd-export-menu { background:#1c1c22; border-color:#2a2a2e; }
+        body.cd-dark .cd-export-menu button { color:#f0f0f0; }
+        body.cd-dark .cd-export-menu button:hover { background:#20233a; color:#c7d2fe; }
+
         /* --- Highlight (4 rang) — glassmorphism osmonrang panel --- */
         .cd-hl { background:#fff59d; border-radius:2px; cursor:pointer; }
         .hl-popup { position:absolute; z-index:300; border-radius:13px; display:inline-flex; align-items:center;
@@ -506,6 +525,15 @@
                 </button>
                 <button id="cd-lang-toggle" title="Til / Язык / Language" aria-label="language">🌐 UZ</button>
                 <button id="cd-theme-toggle" data-i18n-title="theme_toggle" title="Tungi/kunduzgi rejim" aria-label="theme">🌙</button>
+                <div class="cd-export-wrap">
+                    <button id="cd-export-btn" data-i18n-title="exp_title" title="Yuklab olish (PDF / Word)" aria-label="download">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="22" viewBox="0 0 24 24" width="22"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
+                    </button>
+                    <div id="cd-export-menu" class="cd-export-menu">
+                        <button data-exp="pdf">📄 <span data-i18n="exp_pdf">PDF</span></button>
+                        <button data-exp="word">📝 <span data-i18n="exp_word">Word (.doc)</span></button>
+                    </div>
+                </div>
             </div>
         </div>
         {{TELEGRAM_LINK}}

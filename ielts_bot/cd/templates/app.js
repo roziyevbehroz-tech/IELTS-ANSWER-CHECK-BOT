@@ -58,6 +58,9 @@
       kw_title: "Kalit so'zlar jadvali", kw_handle: "Kalit so'zlar jadvali — ochish",
       kw_col_passage: "Similar words in the passage", kw_col_question: "Keywords in questions",
       kw_copy_title: "Jadvalni nusxalash",
+      exp_title: "Yuklab olish (PDF / Word)", exp_pdf: "PDF", exp_word: "Word (.doc)",
+      exp_tries: "urinish", exp_answer: "Javob", exp_answer_key: "Javob kaliti",
+      exp_popup: "Pop-up bloklandi. PDF uchun yangi oynaga ruxsat bering.",
     },
     ru: {
       part_n: function (l) { return "Часть " + l; },
@@ -97,6 +100,9 @@
       kw_title: "Таблица ключевых слов", kw_handle: "Таблица ключевых слов — открыть",
       kw_col_passage: "Similar words in the passage", kw_col_question: "Keywords in questions",
       kw_copy_title: "Копировать таблицу",
+      exp_title: "Скачать (PDF / Word)", exp_pdf: "PDF", exp_word: "Word (.doc)",
+      exp_tries: "попыток", exp_answer: "Ответ", exp_answer_key: "Ключ ответов",
+      exp_popup: "Всплывающее окно заблокировано. Разрешите новое окно для PDF.",
     },
     en: {
       part_n: function (l) { return "Part " + l; },
@@ -136,6 +142,9 @@
       kw_title: "Key word table", kw_handle: "Key word table — open",
       kw_col_passage: "Similar words in the passage", kw_col_question: "Keywords in questions",
       kw_copy_title: "Copy table",
+      exp_title: "Download (PDF / Word)", exp_pdf: "PDF", exp_word: "Word (.doc)",
+      exp_tries: "tries", exp_answer: "Answer", exp_answer_key: "Answer key",
+      exp_popup: "Pop-up blocked. Allow a new window for PDF.",
     },
   };
   var CD_LANGS = ["uz", "ru", "en"];
@@ -194,6 +203,8 @@
     setupHighlight();
     setupVocab();
     setupKeywords();
+    setupExport();
+    setupBoldShortcut();
     setupDarkMode();
     injectPerQuestion();
     // Yakka «tekshirish» tugmalari (event delegation)
@@ -1189,6 +1200,183 @@
       if (panel.classList.contains("show") && !panel.contains(e.target) && !handle.contains(e.target)) {
         persistKw(); panel.classList.remove("show");
       }
+    });
+  }
+
+  // -------------------------- to'liq eksport (PDF / Word) --------------------------
+  // HTML'dagi hamma narsani — passage (highlight+yashil chiziqlar bilan),
+  // savollar (kiritilgan javob + urinish soni), javob kaliti, kalit so'zlar
+  // jadvali, lug'at — bitta hujjatga yig'ib PDF yoki Word'ga beradi.
+  function expEsc(s) { return esc(s); }
+  function staticizeQuestions(clone) {
+    clone.querySelectorAll("input").forEach(function (inp) {
+      if (inp.type === "radio" || inp.type === "checkbox") {
+        var lab = inp.closest("label");
+        var mark = document.createElement("span");
+        mark.textContent = inp.checked ? "☑ " : "☐ ";
+        if (inp.checked && lab) lab.style.fontWeight = "700";
+        if (lab) lab.insertBefore(mark, lab.firstChild);
+        inp.remove();
+      } else {
+        var s = document.createElement("span");
+        s.className = "exp-val";
+        s.textContent = (inp.value || "").trim() || "    ";
+        if (inp.value) s.style.fontWeight = "600";
+        inp.replaceWith(s);
+      }
+    });
+    clone.querySelectorAll("select").forEach(function (sel) {
+      var s = document.createElement("span");
+      s.className = "exp-val";
+      s.textContent = sel.value || "—";
+      if (sel.value) s.style.fontWeight = "600";
+      sel.replaceWith(s);
+    });
+    clone.querySelectorAll(".q-check-wrap").forEach(function (w) {
+      var qb = w.querySelector(".q-check");
+      var q = qb ? qb.getAttribute("data-q") : null;
+      var n = q ? (attempts[q] || 0) : 0;
+      var t = document.createElement("span");
+      t.className = "exp-tries";
+      t.textContent = n ? (" (" + n + " " + T("exp_tries") + ")") : "";
+      w.replaceWith(t);
+    });
+  }
+  function expSection(title, inner) {
+    if (!inner) return "";
+    return '<h2>' + expEsc(title) + '</h2>' + inner;
+  }
+  function expAnswerKeyHtml() {
+    var qs = Object.keys(D.answers || {}).map(Number).sort(function (a, b) { return a - b; });
+    if (!qs.length) return "";
+    var rows = qs.map(function (q) {
+      var a = D.answers[q];
+      if (Array.isArray(a)) a = a.join(" / ");
+      return "<tr><td>" + q + "</td><td>" + expEsc(String(a)) + "</td></tr>";
+    }).join("");
+    return '<table><thead><tr><th>#</th><th>' + expEsc(T("exp_answer")) + '</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  function expKwHtml() {
+    var d = { headers: ["#", T("kw_col_passage"), T("kw_col_question")], rows: [] };
+    kwNonEmpty(loadKw()).forEach(function (r, i) { d.rows.push([String(i + 1), r.p, r.q]); });
+    return d.rows.length ? vocabTableHtml(d) : "";
+  }
+  function expVocabHtml() {
+    var d = vocabCopyData("defex");
+    return d.rows.length ? vocabTableHtml(d) : "";
+  }
+  function buildExportDoc() {
+    var styleTags = Array.prototype.map.call(document.querySelectorAll("style"),
+      function (s) { return s.textContent; }).join("\n");
+    var override =
+      ".reading-passage.hidden,.question-set.hidden,.part-header.hidden{display:block!important}" +
+      "body{background:#fff!important;color:#111!important;margin:22px auto;max-width:940px;padding:0 20px}" +
+      ".q-check-wrap,.q-check,.q-tries{display:none!important}" +
+      ".exp-val{border-bottom:1px solid #888;padding:0 4px;min-width:44px;display:inline-block}" +
+      ".exp-tries{color:#b45309;font-size:12px;font-weight:600}" +
+      ".cd-vw{border-bottom:2px solid #16a34a}" +
+      "h1.exp-h1{text-align:center;margin:6px 0 18px}" +
+      "h2{font-size:17px;border-bottom:2px solid #444;padding-bottom:4px;margin:26px 0 10px}" +
+      ".exp-block{margin-bottom:18px}" +
+      "table{border-collapse:collapse;width:100%;margin:6px 0}" +
+      "th,td{border:1px solid #999;padding:5px 9px;text-align:left;font-size:13px}th{background:#eef}";
+    var body = ['<h1 class="exp-h1">' + expEsc(document.title || "IELTS Reading") + '</h1>'];
+    for (var i = 1; i <= partCount; i++) {
+      var pt = document.getElementById("passage-text-" + i);
+      var qs = document.getElementById("questions-" + i);
+      if (pt) {
+        var pc = pt.cloneNode(true); pc.classList.remove("hidden");
+        pc.querySelectorAll(".cd-vw").forEach(function () {});   // yashil chiziqlar saqlanadi
+        body.push('<div class="exp-block exp-passage">' + pc.innerHTML + '</div>');
+      }
+      if (qs) {
+        var qc = qs.cloneNode(true); qc.classList.remove("hidden");
+        staticizeQuestions(qc);
+        body.push('<div class="exp-block exp-questions">' + qc.innerHTML + '</div>');
+      }
+    }
+    body.push(expSection(T("exp_answer_key"), expAnswerKeyHtml()));
+    body.push(expSection(T("kw_title"), expKwHtml()));
+    body.push(expSection(T("vocab_title"), expVocabHtml()));
+    return "<!DOCTYPE html><html><head><meta charset='utf-8'><title>" +
+      expEsc(document.title || "IELTS Reading") + "</title><style>" + styleTags + "\n" + override +
+      "</style></head><body>" + body.join("\n") + "</body></html>";
+  }
+  function expFileBase() {
+    var t = (document.title || "reading").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    return "dream_zone_" + (t || "reading").slice(0, 40);
+  }
+  function exportWord() {
+    try {
+      var html = buildExportDoc();
+      var blob = new Blob(["﻿", html], { type: "application/msword" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = expFileBase() + ".doc";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    } catch (e) { alert(T("save_error")); }
+  }
+  function exportPdf() {
+    try {
+      var html = buildExportDoc();
+      var w = window.open("", "_blank");
+      if (!w) { alert(T("exp_popup")); return; }
+      w.document.open(); w.document.write(html); w.document.close();
+      var done = false;
+      function go() { if (done) return; done = true; try { w.focus(); w.print(); } catch (e) {} }
+      w.onload = go;
+      setTimeout(go, 700);
+    } catch (e) { alert(T("save_error")); }
+  }
+  function setupExport() {
+    var btn = document.getElementById("cd-export-btn");
+    var menu = document.getElementById("cd-export-menu");
+    if (!btn || !menu) return;
+    btn.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.toggle("show"); });
+    menu.addEventListener("click", function (e) {
+      var opt = e.target.closest ? e.target.closest("[data-exp]") : null;
+      if (!opt) return;
+      menu.classList.remove("show");
+      if (opt.getAttribute("data-exp") === "pdf") exportPdf(); else exportWord();
+    });
+    document.addEventListener("mousedown", function (e) {
+      if (menu.classList.contains("show") && !menu.contains(e.target) && !btn.contains(e.target)) menu.classList.remove("show");
+    });
+  }
+
+  // Ctrl/Cmd+B — tahrirlash rejimisiz ham belgilangan matnni qalin qiladi (toggle)
+  function strongsInRange(range) {
+    var out = [];
+    var anc = range.commonAncestorContainer;
+    var node = anc.nodeType === 1 ? anc : anc.parentNode;
+    var up = node && node.closest ? node.closest("strong.cd-b") : null;
+    if (up) out.push(up);
+    var rootEl = anc.nodeType === 1 ? anc : anc.parentNode;
+    if (rootEl && rootEl.querySelectorAll) {
+      rootEl.querySelectorAll("strong.cd-b").forEach(function (m) {
+        try { if (range.intersectsNode(m) && out.indexOf(m) === -1) out.push(m); } catch (e) {}
+      });
+    }
+    return out;
+  }
+  function setupBoldShortcut() {
+    var root = document.querySelector(".panels-container") || document.getElementById("main-container");
+    if (!root) return;
+    document.addEventListener("keydown", function (e) {
+      if (!(e.ctrlKey || e.metaKey) || (e.key !== "b" && e.key !== "B")) return;
+      if (document.body.classList.contains("cd-editing")) return;   // edit rejimi o'zi hal qiladi
+      var sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+      var range = sel.getRangeAt(0);
+      if (!root.contains(range.commonAncestorContainer)) return;
+      e.preventDefault();
+      var existing = strongsInRange(range);
+      if (existing.length) { existing.forEach(unwrapMark); sel.removeAllRanges(); return; }
+      var b = document.createElement("strong"); b.className = "cd-b";
+      try { range.surroundContents(b); }
+      catch (err) { b.appendChild(range.extractContents()); range.insertNode(b); }
+      sel.removeAllRanges();
     });
   }
 
