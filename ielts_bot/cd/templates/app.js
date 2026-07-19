@@ -470,11 +470,10 @@
     // Passage VA savollar paneli — ikkalasida ham highlight ishlaydi
     var root = document.querySelector(".panels-container") || document.getElementById("main-container");
     var pop = document.getElementById("hl-popup");
-    var markBtn = document.getElementById("hl-mark");
     var addBtn = document.getElementById("hl-add");
     var defBtn = document.getElementById("hl-def");
     if (!root || !pop) return;
-    var lastText = "", lastRect = null;
+    var lastText = "", lastRect = null, lastRange = null;
     // Mavjud highlight ustiga bosib olib tashlash
     root.addEventListener("click", function (e) {
       var m = e.target.closest ? e.target.closest(".cd-hl") : null;
@@ -489,19 +488,21 @@
         if (!root.contains(range.commonAncestorContainer)) { hideHL(); return; }
         lastText = sel.toString().trim();
         lastRect = range.getBoundingClientRect();
+        lastRange = range.cloneRange();
         hideDefCloud();   // yangi tanlov — eski bulutni yopamiz
-        // Tanlov highlight ustida bo'lsa — tugma "olib tashlash" rejimida
-        if (markBtn) markBtn.textContent = marksInRange(range).length ? T("hl_remove") : T("hl_add");
         // Panelni so'z OSTIGA joylashtiramiz (bulut ustidan chiqadi)
         pop.classList.remove("hidden");
-        var w = pop.offsetWidth || 140;
+        var w = pop.offsetWidth || 180;
         pop.style.top = (window.scrollY + lastRect.bottom + 8) + "px";
         pop.style.left = (window.scrollX + lastRect.left + lastRect.width / 2 - w / 2) + "px";
       }, 10);
     });
     pop.addEventListener("mousedown", function (e) { e.preventDefault(); });
-    if (markBtn) markBtn.addEventListener("click", function () {
-      highlightSelection();
+    // Rang namunalari — bosilsa tanlovni o'sha rangda belgilaydi (yoki qayta rang beradi)
+    pop.addEventListener("click", function (e) {
+      var sw = e.target.closest ? e.target.closest(".hl-swatch") : null;
+      if (!sw) return;
+      highlightSelection(sw.getAttribute("data-c"));
       hideHL();
     });
     if (defBtn) defBtn.addEventListener("click", function () {
@@ -1170,20 +1171,29 @@
     }
     return out;
   }
-  function highlightSelection() {
+  // 4 ta yorqin highlight rangi (inline — saqlanganda ham, ikkala rejimda ham ishlaydi)
+  var HL_COLORS = { yellow: "#ffe066", green: "#8ee88e", red: "#ff9d9d", orange: "#ffbe6b" };
+  function applyHlColor(m, color) {
+    var c = HL_COLORS[color] ? color : "yellow";
+    m.setAttribute("data-c", c);
+    m.style.background = HL_COLORS[c];
+    m.style.color = "#1a1a1a";   // yorqin fon ustida qora matn — ikkala rejimda o'qiladi
+  }
+  function highlightSelection(color) {
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     var range = sel.getRangeAt(0);
     if (range.collapsed) return;
-    // Toggle: tanlov highlight ustida bo'lsa — olib tashlaymiz
+    // Tanlov mavjud highlight ustida bo'lsa — o'sha rangга qayta bo'yaymiz
     var existing = marksInRange(range);
     if (existing.length) {
-      existing.forEach(unwrapMark);
+      existing.forEach(function (m) { applyHlColor(m, color); });
       sel.removeAllRanges();
       return;
     }
     var mark = document.createElement("span");
     mark.className = "cd-hl";
+    applyHlColor(mark, color);
     try { range.surroundContents(mark); }
     catch (e) { mark.appendChild(range.extractContents()); range.insertNode(mark); }
     sel.removeAllRanges();
