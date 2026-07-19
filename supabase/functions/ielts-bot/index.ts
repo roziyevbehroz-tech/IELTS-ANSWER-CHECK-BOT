@@ -805,29 +805,79 @@ function docxToText(data: Uint8Array): string {
   return xml;
 }
 // PDF -> matn: pdf.js text-item'laridan qator/paragraf tuzilishini tiklaydi
-// (Y-koordinata bo'yicha). Skanerlangan (rasm) PDF'lar OCR talab qiladi — ular
-// uchun matn topilmaydi va foydalanuvchidan matn/DOCX so'raladi.
+// (Y-koordinata bo'yicha). Ikki USTUNLI sahifalar aniqlanadi va o'qish
+// tartibiga keltiriladi (chap ustun to'liq, keyin o'ng ustun) — element
+// tartibi buzuq PDF'larda ham. Skanerlangan (rasm) PDF'lar OCR talab qiladi.
+interface PdfIt { str: string; x: number; y: number; w: number; h: number; }
+
+function pdfReconstruct(items: PdfIt[], out: string): string {
+  let prevY: number | null = null, prevH = 0, prevEndX = 0;
+  for (const it of items) {
+    const { x, y, w, h } = it;
+    if (prevY !== null) {
+      const gap = prevY - y;
+      if (gap > h * 1.8) out += "\n\n";           // paragraf oralig'i
+      else if (gap > h * 0.4) out += "\n";        // yangi qator
+      else if (x - prevEndX > h * 0.25 && !out.endsWith(" ")) out += " "; // so'z oralig'i
+    }
+    out += it.str;
+    prevY = y; prevH = h; prevEndX = x + w;
+  }
+  return out;
+}
+
+// Ikki ustunli sahifani aniqlab, elementlarni o'qish tartibidagi guruhlarga
+// bo'ladi: [sarlavha(lar), chap ustun, o'ng ustun, pastki yozuvlar].
+// Bir ustunli sahifada asl tartib o'zgarmaydi (regressiya xavfsiz).
+function pdfOrderItems(items: PdfIt[], pageW: number): PdfIt[][] {
+  const mid = pageW / 2, eps = pageW * 0.05;
+  const left: PdfIt[] = [], right: PdfIt[] = [], full: PdfIt[] = [];
+  for (const it of items) {
+    if (it.x < mid && it.x + it.w > mid + eps) full.push(it);
+    else if (it.x >= mid - eps * 0.4) right.push(it);
+    else left.push(it);
+  }
+  if (left.length < 6 || right.length < 6) return [items];
+  // Haqiqiy 2-ustun: o'ng ustun qatorlari BIR XIL x'dan boshlanadi (ustun boshi).
+  // Bir ustunli matnda o'ngdagi bo'laklar qator davomi — x tarqoq bo'ladi.
+  const xs = right.map((i) => i.x).sort((a, b) => a - b);
+  const medX = xs[Math.floor(xs.length / 2)];
+  const aligned = right.filter((i) => Math.abs(i.x - medX) < pageW * 0.012);
+  if (aligned.length < 6 || aligned.length < right.length * 0.6) return [items];
+  const ys = (a: PdfIt[]) => [Math.min(...a.map((i) => i.y)), Math.max(...a.map((i) => i.y))];
+  const [lLo, lHi] = ys(left), [rLo, rHi] = ys(right);
+  const overlap = Math.min(lHi, rHi) - Math.max(lLo, rLo);
+  const span = Math.min(lHi - lLo, rHi - rLo);
+  if (span <= 0 || overlap < span * 0.5) return [items];
+  const bandTop = Math.max(lHi, rHi);
+  const byY = (a: PdfIt, b: PdfIt) => (b.y - a.y) || (a.x - b.x);
+  const header = full.filter((i) => i.y > bandTop).sort(byY);
+  const inband = full.filter((i) => i.y <= bandTop && i.y >= Math.min(lLo, rLo)).sort(byY);
+  const footer = full.filter((i) => i.y < Math.min(lLo, rLo)).sort(byY);
+  const leftAll = left.concat(inband).sort(byY);
+  return [header, leftAll, right.slice().sort(byY), footer].filter((g) => g.length);
+}
+
 async function pdfToText(data: Uint8Array): Promise<string> {
   const pdf = await getDocumentProxy(data);
   let out = "";
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    let prevY: number | null = null, prevH = 0, prevEndX = 0;
+    const view = (page as any).view || [0, 0, 595, 842];
+    const pageW = view[2] - view[0];
+    const items: PdfIt[] = [];
+    let prevH = 0;
     for (const it of content.items as any[]) {
       if (typeof it.str !== "string") continue;
-      const x = it.transform[4], y = it.transform[5];
-      const w = it.width || 0, h = it.height || prevH || 11;
-      if (prevY !== null) {
-        const gap = prevY - y;
-        if (gap > h * 1.8) out += "\n\n";           // paragraf oralig'i
-        else if (gap > h * 0.4) out += "\n";        // yangi qator
-        else if (x - prevEndX > h * 0.25 && !out.endsWith(" ")) out += " "; // so'z oralig'i
-      }
-      out += it.str;
-      prevY = y; prevH = h; prevEndX = x + w;
+      const h = it.height || prevH || 11;
+      items.push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0, h });
+      prevH = h;
     }
-    out += "\n\n";
+    for (const g of pdfOrderItems(items, pageW)) {
+      out = pdfReconstruct(g, out);
+      out += "\n\n";
+    }
   }
   return out;
 }
