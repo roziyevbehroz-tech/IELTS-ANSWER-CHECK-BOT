@@ -10,6 +10,7 @@ import base64
 import html
 import json
 import re
+import uuid
 from pathlib import Path
 from typing import Dict, List
 
@@ -436,6 +437,8 @@ def _build_data(test: ReadingTest) -> Dict:
         "groups": groups,
         "parts": parts,
         "partNos": part_nos,
+        # Noyob test ID — har HTML fayl lug'ati/jadvali alohida saqlanishi uchun
+        "tid": uuid.uuid4().hex[:12],
         "settings": {"duration": duration, "lang": test.settings.lang or "uz"},
     }
 

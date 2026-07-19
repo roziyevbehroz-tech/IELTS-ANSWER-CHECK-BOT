@@ -1245,8 +1245,10 @@ function buildData(test: ReadingTest) {
   const partNos = test.passages.map((p, i) => p.partNo || (i + 1));
   // Vaqt passage soniga qarab: 1→20, 2→40, 3→60 daqiqa (faqat eslatma)
   const duration = 20 * Math.max(1, test.passages.length);
+  // Noyob test ID — har HTML fayl lug'ati/jadvali alohida saqlanishi uchun
+  const tid = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
   return {
-    answers, groups, parts, partNos,
+    answers, groups, parts, partNos, tid,
     settings: { duration, lang: test.settings.lang || "uz" },
   };
 }
