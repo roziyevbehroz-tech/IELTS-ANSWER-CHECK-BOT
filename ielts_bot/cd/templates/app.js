@@ -575,6 +575,9 @@
   // fayllar bilan aralashmaydi.
   function testSig() {
     try {
+      // Yangi fayllar: renderda yozilgan noyob ID (fayllar hech qachon to'qnashmaydi)
+      if (D && D.tid) return String(D.tid);
+      // Eski fayllar: mazmun-imzo (title + savol soni + part diapazonlari)
       var s = (document.title || "") + "|" + Object.keys(D.answers || {}).length +
         "|" + JSON.stringify(D.parts || []);
       var h = 5381;
@@ -914,10 +917,22 @@
         panel.classList.remove("show");
       }
     });
-    // idx: tahrirlanayotgan izoh raqami (-1 = yangi izoh qatori)
-    function openNote(item, idx) {
+    // idx: tahrirlanayotgan izoh raqami (-1 = yangi izoh qatori).
+    // Mavjud izoh tahrirlanganda editor O'SHA chip o'rnida ochiladi
+    // (chip yashiriladi) — pastda "yangi qator" ochilib chalg'itmaydi.
+    function openNote(item, idx, chip) {
       item.classList.add("noting");
       item._editIdx = (typeof idx === "number") ? idx : -1;
+      var ed = item.querySelector(".cd-vocab-note");
+      var notesEl = item.querySelector(".cd-vocab-notes");
+      if (ed && notesEl) {
+        if (item._editIdx >= 0 && chip) {
+          chip.style.display = "none";
+          notesEl.insertBefore(ed, chip.nextSibling);
+        } else {
+          notesEl.appendChild(ed);   // yangi izoh — chiplar tagida
+        }
+      }
       var inp = item.querySelector(".cd-vocab-note-input");
       if (inp) {
         var entry = findVocabEntry(item._word);
@@ -926,16 +941,20 @@
         setTimeout(function () { inp.focus(); }, 30);
       }
     }
+    // true qaytaradi — agar mavjud izoh bo'shatilib O'CHIRILGAN bo'lsa
     function saveNote(item) {
       var inp = item.querySelector(".cd-vocab-note-input");
       var val = inp ? inp.value.replace(/\s+/g, " ").trim() : "";
       var entry = findVocabEntry(item._word);
       var n = (entry && entry.n ? entry.n : []).slice();
+      var removed = false;
       if (item._editIdx >= 0) {
-        if (val) n[item._editIdx] = val; else n.splice(item._editIdx, 1);
+        if (val) n[item._editIdx] = val;
+        else { n.splice(item._editIdx, 1); removed = true; }
       } else if (val) n.push(val);
       setVocabNotes(item._word, n);
       renderVocab();
+      return removed;
     }
     // ✗ — tahrirlanayotgan izohni o'chiradi (yangi bo'lsa shunchaki yopadi)
     function delNote(item) {
@@ -974,17 +993,36 @@
         }
         if (e.target.closest(".cd-vocab-note-save")) { saveNote(item); return; }
         if (e.target.closest(".cd-vocab-note-cancel")) { delNote(item); return; }
-        // chip ustiga bosilsa — o'sha izohni tahrirlash
+        // chip ustiga bosilsa — O'SHA izohni o'z joyida tahrirlash.
+        // Boshqa izoh yozilayotgan bo'lsa — avval u saqlanadi.
         var chip = e.target.closest ? e.target.closest(".cd-vocab-note-show") : null;
-        if (chip) { openNote(item, parseInt(chip.getAttribute("data-idx"), 10)); return; }
+        if (chip) {
+          var cw = item._word;
+          var cIdx = parseInt(chip.getAttribute("data-idx"), 10);
+          if (item.classList.contains("noting")) {
+            var prevIdx = item._editIdx;
+            var removedNow = saveNote(item);   // DOM qayta chiziladi
+            if (removedNow && prevIdx >= 0 && prevIdx < cIdx) cIdx--;
+            item = findItem(cw);
+            if (!item) return;
+            var chips = item.querySelectorAll(".cd-vocab-note-show");
+            if (!chips.length) return;
+            if (cIdx >= chips.length) cIdx = chips.length - 1;
+            openNote(item, cIdx, chips[cIdx]);
+          } else {
+            openNote(item, cIdx, chip);
+          }
+          return;
+        }
         // so'z ustiga bosilsa — matndan topib porlatamiz
         if (e.target.closest(".cd-vocab-word")) { locateVocab(item._word); return; }
       });
-      // Enter — izohni saqlaydi (Shift+Enter — yangi qator)
+      // Enter — saqlaydi (Shift+Enter — yangi qator) · Escape — o'zgarishni bekor qiladi
       list.addEventListener("keydown", function (e) {
-        if (e.key !== "Enter" || e.shiftKey) return;
         var inp = e.target.closest ? e.target.closest(".cd-vocab-note-input") : null;
         if (!inp) return;
+        if (e.key === "Escape") { e.preventDefault(); renderVocab(); return; }
+        if (e.key !== "Enter" || e.shiftKey) return;
         e.preventDefault();
         var item = inp.closest(".cd-vocab-item");
         if (item) saveNote(item);
