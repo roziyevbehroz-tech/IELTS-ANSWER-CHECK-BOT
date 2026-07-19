@@ -61,22 +61,33 @@
         /* Vaqt tugaganda taymer qizil (faqat eslatma) */
         .timer-display.time-up { color:#c1121f; font-weight:700; }
 
-        /* --- Highlight --- */
+        /* --- Highlight (4 rang) — glassmorphism osmonrang panel --- */
         .cd-hl { background:#fff59d; border-radius:2px; cursor:pointer; }
-        .hl-popup { position:absolute; z-index:300; background:#1f2937; color:#fff;
-            font-size:13px; font-weight:600; border-radius:9px; display:inline-flex; align-items:stretch;
-            box-shadow:0 3px 12px rgba(0,0,0,.32); white-space:nowrap; user-select:none; overflow:hidden; }
+        .hl-popup { position:absolute; z-index:300; border-radius:13px; display:inline-flex; align-items:center;
+            gap:7px; padding:7px 10px; white-space:nowrap; user-select:none;
+            background:rgba(186,230,253,.5); -webkit-backdrop-filter:blur(12px) saturate(1.5);
+            backdrop-filter:blur(12px) saturate(1.5);
+            border:1px solid rgba(255,255,255,.6); box-shadow:0 8px 26px rgba(30,90,170,.28); }
         /* popup so'z OSTIDA — tail yuqoriga qaraydi */
-        .hl-popup::after { content:""; position:absolute; left:50%; top:-5px; transform:translateX(-50%);
-            border:5px solid transparent; border-bottom-color:#1f2937; border-top:0; }
-        .hl-act { padding:7px 12px; cursor:pointer; display:inline-flex; align-items:center; }
-        .hl-act:hover { background:#111827; }
-        .hl-plus { border-left:1px solid rgba(255,255,255,.18); font-size:18px; font-weight:400;
-            color:#7ee2a8; padding:4px 12px; }
-        .hl-plus:hover { background:#123524; color:#a9f0c6; }
-        .hl-quest { border-left:1px solid rgba(255,255,255,.18); font-size:15px; font-weight:800;
-            color:#8ec5ff; padding:4px 13px; }
-        .hl-quest:hover { background:#12243a; color:#bcdcff; }
+        .hl-popup::after { content:""; position:absolute; left:50%; top:-6px; transform:translateX(-50%);
+            border:6px solid transparent; border-bottom-color:rgba(210,238,253,.7); border-top:0; }
+        .hl-swatch { width:21px; height:21px; border-radius:50%; cursor:pointer;
+            border:2px solid rgba(255,255,255,.85); box-shadow:0 1px 3px rgba(0,0,0,.2);
+            transition:transform .12s, filter .12s, box-shadow .12s; }
+        .hl-swatch:hover { transform:scale(1.22); filter:brightness(1.12); box-shadow:0 2px 8px rgba(0,0,0,.3); }
+        .hl-sep { width:1px; align-self:stretch; margin:3px 1px; background:rgba(40,80,130,.28); }
+        .hl-act { cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+            width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.5);
+            transition:transform .12s, filter .12s, background .12s; }
+        .hl-plus { font-size:20px; font-weight:400; color:#0c7a3f; }
+        .hl-plus:hover { transform:scale(1.2); filter:brightness(1.08); background:rgba(210,245,224,.85); }
+        .hl-quest { font-size:16px; font-weight:800; color:#0b5cad; }
+        .hl-quest:hover { transform:scale(1.2); filter:brightness(1.08); background:rgba(209,231,251,.9); }
+        body.cd-dark .hl-popup { background:rgba(56,110,168,.42); border-color:rgba(255,255,255,.35); }
+        body.cd-dark .hl-popup::after { border-bottom-color:rgba(70,120,175,.6); }
+        body.cd-dark .hl-act { background:rgba(255,255,255,.14); }
+        body.cd-dark .hl-plus { color:#8ff0b8; }
+        body.cd-dark .hl-quest { color:#a7d2ff; }
 
         /* --- Ma'no buluti (definition) — so'z ustidan chiqadi --- */
         .cd-def-cloud { position:absolute; z-index:360; width:330px; max-width:90vw; max-height:230px;
@@ -539,7 +550,11 @@
     </div>
 
     <div id="hl-popup" class="hl-popup hidden">
-        <span id="hl-mark" class="hl-act" data-i18n="hl_add">🖍 Highlight</span>
+        <span class="hl-swatch" data-c="yellow" style="background:#ffe066" title="Sariq"></span>
+        <span class="hl-swatch" data-c="green" style="background:#8ee88e" title="Yashil"></span>
+        <span class="hl-swatch" data-c="red" style="background:#ff9d9d" title="Qizil"></span>
+        <span class="hl-swatch" data-c="orange" style="background:#ffbe6b" title="Orange"></span>
+        <span class="hl-sep"></span>
         <span id="hl-add" class="hl-act hl-plus" data-i18n-title="vocab_add_title" title="Lug'atga qo'shish">＋</span>
         <span id="hl-def" class="hl-act hl-quest" data-i18n-title="vocab_def_title" title="Ma'nosi">?</span>
     </div>
