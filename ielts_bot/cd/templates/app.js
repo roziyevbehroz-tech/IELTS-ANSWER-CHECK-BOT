@@ -45,7 +45,9 @@
       vocab_title: "Mening lug'atim", vocab_add_title: "Lug'atga qo'shish",
       vocab_empty: "Hozircha so'z yo'q. Matndan so'z belgilab ＋ ni bosing.",
       vocab_added: "✅ Lug'atga qo'shildi", vocab_exists: "Bu so'z allaqachon bor",
-      vocab_del_title: "O'chirish", vocab_copy_title: "Barchasini nusxalash",
+      vocab_del_title: "O'chirish", vocab_copy_title: "Nusxalash",
+      vocab_copy_def: "So'z + izoh", vocab_copy_ex: "So'z + example",
+      vocab_copy_defex: "So'z + izoh + example", vocab_copy_onlyex: "Faqat example",
       vocab_copied: "✅ Nusxalandi", vocab_tr_ph: "tarjima / izoh / example…",
       vocab_col_word: "So'z", vocab_col_tr: "Tarjima", vocab_col_def: "Izoh",
       vocab_col_note: "Izoh/tarjima", vocab_note_add: "Izoh yoki tarjima qo'shish",
@@ -82,7 +84,9 @@
       vocab_title: "Мой словарь", vocab_add_title: "Добавить в словарь",
       vocab_empty: "Пока нет слов. Выделите слово в тексте и нажмите ＋.",
       vocab_added: "✅ Добавлено в словарь", vocab_exists: "Это слово уже есть",
-      vocab_del_title: "Удалить", vocab_copy_title: "Копировать всё",
+      vocab_del_title: "Удалить", vocab_copy_title: "Копировать",
+      vocab_copy_def: "Слово + значение", vocab_copy_ex: "Слово + example",
+      vocab_copy_defex: "Слово + значение + example", vocab_copy_onlyex: "Только example",
       vocab_copied: "✅ Скопировано", vocab_tr_ph: "перевод / заметка / пример…",
       vocab_col_word: "Слово", vocab_col_tr: "Перевод", vocab_col_def: "Значение",
       vocab_col_note: "Заметка/перевод", vocab_note_add: "Добавить заметку или перевод",
@@ -119,7 +123,9 @@
       vocab_title: "My vocabulary", vocab_add_title: "Add to vocabulary",
       vocab_empty: "No words yet. Select a word in the text and tap ＋.",
       vocab_added: "✅ Added to vocabulary", vocab_exists: "Already in your vocabulary",
-      vocab_del_title: "Delete", vocab_copy_title: "Copy all",
+      vocab_del_title: "Delete", vocab_copy_title: "Copy",
+      vocab_copy_def: "Word + definition", vocab_copy_ex: "Word + example",
+      vocab_copy_defex: "Word + definition + example", vocab_copy_onlyex: "Only example",
       vocab_copied: "✅ Copied", vocab_tr_ph: "translation / note / example…",
       vocab_col_word: "Word", vocab_col_tr: "Translation", vocab_col_def: "Definition",
       vocab_col_note: "Note/translation", vocab_note_add: "Add a note or translation",
@@ -755,12 +761,13 @@
     if (empty) empty.classList.toggle("hidden", v.length > 0);
     if (cols) cols.classList.toggle("hidden", v.length === 0);
     list.innerHTML = "";
-    v.forEach(function (entry) {
+    v.forEach(function (entry, i) {
       var item = document.createElement("div");
       var notes = entry.n || [];
       item.className = "cd-vocab-item" + (notes.length ? " has-note" : "");
       item.innerHTML =
         '<div class="cd-vocab-main">' +
+          '<span class="cd-vocab-idx">' + (i + 1) + '</span>' +
           '<span class="cd-vocab-word" title="' + esc(T("vocab_locate")) + '"></span>' +
           '<div class="cd-vocab-def"></div>' +
           '<span class="cd-vocab-acts">' +
@@ -805,22 +812,36 @@
     return x.d.map(function (d) { return (d[0] ? "(" + d[0] + ") " : "") + d[1]; }).join("; ");
   }
   function vocabNoteStr(x) { return (x.n || []).join("; "); }
-  function vocabText() {
-    return loadVocab().map(function (x) {
-      return [x.w, vocabDefStr(x), vocabNoteStr(x)].join("\t");
-    }).join("\n");
+  // Nusxa turlari: def (so'z+izoh) · ex (so'z+example) · defex (so'z+izoh+example)
+  // · onlyex (faqat example). "example" — foydalanuvchi qo'shgan izohlar (n).
+  function vocabCopyData(type) {
+    var v = loadVocab();
+    var H = { num: "#", w: T("vocab_col_word"), d: T("vocab_col_def"), e: T("vocab_col_note") };
+    var headers, rows = [];
+    if (type === "ex") headers = [H.num, H.w, H.e];
+    else if (type === "defex") headers = [H.num, H.w, H.d, H.e];
+    else if (type === "onlyex") headers = [H.e];
+    else { type = "def"; headers = [H.num, H.w, H.d]; }
+    var k = 0;
+    v.forEach(function (x) {
+      var def = vocabDefStr(x), note = vocabNoteStr(x);
+      if (type === "ex") rows.push([String(++k), x.w, note]);
+      else if (type === "defex") rows.push([String(++k), x.w, def, note]);
+      else if (type === "onlyex") { if (note) rows.push([note]); }
+      else rows.push([String(++k), x.w, def]);
+    });
+    return { headers: headers, rows: rows };
   }
-  function vocabHtml() {
-    var rows = loadVocab().map(function (x) {
-      return "<tr><td>" + esc(x.w) + "</td><td>" + esc(vocabDefStr(x)) +
-        "</td><td>" + esc(vocabNoteStr(x)) + "</td></tr>";
+  function vocabTableHtml(d) {
+    var th = d.headers.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("");
+    var tr = d.rows.map(function (r) {
+      return "<tr>" + r.map(function (c) { return "<td>" + esc(c) + "</td>"; }).join("") + "</tr>";
     }).join("");
     return "<table style=\"border-collapse:collapse\" border=\"1\" cellpadding=\"6\" cellspacing=\"0\">" +
-      "<thead><tr>" +
-      "<th>" + esc(T("vocab_col_word")) + "</th>" +
-      "<th>" + esc(T("vocab_col_def")) + "</th>" +
-      "<th>" + esc(T("vocab_col_note")) + "</th>" +
-      "</tr></thead><tbody>" + rows + "</tbody></table>";
+      "<thead><tr>" + th + "</tr></thead><tbody>" + tr + "</tbody></table>";
+  }
+  function vocabTableText(d) {
+    return d.rows.map(function (r) { return r.join("\t"); }).join("\n");
   }
   function vocabToast(text) {
     var t = document.getElementById("cd-toast");
@@ -854,10 +875,11 @@
       setTimeout(function () { btn.classList.remove("cd-vocab-bump"); }, 300);
     }, 520);
   }
-  function copyVocab(btn) {
+  function copyVocab(btn, type) {
     if (!loadVocab().length) return;
-    var text = vocabText();
-    var html = vocabHtml();
+    var d = vocabCopyData(type || "defex");
+    var text = vocabTableText(d);
+    var html = vocabTableHtml(d);
     function done() {
       if (!btn) return;
       btn.classList.add("copied");
@@ -912,7 +934,28 @@
       else { renderVocab(); panel.classList.add("show"); }
     });
     if (closeB) closeB.addEventListener("click", function () { panel.classList.remove("show"); });
-    if (copyB) copyB.addEventListener("click", function () { copyVocab(copyB); });
+    // Nusxa turi menyusi: so'z+izoh / so'z+example / so'z+izoh+example / faqat example
+    var copyMenu = document.getElementById("cd-vocab-copy-menu");
+    if (copyB && copyMenu) {
+      copyB.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!loadVocab().length) return;
+        copyMenu.classList.toggle("show");
+      });
+      copyMenu.addEventListener("click", function (e) {
+        var opt = e.target.closest ? e.target.closest("[data-copy]") : null;
+        if (!opt) return;
+        copyVocab(copyB, opt.getAttribute("data-copy"));
+        copyMenu.classList.remove("show");
+      });
+      document.addEventListener("mousedown", function (e) {
+        if (copyMenu.classList.contains("show") && !copyMenu.contains(e.target) && !copyB.contains(e.target)) {
+          copyMenu.classList.remove("show");
+        }
+      });
+    } else if (copyB) {
+      copyB.addEventListener("click", function () { copyVocab(copyB, "defex"); });
+    }
     document.addEventListener("mousedown", function (e) {
       if (panel.classList.contains("show") && !panel.contains(e.target) && !btn.contains(e.target)) {
         panel.classList.remove("show");
