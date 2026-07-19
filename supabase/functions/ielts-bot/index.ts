@@ -202,7 +202,8 @@ function sendAnswersPrompt(book: number, test: number, section: string, part: st
 
 // ------------------------------- klaviaturalar -------------------------------
 
-type Btn = { text: string; callback_data?: string; web_app?: { url: string } };
+// style (Bot API 9.4+): "primary" ko'k · "success" yashil · "danger" qizil
+type Btn = { text: string; callback_data?: string; web_app?: { url: string }; style?: string };
 
 function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = [];
@@ -954,10 +955,13 @@ async function sendDocumentHtml(chatId: number, filename: string, html: string, 
 
 // ---- klaviaturalar ----
 function cdSkillKb(lang: Lang) {
+  // Rangli tugmalar (Bot API 9.4 style): tayyor bo'lim yashil, qolganlari qizil
   return {
     inline_keyboard: [
-      [{ text: "🟢 Reading", callback_data: "cd:skill:reading" }, { text: "🔴 Listening", callback_data: "cd:skill:listening" }],
-      [{ text: "🔴 Speaking", callback_data: "cd:skill:speaking" }, { text: "🔴 Writing", callback_data: "cd:skill:writing" }],
+      [{ text: "Reading", callback_data: "cd:skill:reading", style: "success" },
+       { text: "Listening", callback_data: "cd:skill:listening", style: "danger" }],
+      [{ text: "Speaking", callback_data: "cd:skill:speaking", style: "danger" },
+       { text: "Writing", callback_data: "cd:skill:writing", style: "danger" }],
       [{ text: t(lang, "btn_home"), callback_data: "cd:cancel" }],
     ],
   };
