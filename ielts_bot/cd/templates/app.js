@@ -449,7 +449,15 @@
       if (wrap.classList) wrap.classList.add("q-active");
       if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    updateNavArrows();
     refreshBottomNav();
+  }
+  // Prev/Next strelkalar holati — joriy savol o'rniga qarab (part ichida ham)
+  function updateNavArrows() {
+    var idx = qList.indexOf(currentQuestion);
+    var pb = document.getElementById("prevBtn"), nb = document.getElementById("nextBtn");
+    if (pb) pb.disabled = idx <= 0;
+    if (nb) nb.disabled = idx >= qList.length - 1;
   }
   function stepQuestion(dir) {
     var idx = qList.indexOf(currentQuestion);
