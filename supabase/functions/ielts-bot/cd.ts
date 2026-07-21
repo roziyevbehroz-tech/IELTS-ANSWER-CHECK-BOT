@@ -1219,13 +1219,17 @@ function answerValue(ans: string, kind: string): string | string[] {
   ans = String(ans).trim();
   if (kind === "tfng" || kind === "ynng") return TF_CANON[ans.toLowerCase()] ?? ans.toUpperCase();
   if (kind === "mcq" || kind === "matching" || kind === "mcq_multi") return ans.toUpperCase();
+  // Muqobil ajratkichlar: "/", "yoki", "or", "или" ("toothbrushes yoki toothpaste")
+  const ALT = /\s*\/\s*|\s+yoki\s+|\s+или\s+|\s+or\s+/i;
   const variants: string[] = [];
-  for (const alt of ans.split("/")) {
+  for (const alt of ans.split(ALT)) {
     const a = alt.trim();
     if (!a) continue;
     for (const exp of expandOptionals(a)) {
-      const e = exp.replace(/\s+/g, " ").trim();
-      if (e) variants.push(e);
+      for (const piece of exp.split(ALT)) {   // ixtiyoriy () ichidagi "yoki" ham
+        const e = piece.replace(/\s+/g, " ").trim();
+        if (e) variants.push(e);
+      }
     }
   }
   if (!variants.length) variants.push(ans);

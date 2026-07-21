@@ -30,6 +30,8 @@ _TF_CANON = {
 }
 _TFNG_OPTS = ["TRUE", "FALSE", "NOT GIVEN"]
 _YNNG_OPTS = ["YES", "NO", "NOT GIVEN"]
+# Muqobil javob ajratkichlari: "/", "yoki", "or", "или" (bo'shliq bilan)
+_ALT_SPLIT = re.compile(r"\s*/\s*|\s+yoki\s+|\s+или\s+|\s+or\s+", re.IGNORECASE)
 
 
 def render_test(test: ReadingTest) -> str:
@@ -456,16 +458,19 @@ def _answer_value(ans: str, kind: str):
         return _TF_CANON.get(ans.lower(), ans.upper())
     if kind in ("mcq", "matching", "mcq_multi"):
         return ans.upper()
-    # gap — muqobil (/) va ixtiyoriy (()) variantlarni yoyamiz (matn taqqoslash)
+    # gap — muqobil variantlarni yoyamiz. Ajratkichlar: "/", "yoki", "or", "или"
+    # (o'qituvchi "toothbrushes yoki toothpaste" deb yozsa — ikkalasi ham to'g'ri).
+    # Ixtiyoriy (()) qismlar ham yoyiladi (matn taqqoslash uchun).
     variants = []
-    for alt in ans.split("/"):
+    for alt in _ALT_SPLIT.split(ans):
         alt = alt.strip()
         if not alt:
             continue
         for exp in checker._expand_optionals(alt):
-            exp = re.sub(r"\s+", " ", exp).strip()
-            if exp:
-                variants.append(exp)
+            for piece in _ALT_SPLIT.split(exp):   # ixtiyoriy () ichidagi "yoki" ham
+                piece = re.sub(r"\s+", " ", piece).strip()
+                if piece:
+                    variants.append(piece)
     if not variants:
         variants = [ans]
     return variants if len(variants) > 1 else variants[0]

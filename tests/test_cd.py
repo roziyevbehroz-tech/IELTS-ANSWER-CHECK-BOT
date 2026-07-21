@@ -544,6 +544,17 @@ def test_render_settings_has_duration_only():
     assert "explanations" not in html
 
 
+def test_answer_value_alt_separators():
+    # "/", "yoki", "or", "или" — hammasi muqobil ajratkichi (o'qituvchi shaklidan)
+    assert render._answer_value("toothbrushes yoki toothpaste / toothbrushes", "gap") == \
+        ["toothbrushes", "toothpaste", "toothbrushes"]
+    assert set(render._answer_value("toothpaste (yoki toothbrushes)", "gap")) == \
+        {"toothpaste", "toothbrushes"}
+    assert render._answer_value("20 or 20th", "gap") == ["20", "20th"]
+    # oddiy bir so'z — string qaytadi (o'zgarmaydi)
+    assert render._answer_value("sunlight", "gap") == "sunlight"
+
+
 def test_render_duration_scales_with_passages():
     # 1→20, 2→40, 3→60 daqiqa
     p = passage_mod.parse_passage("T\n\nBody one about things here.\n")
